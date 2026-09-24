@@ -1,0 +1,59 @@
+package dev.betterlitematica.fabric;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.Text;
+import java.util.*;
+
+/** Virtual grid: only the rows intersecting the viewport are painted. */
+final class MaterialGrid extends ButtonWidget {
+    private static final int COLUMNS=5,ROW=72,GAP=6;
+    private List<PlacementAnalysis.Material> rows=List.of();
+    private List<ItemStack> icons=List.of();
+    private double scroll;private boolean dragging;
+    MaterialGrid(int x,int width,int height){super(x,0,width,height,Text.literal("材料"),b->{},DEFAULT_NARRATION_SUPPLIER);}
+    void rows(List<PlacementAnalysis.Material> next,boolean reset){
+        if(!rows.equals(next)){rows=List.copyOf(next);icons=rows.stream().map(row->new ItemStack(row.item())).toList();}
+        if(reset)scroll=0;clamp();
+    }
+    double scrollOffset(){return scroll;}
+    private int content(){return ((rows.size()+COLUMNS-1)/COLUMNS)*ROW;}
+    private int maxScroll(){return Math.max(0,content()-height);}
+    private void clamp(){scroll=Math.max(0,Math.min(scroll,maxScroll()));}
+    @Override public boolean mouseScrolled(double x,double y,double amount){if(!isMouseOver(x,y))return false;scroll-=amount*36;clamp();return true;}
+    @Override public boolean mouseClicked(double x,double y,int button){if(button!=0||!isMouseOver(x,y))return false;setFocused(true);dragging=maxScroll()>0&&x>=getX()+width-8;if(dragging)dragTo(y);return true;}
+    private void dragTo(double y){double thumb=Math.max(18,height*(double)height/Math.max(1,content()));scroll=(y-getY()-thumb/2)/Math.max(1,height-thumb)*maxScroll();clamp();}
+    @Override public boolean mouseDragged(double x,double y,int button,double dx,double dy){if(!dragging||button!=0)return false;dragTo(y);return true;}
+    @Override public boolean mouseReleased(double x,double y,int button){boolean was=dragging;dragging=false;return was;}
+    @Override public boolean keyPressed(int key,int scan,int modifiers){
+        if(key==264)scroll+=36;else if(key==265)scroll-=36;else if(key==267)scroll+=height;else if(key==266)scroll-=height;else if(key==268)scroll=0;else if(key==269)scroll=maxScroll();else return false;
+        clamp();return true;
+    }
+    @Override public void renderButton(DrawContext ctx,int mouseX,int mouseY,float delta){
+        var ui=IndependentUi.INSTANCE;int cardWidth=(width-10-(COLUMNS-1)*GAP)/COLUMNS,hover=-1;
+        ui.clip(getX(),getY(),getX()+width,getY()+height);
+        try{
+            if(rows.isEmpty())ui.text("无匹配材料",getX()+4,getY()+6,width-8,UiTheme.SECONDARY);
+            int first=Math.max(0,(int)(scroll/ROW)),last=Math.min((rows.size()+COLUMNS-1)/COLUMNS,(int)Math.ceil((scroll+height)/ROW));
+            for(int row=first;row<last;row++)for(int col=0;col<COLUMNS;col++){
+                int index=row*COLUMNS+col;if(index>=rows.size())break;var material=rows.get(index);
+                int x=getX()+col*(cardWidth+GAP);double y=getY()+row*ROW-scroll;boolean over=mouseX>=x&&mouseX<x+cardWidth&&mouseY>=Math.max(getY(),y)&&mouseY<Math.min(getY()+height,y+ROW-GAP);
+                if(over)hover=index;
+                ui.rect(x,y,x+cardWidth,y+ROW-GAP,over?UiTheme.HOVER:UiTheme.SURFACE);
+                ui.item(icons.get(index),x+4,y+4,22);
+                ui.text(material.item().getName().getString(),x+30,y+7,cardWidth-34,UiTheme.TEXT);
+                ui.text("总 "+material.total(),x+5,y+29,cardWidth-10,UiTheme.SECONDARY);
+                long missing=Math.max(0,material.total()-material.available());
+                ui.text("缺 "+missing,x+5,y+41,cardWidth-10,missing>0?UiTheme.WARNING:UiTheme.SUCCESS);
+                ui.text("有 "+material.available(),x+5,y+53,cardWidth-10,UiTheme.SECONDARY);
+            }
+        }finally{ui.unclip();}
+        if(maxScroll()>0){double thumb=Math.max(18,height*(double)height/content()),y=getY()+(height-thumb)*scroll/maxScroll();ui.rect(getX()+width-5,getY(),getX()+width-2,getY()+height,UiTheme.TRACK);ui.rect(getX()+width-5,y,getX()+width-2,y+thumb,UiTheme.ACCENT);}
+        if(hover>=0){var m=rows.get(hover);int x=Math.min(getX()+width-244,Math.max(getX(),mouseX+10)),y=Math.min(getY()+height-44,Math.max(getY(),mouseY+12));
+            ctx.getMatrices().push();ctx.getMatrices().translate(0,0,400);
+            try{ui.rect(x,y,x+240,y+42,UiTheme.TOOLTIP);ui.text(m.item().getName().getString(),x+6,y+4,228,UiTheme.TEXT);
+            int stack=Math.max(1,m.item().getMaxCount());ui.text(m.total()/stack+" 组 "+m.total()%stack+" 个 · "+(long)Math.ceil(m.total()/(stack*27.0))+" 盒",x+6,y+23,228,UiTheme.SECONDARY);
+            }finally{ctx.getMatrices().pop();}
+        }
+    }
+}

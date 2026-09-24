@@ -1,0 +1,30 @@
+.gradle/
+**/.gradle/
+**/logs/
+.tools/
+**/build/
+**/run/
+.idea/
+*.iml
+*.bpc
+*.part
+
+# Local validation captures, copied worlds and frozen binaries
+/validation/
+# Personal schematics; only generated demo fixtures belong in source control
+*.litematic
+*.schem
+*.schematic
+!examples/demo.litematic
+!examples/demo.schem
+# Archive installer metadata (not used for a Git checkout)
+/MANIFEST.sha256
+/Install-Workspace.ps1
+# Local secrets and editor/OS state
+.env
+.env.*
+*.pem
+*.key
+.vscode/
+.DS_Store
+Thumbs.db

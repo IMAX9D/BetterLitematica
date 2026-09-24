@@ -1,0 +1,14 @@
+name: Compile and core regression
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: bash scripts/test-core.sh
+      - run: bash scripts/build.sh coreCheck :fabric-1.20.1:build
+# This workflow is provided as source. No remote CI run has been performed for this delivery.

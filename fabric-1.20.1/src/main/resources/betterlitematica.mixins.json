@@ -1,0 +1,26 @@
+{
+  "required": true,
+  "package": "dev.betterlitematica.fabric.mixin",
+  "plugin": "dev.betterlitematica.fabric.OptionalMixins",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "EasyPlaceMixin",
+    "EditorKeyboardMixin",
+    "AccurateBlockItemMixin",
+    "AccurateServerMixin",
+    "PickBlockMixin",
+    "ToolScrollMixin",
+    "VerificationBlockMixin",
+    "VerificationChunkMixin",
+    "PrinterBlockUpdateMixin",
+    "SupplyInteractionMixin",
+    "ExternalMinerMixin",
+    "RenderLayerAccessor",
+    "RenderPhasesAccessor",
+    "TexturePhaseAccessor",
+    "RenderPhaseAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,110 @@
+package dev.betterlitematica.fabric;
+
+import dev.betterlitematica.core.UiViewport;
+import dev.betterlitematica.runtime.OutlineFont;
+import dev.betterlitematica.runtime.WeightedLru;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.texture.*;
+import net.minecraft.util.Identifier;
+import com.mojang.blaze3d.systems.RenderSystem;
+import java.util.*;
+import java.util.concurrent.*;
+
+/** Physical-pixel overlay. Font textures are copied 1:1, never enlarged game glyphs. */
+final class IndependentUi implements AutoCloseable {
+    static final IndependentUi INSTANCE=new IndependentUi();
+    private record Key(String text,int pixels,int color){}
+    private record Texture(Identifier id,int width,int height){long bytes(){return (long)width*height*4;}}
+    private final ThreadPoolExecutor worker=new ThreadPoolExecutor(1,1,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(32),r->{Thread t=new Thread(r,"betterlitematica-ui-font");t.setDaemon(true);return t;});
+    private final CompletableFuture<OutlineFont> loading;
+    private final Map<Key,CompletableFuture<OutlineFont.Raster>> pending=new LinkedHashMap<>();
+    private final WeightedLru<Key,Texture> textures=new WeightedLru<>(16L<<20,256,Texture::bytes,t->MinecraftClient.getInstance().getTextureManager().destroyTexture(t.id()));
+    private final LinkedHashMap<String,Float> widths=new LinkedHashMap<>(256,0.75f,true);
+    private final LinkedHashMap<String,String> trims=new LinkedHashMap<>(256,0.75f,true);
+    private final Deque<UiViewport.Clip> clips=new ArrayDeque<>();
+    private OutlineFont font;private UiViewport view;private DrawContext context;private float[] previousColor;private boolean active;
+    private int textPixels=20;
+    private IndependentUi(){loading=CompletableFuture.supplyAsync(()->{
+        var selected=OutlineFont.system();BetterLitematicaClient.LOGGER.info("UI system font: {}",selected.family());
+        if(!selected.supports("投影材料设置"))BetterLitematicaClient.LOGGER.warn("No Chinese-capable system font found; install a CJK font for menu text.");
+        return selected;
+    },worker);}
+    boolean ready(){if(font==null&&loading.isDone())font=loading.join();return font!=null;}
+    int pixels(){return textPixels;}
+    boolean begin(DrawContext ctx,UiViewport viewport){
+        view=viewport;textPixels=Math.max(16,Math.min(64,(int)Math.round(view.scale()*9.5)));
+        if(!ready())return false;
+        drain();context=ctx;ctx.draw();previousColor=RenderSystem.getShaderColor().clone();RenderSystem.setShaderColor(1,1,1,1);
+        ctx.getMatrices().push();ctx.getMatrices().loadIdentity();ctx.getMatrices().scale((float)(1/view.guiScale()),(float)(1/view.guiScale()),1);
+        active=true;return true;
+    }
+    void end(){if(!active)return;try{while(!clips.isEmpty())unclip();context.draw();}finally{context.getMatrices().pop();RenderSystem.setShaderColor(previousColor[0],previousColor[1],previousColor[2],previousColor[3]);active=false;context=null;}}
+    private void drain(){
+        int count=0;long bytes=0;
+        for(var it=pending.entrySet().iterator();it.hasNext()&&count<6&&bytes<(1<<20);){
+            var entry=it.next();if(!entry.getValue().isDone())continue;var raster=entry.getValue().join();it.remove();count++;bytes+=raster.bytes();
+            NativeImage image=new NativeImage(raster.width(),raster.height(),false);int[] argb=raster.argb();
+            for(int y=0;y<raster.height();y++)for(int x=0;x<raster.width();x++){int c=argb[x+y*raster.width()];image.setColor(x,y,(c&0xff00ff00)|((c&255)<<16)|((c>>>16)&255));}
+            NativeImageBackedTexture texture=new NativeImageBackedTexture(image);texture.setFilter(false,false);
+            Identifier id=MinecraftClient.getInstance().getTextureManager().registerDynamicTexture("betterlitematica-ui",texture);
+            textures.put(entry.getKey(),new Texture(id,raster.width(),raster.height()));
+        }
+    }
+    private Texture texture(String text,int size,int color){
+        Key key=new Key(text,size,color);Texture ready=textures.get(key);if(ready!=null)return ready;
+        if(pending.size()<24&&!pending.containsKey(key))pending.put(key,CompletableFuture.supplyAsync(()->font.raster(text,size,color),worker));
+        return null;
+    }
+    private static String bounded(String text){if(text.length()<=OutlineFont.MAX_TEXT)return text;int end=OutlineFont.MAX_TEXT-1;if(Character.isHighSurrogate(text.charAt(end-1)))end--;return text.substring(0,end)+"…";}
+    double measure(String text){return ready()?measurePixels(bounded(text),textPixels)/view.scale():0;}
+    private float measurePixels(String text,int pixels){String key=pixels+":"+text;Float result=widths.get(key);if(result==null){result=font.width(text,pixels);if(widths.size()>=1024)widths.remove(widths.keySet().iterator().next());widths.put(key,result);}return result;}
+    String trim(String text,double width){if(!ready())return "";return trimAt(text,textPixels,width);}
+    private int rasterWidthLimit(int pixels){return Math.min(OutlineFont.MAX_WIDTH-4,OutlineFont.MAX_PIXELS/((int)Math.ceil(font.lineHeight(pixels))+4)-4);}
+    private String trimAt(String text,int pixels,double width){text=bounded(text);int limit=Math.max(0,Math.min(rasterWidthLimit(pixels),(int)Math.floor(width*view.scale())));String key=pixels+":"+limit+":"+text;String result=trims.get(key);if(result==null){result=font.trim(text,pixels,limit,true);if(trims.size()>=1024)trims.remove(trims.keySet().iterator().next());trims.put(key,result);}return result;}
+    void item(net.minecraft.item.ItemStack stack,double x,double y,double size){
+        context.draw();var matrices=context.getMatrices();matrices.push();
+        try{matrices.translate(px(x),py(y),0);float scale=(float)(size*view.scale()/16);matrices.scale(scale,scale,1);context.drawItem(stack,0,0);context.draw();}
+        finally{matrices.pop();RenderSystem.setShaderColor(1,1,1,1);RenderSystem.disableBlend();}
+    }
+    void itemCount(int count,double x,double y,double width){context.getMatrices().push();context.getMatrices().translate(0,0,300);try{text(Integer.toString(count),x,y,width,UiTheme.TEXT);}finally{context.getMatrices().pop();}}
+    void rect(double x,double y,double right,double bottom,int color){context.fill(px(x),py(y),px(right),py(bottom),color);}
+    /** Physical-pixel annular sector, also used for discs (inner=0). Angles are radians. */
+    void sector(double cx,double cy,double inner,double outer,double start,double end,int color){
+        if(outer<=inner||end<=start)return;
+        context.draw();boolean depth=org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_DEPTH_TEST),cull=org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_CULL_FACE);
+        RenderSystem.disableDepthTest();RenderSystem.disableCull();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
+        try{
+            RenderSystem.setShader(net.minecraft.client.render.GameRenderer::getPositionColorProgram);
+            var buffer=net.minecraft.client.render.Tessellator.getInstance().getBuffer();var matrix=context.getMatrices().peek().getPositionMatrix();
+            buffer.begin(net.minecraft.client.render.VertexFormat.DrawMode.QUADS,net.minecraft.client.render.VertexFormats.POSITION_COLOR);
+            int steps=Math.max(1,Math.min(256,(int)Math.ceil((end-start)*outer*view.scale()/5)));
+            for(int i=0;i<steps;i++){
+                double a=start+(end-start)*i/steps,b=start+(end-start)*(i+1)/steps;
+                for(int v=0;v<4;v++){double r=v==1||v==2?outer:inner,t=v<2?a:b;buffer.vertex(matrix,(float)view.pixelX(cx+Math.cos(t)*r),(float)view.pixelY(cy+Math.sin(t)*r),0).color((color>>>16)&255,(color>>>8)&255,color&255,(color>>>24)&255).next();}
+            }
+            net.minecraft.client.render.BufferRenderer.drawWithGlobalProgram(buffer.end());
+        }finally{RenderSystem.disableBlend();if(depth)RenderSystem.enableDepthTest();if(cull)RenderSystem.enableCull();}
+    }
+    void frame(double x,double y,double right,double bottom,int color){double line=1/view.scale();rect(x,y,right,y+line,color);rect(x,bottom-line,right,bottom,color);rect(x,y,x+line,bottom,color);rect(right-line,y,right,bottom,color);}
+    void image(Identifier id,int pixels,double x,double y,double width,double height){context.draw();RenderSystem.setShaderColor(1,1,1,1);context.drawTexture(id,px(x),py(y),px(x+width)-px(x),py(y+height)-py(y),0,0,pixels,pixels,pixels,pixels);}
+    private int px(double x){return (int)Math.round(view.pixelX(x));}private int py(double y){return (int)Math.round(view.pixelY(y));}
+    void text(String text,double x,double y,double maxWidth,int color){draw(trimAt(text,textPixels,maxWidth),px(x),py(y),textPixels,color);}
+    void title(String text,double x,double y,double maxWidth,int color){int size=Math.min(64,textPixels+4);draw(trimAt(text,size,maxWidth),px(x),py(y),size,color);}
+    void centered(String text,double x,double y,double width,double height,int color){String shown=trim(text,width-12);int left=px(x)+(int)Math.round((width*view.scale()-measurePixels(shown,textPixels))/2);int top=py(y)+(int)Math.round((height*view.scale()-font.lineHeight(textPixels))/2);draw(shown,left,top,textPixels,color);}
+    private void draw(String text,int x,int y,int pixels,int color){
+        if(text.isEmpty())return;Texture run=texture(text,pixels,color);if(run==null)return;
+        context.draw();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
+        try{context.drawTexture(run.id(),x-2,y-2,0,0,run.width(),run.height(),run.width(),run.height());}
+        finally{RenderSystem.disableBlend();}
+    }
+    void clip(double left,double top,double right,double bottom){context.draw();var clip=view.clip(left,top,right,bottom);if(clips.isEmpty())context.enableScissor(0,0,view.inputWidth(),view.inputHeight());else{var parent=clips.peek();int x=Math.max(parent.x(),clip.x()),y=Math.max(parent.y(),clip.y());clip=new UiViewport.Clip(x,y,Math.max(0,Math.min(parent.x()+parent.width(),clip.x()+clip.width())-x),Math.max(0,Math.min(parent.y()+parent.height(),clip.y()+clip.height())-y));}clips.push(clip);RenderSystem.enableScissor(clip.x(),clip.y(),clip.width(),clip.height());}
+    void unclip(){context.draw();clips.pop();if(clips.isEmpty())context.disableScissor();else{var clip=clips.peek();RenderSystem.enableScissor(clip.x(),clip.y(),clip.width(),clip.height());}}
+    int hit(String text,double localX){return ready()?font.hit(text,textPixels,(float)(localX*view.scale())):0;}
+    int startForCursor(String text,int cursor,double width){return font.startForCursor(text,cursor,textPixels,(float)(width*view.scale()));}
+    String fittingText(String text,double width){return font.trim(text,textPixels,(float)Math.min(rasterWidthLimit(textPixels),width*view.scale()),false);}
+    void rawText(String text,double x,double y,int color){draw(text,px(x),py(y),textPixels,color);}
+    double lineHeight(){return font.lineHeight(textPixels)/view.scale();}
+    void clearTextures(){for(var future:pending.values())future.cancel(false);pending.clear();worker.getQueue().clear();textures.close();widths.clear();trims.clear();}
+    @Override public void close(){worker.shutdownNow();pending.clear();clearTextures();}
+}

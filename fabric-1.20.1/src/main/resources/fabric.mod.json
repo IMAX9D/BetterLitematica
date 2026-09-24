@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "betterlitematica",
+  "version": "${version}",
+  "name": "BetterLitematica",
+  "description": "Independent blueprint engine. Development preview; see VALIDATION.md.",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.betterlitematica.fabric.BetterLitematicaClient"
+    ]
+  },
+  "mixins": [
+    "betterlitematica.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.15.11",
+    "minecraft": "1.20.1",
+    "java": ">=17",
+    "fabric-api": "*"
+  },
+  "accessWidener": "betterlitematica.accesswidener"
+}

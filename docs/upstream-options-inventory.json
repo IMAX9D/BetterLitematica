@@ -1,0 +1,1586 @@
+[
+  {
+    "category": "Configs",
+    "key": "easyPlaceProtocolVersion",
+    "source": "config/Configs.java",
+    "line": 35,
+    "status": "已接入，待游戏验收",
+    "local": "AccuratePlacement: SLAB/V2/V3/AUTO"
+  },
+  {
+    "category": "Configs",
+    "key": "pasteNbtRestoreBehavior",
+    "source": "config/Configs.java",
+    "line": 36,
+    "status": "部分",
+    "local": "NBT 开关与完整 storage 回填；未提供全部恢复模式"
+  },
+  {
+    "category": "Configs",
+    "key": "pasteReplaceBehavior",
+    "source": "config/Configs.java",
+    "line": 37,
+    "status": "已接入，待游戏验收",
+    "local": "CreativeScreen / ReplaceRule"
+  },
+  {
+    "category": "Configs",
+    "key": "placementReplaceBehavior",
+    "source": "config/Configs.java",
+    "line": 38,
+    "status": "已接入，待游戏验收",
+    "local": "PlacementLayout / overlapRule"
+  },
+  {
+    "category": "Configs",
+    "key": "placementRestrictionWarn",
+    "source": "config/Configs.java",
+    "line": 39,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "selectionCornersMode",
+    "source": "config/Configs.java",
+    "line": 40,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "customSchematicBaseDirectoryEnabled",
+    "source": "config/Configs.java",
+    "line": 42,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "customSchematicBaseDirectory",
+    "source": "config/Configs.java",
+    "line": 43,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "areaSelectionsPerWorld",
+    "source": "config/Configs.java",
+    "line": 45,
+    "status": "已接入，待游戏验收",
+    "local": "SelectionLibrary / worldKey"
+  },
+  {
+    "category": "Configs",
+    "key": "betterRenderOrder",
+    "source": "config/Configs.java",
+    "line": 46,
+    "status": "独立实现差异",
+    "local": "独立最近表面合成，非原版渲染顺序开关"
+  },
+  {
+    "category": "Configs",
+    "key": "changeSelectedCornerOnMove",
+    "source": "config/Configs.java",
+    "line": 47,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "cloneAtOriginalPosition",
+    "source": "config/Configs.java",
+    "line": 48,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "commandDisableFeedback",
+    "source": "config/Configs.java",
+    "line": 49,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "commandFillMaxVolume",
+    "source": "config/Configs.java",
+    "line": 50,
+    "status": "部分",
+    "local": "配置已接入；当前合并连续线段并受区段预算约束"
+  },
+  {
+    "category": "Configs",
+    "key": "commandFillNoChunkClamp",
+    "source": "config/Configs.java",
+    "line": 51,
+    "status": "部分",
+    "local": "跨区块线段检查所有经过区块，未提供同名切换"
+  },
+  {
+    "category": "Configs",
+    "key": "commandLimitPerTick",
+    "source": "config/Configs.java",
+    "line": 52,
+    "status": "已接入，待游戏验收",
+    "local": "CommandSettings.perTick"
+  },
+  {
+    "category": "Configs",
+    "key": "commandNameClone",
+    "source": "config/Configs.java",
+    "line": 53,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "commandNameFill",
+    "source": "config/Configs.java",
+    "line": 54,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "commandNameSetblock",
+    "source": "config/Configs.java",
+    "line": 55,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "commandNameSummon",
+    "source": "config/Configs.java",
+    "line": 56,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "commandTaskInterval",
+    "source": "config/Configs.java",
+    "line": 57,
+    "status": "已接入，待游戏验收",
+    "local": "CommandSettings.interval"
+  },
+  {
+    "category": "Configs",
+    "key": "commandUseWorldEdit",
+    "source": "config/Configs.java",
+    "line": 58,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "debugLogging",
+    "source": "config/Configs.java",
+    "line": 59,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "easyPlaceFirst",
+    "source": "config/Configs.java",
+    "line": 60,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "easyPlaceHoldEnabled",
+    "source": "config/Configs.java",
+    "line": 61,
+    "status": "已接入，待游戏验收",
+    "local": "BuildingInteractions / InteractionOptions.hold"
+  },
+  {
+    "category": "Configs",
+    "key": "easyPlaceMode",
+    "source": "config/Configs.java",
+    "line": 62,
+    "status": "已接入，待游戏验收",
+    "local": "BuildingInteractions / InteractionOptions.easyPlace"
+  },
+  {
+    "category": "Configs",
+    "key": "easyPlaceSinglePlayerHandling",
+    "source": "config/Configs.java",
+    "line": 63,
+    "status": "已接入，待游戏验收",
+    "local": "AccuratePlacement / AccuratePlaceServerMixin"
+  },
+  {
+    "category": "Configs",
+    "key": "easyPlaceSwapInterval",
+    "source": "config/Configs.java",
+    "line": 64,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "easyPlaceVanillaReach",
+    "source": "config/Configs.java",
+    "line": 65,
+    "status": "独立实现差异",
+    "local": "始终遵守实际原版交互距离"
+  },
+  {
+    "category": "Configs",
+    "key": "executeRequireHoldingTool",
+    "source": "config/Configs.java",
+    "line": 66,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "fixChestMirror",
+    "source": "config/Configs.java",
+    "line": 67,
+    "status": "部分",
+    "local": "原版状态镜像与附加 NBT 变换已接线，实机双箱待验"
+  },
+  {
+    "category": "Configs",
+    "key": "fixRailRotation",
+    "source": "config/Configs.java",
+    "line": 68,
+    "status": "部分",
+    "local": "原版状态旋转已接线，复杂铁轨组合待验"
+  },
+  {
+    "category": "Configs",
+    "key": "generateLowercaseNames",
+    "source": "config/Configs.java",
+    "line": 69,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "highlightBlockInInventory",
+    "source": "config/Configs.java",
+    "line": 70,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "itemUsePacketCheckBypass",
+    "source": "config/Configs.java",
+    "line": 71,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "layerModeFollowsPlayer",
+    "source": "config/Configs.java",
+    "line": 72,
+    "status": "已接入，待游戏验收",
+    "local": "LayerScreen / followLayer"
+  },
+  {
+    "category": "Configs",
+    "key": "loadEntireSchematics",
+    "source": "config/Configs.java",
+    "line": 73,
+    "status": "独立实现差异",
+    "local": "完整源统计与局部渲染缓存分离，不强制驻留整图"
+  },
+  {
+    "category": "Configs",
+    "key": "pasteAlwaysUseFill",
+    "source": "config/Configs.java",
+    "line": 74,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "pasteIgnoreBlockEntitiesEntirely",
+    "source": "config/Configs.java",
+    "line": 75,
+    "status": "已接入，待游戏验收",
+    "local": "CreativeScreen.nbt"
+  },
+  {
+    "category": "Configs",
+    "key": "pasteIgnoreBlockEntitiesFromFill",
+    "source": "config/Configs.java",
+    "line": 76,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "pasteIgnoreCommandLimitWithNbtRestore",
+    "source": "config/Configs.java",
+    "line": 77,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "pasteIgnoreEntities",
+    "source": "config/Configs.java",
+    "line": 78,
+    "status": "已接入，待游戏验收",
+    "local": "CreativeScreen.entities"
+  },
+  {
+    "category": "Configs",
+    "key": "pasteIgnoreInventories",
+    "source": "config/Configs.java",
+    "line": 79,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "pasteToMcFunctionFiles",
+    "source": "config/Configs.java",
+    "line": 80,
+    "status": "部分",
+    "local": "单新文件 128 MiB 限额，尚未按原版分文件"
+  },
+  {
+    "category": "Configs",
+    "key": "pasteUseFillCommand",
+    "source": "config/Configs.java",
+    "line": 81,
+    "status": "部分",
+    "local": "可关闭合并；尚非原版三维 fill 归并"
+  },
+  {
+    "category": "Configs",
+    "key": "pasteUsingCommandsInSp",
+    "source": "config/Configs.java",
+    "line": 82,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "pickBlockAvoidDamageable",
+    "source": "config/Configs.java",
+    "line": 83,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "pickBlockAvoidTools",
+    "source": "config/Configs.java",
+    "line": 84,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "pickBlockEnabled",
+    "source": "config/Configs.java",
+    "line": 85,
+    "status": "已接入，待游戏验收",
+    "local": "BuildingInteractions.pick"
+  },
+  {
+    "category": "Configs",
+    "key": "pickBlockShulkers",
+    "source": "config/Configs.java",
+    "line": 86,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "pickBlockableSlots",
+    "source": "config/Configs.java",
+    "line": 87,
+    "status": "部分",
+    "local": "替换保护快捷栏已接入；全部原版选槽规则仍需核对"
+  },
+  {
+    "category": "Configs",
+    "key": "placementRestriction",
+    "source": "config/Configs.java",
+    "line": 88,
+    "status": "已接入，待游戏验收",
+    "local": "BuildingInteractions.blockClick"
+  },
+  {
+    "category": "Configs",
+    "key": "renderMaterialListInGuis",
+    "source": "config/Configs.java",
+    "line": 89,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "renderThreadNoTimeout",
+    "source": "config/Configs.java",
+    "line": 90,
+    "status": "独立实现差异",
+    "local": "构建持续遵守预算，不提供无限阻塞渲染线程选项"
+  },
+  {
+    "category": "Configs",
+    "key": "signTextPaste",
+    "source": "config/Configs.java",
+    "line": 91,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "toolItem",
+    "source": "config/Configs.java",
+    "line": 92,
+    "status": "部分",
+    "local": "可配置物品 ID；尚无完整 NBT 匹配配置"
+  },
+  {
+    "category": "Configs",
+    "key": "toolItemEnabled",
+    "source": "config/Configs.java",
+    "line": 93,
+    "status": "已接入，待游戏验收",
+    "local": "InteractionOptions.tool"
+  },
+  {
+    "category": "Configs",
+    "key": "unhideSchematicVCS",
+    "source": "config/Configs.java",
+    "line": 94,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "enableAreaSelectionBoxesRendering",
+    "source": "config/Configs.java",
+    "line": 162,
+    "status": "已接入，待游戏验收",
+    "local": "DisplayScreen / boxes"
+  },
+  {
+    "category": "Configs",
+    "key": "enablePlacementBoxesRendering",
+    "source": "config/Configs.java",
+    "line": 163,
+    "status": "已接入，待游戏验收",
+    "local": "DisplayScreen / placementBounds"
+  },
+  {
+    "category": "Configs",
+    "key": "enableRendering",
+    "source": "config/Configs.java",
+    "line": 164,
+    "status": "已接入，待游戏验收",
+    "local": "ProjectionController.rendering"
+  },
+  {
+    "category": "Configs",
+    "key": "enableSchematicBlocksRendering",
+    "source": "config/Configs.java",
+    "line": 165,
+    "status": "部分",
+    "local": "投影方块总开关与单摆放开关；实体分项未齐"
+  },
+  {
+    "category": "Configs",
+    "key": "enableSchematicOverlay",
+    "source": "config/Configs.java",
+    "line": 166,
+    "status": "部分",
+    "local": "校验错误覆盖层，受 2048 样本限额"
+  },
+  {
+    "category": "Configs",
+    "key": "enableSchematicRendering",
+    "source": "config/Configs.java",
+    "line": 167,
+    "status": "部分",
+    "local": "总投影开关；全部分项未齐"
+  },
+  {
+    "category": "Configs",
+    "key": "ghostBlockAlpha",
+    "source": "config/Configs.java",
+    "line": 168,
+    "status": "已接入，待游戏验收",
+    "local": "Placement.opacity / OverlayOpacitySlider"
+  },
+  {
+    "category": "Configs",
+    "key": "ignoreExistingFluids",
+    "source": "config/Configs.java",
+    "line": 169,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "overlayReducedInnerSides",
+    "source": "config/Configs.java",
+    "line": 170,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "placementBoxSideAlpha",
+    "source": "config/Configs.java",
+    "line": 171,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "renderAreaSelectionBoxSides",
+    "source": "config/Configs.java",
+    "line": 172,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "renderBlocksAsTranslucent",
+    "source": "config/Configs.java",
+    "line": 173,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "renderCollidingSchematicBlocks",
+    "source": "config/Configs.java",
+    "line": 174,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "renderErrorMarkerConnections",
+    "source": "config/Configs.java",
+    "line": 175,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "renderErrorMarkerSides",
+    "source": "config/Configs.java",
+    "line": 176,
+    "status": "部分",
+    "local": "面/轮廓两种样式，非原版全量标记"
+  },
+  {
+    "category": "Configs",
+    "key": "renderPlacementBoxSides",
+    "source": "config/Configs.java",
+    "line": 177,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "renderPlacementEnclosingBox",
+    "source": "config/Configs.java",
+    "line": 178,
+    "status": "部分",
+    "local": "摆放包围盒已接线，子区域选中特色尚缺"
+  },
+  {
+    "category": "Configs",
+    "key": "renderPlacementEnclosingBoxSides",
+    "source": "config/Configs.java",
+    "line": 179,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "renderTranslucentBlockInnerSides",
+    "source": "config/Configs.java",
+    "line": 180,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayEnableOutlines",
+    "source": "config/Configs.java",
+    "line": 181,
+    "status": "已接入，待游戏验收",
+    "local": "DisplayOptions.errorStyle"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayEnableSides",
+    "source": "config/Configs.java",
+    "line": 182,
+    "status": "已接入，待游戏验收",
+    "local": "DisplayOptions.errorStyle"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayModelOutline",
+    "source": "config/Configs.java",
+    "line": 183,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayModelSides",
+    "source": "config/Configs.java",
+    "line": 184,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayOutlineWidth",
+    "source": "config/Configs.java",
+    "line": 185,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayOutlineWidthThrough",
+    "source": "config/Configs.java",
+    "line": 186,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayRenderThroughBlocks",
+    "source": "config/Configs.java",
+    "line": 187,
+    "status": "已接入，待游戏验收",
+    "local": "DisplayOptions.errorsThrough"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayTypeExtra",
+    "source": "config/Configs.java",
+    "line": 188,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayTypeMissing",
+    "source": "config/Configs.java",
+    "line": 189,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayTypeWrongBlock",
+    "source": "config/Configs.java",
+    "line": 190,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayTypeWrongState",
+    "source": "config/Configs.java",
+    "line": 191,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicVerifierUseBlockModels",
+    "source": "config/Configs.java",
+    "line": 192,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "blockInfoLinesAlignment",
+    "source": "config/Configs.java",
+    "line": 233,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "blockInfoOverlayAlignment",
+    "source": "config/Configs.java",
+    "line": 234,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "infoHudAlignment",
+    "source": "config/Configs.java",
+    "line": 235,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "toolHudAlignment",
+    "source": "config/Configs.java",
+    "line": 236,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "blockInfoLinesEnabled",
+    "source": "config/Configs.java",
+    "line": 238,
+    "status": "已接入，待游戏验收",
+    "local": "ProjectionInformation"
+  },
+  {
+    "category": "Configs",
+    "key": "blockInfoLinesFontScale",
+    "source": "config/Configs.java",
+    "line": 239,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "blockInfoLinesOffsetX",
+    "source": "config/Configs.java",
+    "line": 240,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "blockInfoLinesOffsetY",
+    "source": "config/Configs.java",
+    "line": 241,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "blockInfoOverlayOffsetY",
+    "source": "config/Configs.java",
+    "line": 242,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "blockInfoOverlayEnabled",
+    "source": "config/Configs.java",
+    "line": 243,
+    "status": "已接入，待游戏验收",
+    "local": "ProjectionInformation"
+  },
+  {
+    "category": "Configs",
+    "key": "infoHudMaxLines",
+    "source": "config/Configs.java",
+    "line": 244,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "infoHudOffsetX",
+    "source": "config/Configs.java",
+    "line": 245,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "infoHudOffsetY",
+    "source": "config/Configs.java",
+    "line": 246,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "infoHudScale",
+    "source": "config/Configs.java",
+    "line": 247,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "infoOverlaysTargetFluids",
+    "source": "config/Configs.java",
+    "line": 248,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "materialListHudMaxLines",
+    "source": "config/Configs.java",
+    "line": 249,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "materialListHudScale",
+    "source": "config/Configs.java",
+    "line": 250,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "statusInfoHud",
+    "source": "config/Configs.java",
+    "line": 251,
+    "status": "已接入，待游戏验收",
+    "local": "ProjectionController.hud"
+  },
+  {
+    "category": "Configs",
+    "key": "statusInfoHudAuto",
+    "source": "config/Configs.java",
+    "line": 252,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "toolHudOffsetX",
+    "source": "config/Configs.java",
+    "line": 253,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "toolHudOffsetY",
+    "source": "config/Configs.java",
+    "line": 254,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "toolHudScale",
+    "source": "config/Configs.java",
+    "line": 255,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "verifierErrorHilightAlpha",
+    "source": "config/Configs.java",
+    "line": 256,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "verifierErrorHilightMaxPositions",
+    "source": "config/Configs.java",
+    "line": 257,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "verifierOverlayEnabled",
+    "source": "config/Configs.java",
+    "line": 258,
+    "status": "已接入，待游戏验收",
+    "local": "ProjectionController.errorOverlay"
+  },
+  {
+    "category": "Configs",
+    "key": "warnDisabledRendering",
+    "source": "config/Configs.java",
+    "line": 259,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "areaSelectionBoxSideColor",
+    "source": "config/Configs.java",
+    "line": 295,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "hightlightBlockInInventoryColor",
+    "source": "config/Configs.java",
+    "line": 296,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "materialListHudItemCountsColor",
+    "source": "config/Configs.java",
+    "line": 297,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicRebuildBreakPlaceOverlayColor",
+    "source": "config/Configs.java",
+    "line": 298,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicRebuildBreakExceptPlaceOverlayColor",
+    "source": "config/Configs.java",
+    "line": 299,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicRebuildReplaceOverlayColor",
+    "source": "config/Configs.java",
+    "line": 300,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayColorExtra",
+    "source": "config/Configs.java",
+    "line": 301,
+    "status": "部分",
+    "local": "颜色字段已保存，颜色 UI 未接入"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayColorMissing",
+    "source": "config/Configs.java",
+    "line": 302,
+    "status": "部分",
+    "local": "颜色字段已保存，颜色 UI 未接入"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayColorWrongBlock",
+    "source": "config/Configs.java",
+    "line": 303,
+    "status": "部分",
+    "local": "颜色字段已保存，颜色 UI 未接入"
+  },
+  {
+    "category": "Configs",
+    "key": "schematicOverlayColorWrongState",
+    "source": "config/Configs.java",
+    "line": 304,
+    "status": "部分",
+    "local": "颜色字段已保存，颜色 UI 未接入"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "addSelectionBox",
+    "source": "config/Hotkeys.java",
+    "line": 10,
+    "status": "已接入，待游戏验收",
+    "local": "selectionAdd"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "cloneSelection",
+    "source": "config/Hotkeys.java",
+    "line": 11,
+    "status": "部分",
+    "local": "捕获临时摆放、变换预览、创造粘贴已接入，专门一体化入口未齐"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "deleteSelectionBox",
+    "source": "config/Hotkeys.java",
+    "line": 12,
+    "status": "已接入，待游戏验收",
+    "local": "selectionRemove"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "easyPlaceUseKey",
+    "source": "config/Hotkeys.java",
+    "line": 13,
+    "status": "已接入，待游戏验收",
+    "local": "easyPlaceHold"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "easyPlaceToggle",
+    "source": "config/Hotkeys.java",
+    "line": 14,
+    "status": "已接入，待游戏验收",
+    "local": "easyPlace"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "executeOperation",
+    "source": "config/Hotkeys.java",
+    "line": 15,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "invertGhostBlockRenderState",
+    "source": "config/Hotkeys.java",
+    "line": 16,
+    "status": "已接入，待游戏验收",
+    "local": "hideProjection"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "invertOverlayRenderState",
+    "source": "config/Hotkeys.java",
+    "line": 17,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "layerModeNext",
+    "source": "config/Hotkeys.java",
+    "line": 18,
+    "status": "已接入，待游戏验收",
+    "local": "layerMode"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "layerModePrevious",
+    "source": "config/Hotkeys.java",
+    "line": 19,
+    "status": "已接入，待游戏验收",
+    "local": "layerModePrevious"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "layerNext",
+    "source": "config/Hotkeys.java",
+    "line": 20,
+    "status": "已接入，待游戏验收",
+    "local": "layerNext"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "layerPrevious",
+    "source": "config/Hotkeys.java",
+    "line": 21,
+    "status": "已接入，待游戏验收",
+    "local": "layerPrevious"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "layerSetHere",
+    "source": "config/Hotkeys.java",
+    "line": 22,
+    "status": "已接入，待游戏验收",
+    "local": "layerPlayer"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "nudgeSelectionNegative",
+    "source": "config/Hotkeys.java",
+    "line": 23,
+    "status": "部分",
+    "local": "滚轮负向已有，专门热键尚缺"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "nudgeSelectionPositive",
+    "source": "config/Hotkeys.java",
+    "line": 24,
+    "status": "部分",
+    "local": "滚轮正向已有，专门热键尚缺"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "moveEntireSelection",
+    "source": "config/Hotkeys.java",
+    "line": 25,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "openGuiAreaSettings",
+    "source": "config/Hotkeys.java",
+    "line": 26,
+    "status": "已接入，待游戏验收",
+    "local": "selection"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "openGuiLoadedSchematics",
+    "source": "config/Hotkeys.java",
+    "line": 27,
+    "status": "部分",
+    "local": "独立资源页已接入，专门热键尚缺"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "openGuiMainMenu",
+    "source": "config/Hotkeys.java",
+    "line": 28,
+    "status": "已接入，待游戏验收",
+    "local": "menu"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "openGuiMaterialList",
+    "source": "config/Hotkeys.java",
+    "line": 29,
+    "status": "已接入，待游戏验收",
+    "local": "materials"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "openGuiPlacementSettings",
+    "source": "config/Hotkeys.java",
+    "line": 30,
+    "status": "部分",
+    "local": "配置页已接入，专门热键尚缺"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "openGuiSchematicPlacements",
+    "source": "config/Hotkeys.java",
+    "line": 31,
+    "status": "已接入，待游戏验收",
+    "local": "placements"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "openGuiSchematicProjects",
+    "source": "config/Hotkeys.java",
+    "line": 32,
+    "status": "部分",
+    "local": "项目页已接入，专门热键尚缺"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "openGuiSchematicVerifier",
+    "source": "config/Hotkeys.java",
+    "line": 33,
+    "status": "已接入，待游戏验收",
+    "local": "verifier"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "openGuiSelectionManager",
+    "source": "config/Hotkeys.java",
+    "line": 34,
+    "status": "部分",
+    "local": "选区库已接入，专门热键尚缺"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "openGuiSettings",
+    "source": "config/Hotkeys.java",
+    "line": 35,
+    "status": "已接入，待游戏验收",
+    "local": "settings"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "operationModeChangeModifier",
+    "source": "config/Hotkeys.java",
+    "line": 36,
+    "status": "部分",
+    "local": "Ctrl+滚轮以及可配工具模式键，修饰键不可单独配置"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "pickBlockFirst",
+    "source": "config/Hotkeys.java",
+    "line": 37,
+    "status": "部分",
+    "local": "原生拾取键已接线，单独组合键尚缺"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "pickBlockLast",
+    "source": "config/Hotkeys.java",
+    "line": 38,
+    "status": "已接入，待游戏验收",
+    "local": "pickLast"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "pickBlockToggle",
+    "source": "config/Hotkeys.java",
+    "line": 39,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "renderInfoOverlay",
+    "source": "config/Hotkeys.java",
+    "line": 40,
+    "status": "已接入，待游戏验收",
+    "local": "information"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "renderOverlayThroughBlocks",
+    "source": "config/Hotkeys.java",
+    "line": 41,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "rerenderSchematic",
+    "source": "config/Hotkeys.java",
+    "line": 42,
+    "status": "部分",
+    "local": "资源重载入口与热键；单纯重建网格热键尚缺"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "saveAreaAsInMemorySchematic",
+    "source": "config/Hotkeys.java",
+    "line": 43,
+    "status": "部分",
+    "local": "临时投影资源流程，完整数据缓存文件托管；热键尚缺"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "saveAreaAsSchematicToFile",
+    "source": "config/Hotkeys.java",
+    "line": 44,
+    "status": "部分",
+    "local": "选区新文件保存入口；独立热键尚缺"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "schematicEditBreakAllExcept",
+    "source": "config/Hotkeys.java",
+    "line": 45,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "schematicEditBreakPlaceAll",
+    "source": "config/Hotkeys.java",
+    "line": 46,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "schematicEditBreakPlaceDirection",
+    "source": "config/Hotkeys.java",
+    "line": 47,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "schematicEditReplaceAll",
+    "source": "config/Hotkeys.java",
+    "line": 48,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "schematicEditReplaceBlock",
+    "source": "config/Hotkeys.java",
+    "line": 49,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "schematicEditReplaceDirection",
+    "source": "config/Hotkeys.java",
+    "line": 50,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "schematicVersionCycleModifier",
+    "source": "config/Hotkeys.java",
+    "line": 51,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "schematicVersionCycleNext",
+    "source": "config/Hotkeys.java",
+    "line": 52,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "schematicVersionCyclePrevious",
+    "source": "config/Hotkeys.java",
+    "line": 53,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "selectionGrabModifier",
+    "source": "config/Hotkeys.java",
+    "line": 54,
+    "status": "部分",
+    "local": "Ctrl 与拾取键抓取已接线，修饰键不可单独配置"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "selectionGrow",
+    "source": "config/Hotkeys.java",
+    "line": 55,
+    "status": "部分",
+    "local": "Shift+Alt+滚轮扩缩已接线，专门热键尚缺"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "selectionGrowModifier",
+    "source": "config/Hotkeys.java",
+    "line": 56,
+    "status": "部分",
+    "local": "固定 Shift 修饰键，未独立配置"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "selectionNudgeModifier",
+    "source": "config/Hotkeys.java",
+    "line": 57,
+    "status": "部分",
+    "local": "固定 Alt 滚轮微调，未独立配置"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "selectionModeCycle",
+    "source": "config/Hotkeys.java",
+    "line": 58,
+    "status": "已接入，待游戏验收",
+    "local": "selectionMode"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "selectionShrink",
+    "source": "config/Hotkeys.java",
+    "line": 59,
+    "status": "部分",
+    "local": "固定滚轮收缩，专门热键尚缺"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "setAreaOrigin",
+    "source": "config/Hotkeys.java",
+    "line": 60,
+    "status": "已接入，待游戏验收",
+    "local": "selectionOrigin"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "setSelectionBoxPosition1",
+    "source": "config/Hotkeys.java",
+    "line": 61,
+    "status": "已接入，待游戏验收",
+    "local": "selectionFirst"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "setSelectionBoxPosition2",
+    "source": "config/Hotkeys.java",
+    "line": 62,
+    "status": "已接入，待游戏验收",
+    "local": "selectionSecond"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toggleAllRendering",
+    "source": "config/Hotkeys.java",
+    "line": 63,
+    "status": "已接入，待游戏验收",
+    "local": "rendering"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toggleAreaSelectionBoxesRendering",
+    "source": "config/Hotkeys.java",
+    "line": 64,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toggleSchematicRendering",
+    "source": "config/Hotkeys.java",
+    "line": 65,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toggleInfoOverlayRendering",
+    "source": "config/Hotkeys.java",
+    "line": 66,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toggleOverlayRendering",
+    "source": "config/Hotkeys.java",
+    "line": 67,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toggleOverlayOutlineRendering",
+    "source": "config/Hotkeys.java",
+    "line": 68,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toggleOverlaySideRendering",
+    "source": "config/Hotkeys.java",
+    "line": 69,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "togglePlacementBoxesRendering",
+    "source": "config/Hotkeys.java",
+    "line": 70,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "togglePlacementRestriction",
+    "source": "config/Hotkeys.java",
+    "line": 71,
+    "status": "已接入，待游戏验收",
+    "local": "restriction"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toggleSchematicBlockRendering",
+    "source": "config/Hotkeys.java",
+    "line": 72,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toggleSignTextPaste",
+    "source": "config/Hotkeys.java",
+    "line": 73,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toggleTranslucentRendering",
+    "source": "config/Hotkeys.java",
+    "line": 74,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toggleVerifierOverlayRendering",
+    "source": "config/Hotkeys.java",
+    "line": 75,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toolEnabledToggle",
+    "source": "config/Hotkeys.java",
+    "line": 76,
+    "status": "已接入，待游戏验收",
+    "local": "tool"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toolPlaceCorner1",
+    "source": "config/Hotkeys.java",
+    "line": 77,
+    "status": "部分",
+    "local": "原生攻击工具键已接线，独立重新绑定未齐"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toolPlaceCorner2",
+    "source": "config/Hotkeys.java",
+    "line": 78,
+    "status": "部分",
+    "local": "原生使用工具键已接线，独立重新绑定未齐"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toolSelectElements",
+    "source": "config/Hotkeys.java",
+    "line": 79,
+    "status": "部分",
+    "local": "原生拾取键选区对象已接线，独立重新绑定未齐"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toolSelectModifierBlock1",
+    "source": "config/Hotkeys.java",
+    "line": 80,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "toolSelectModifierBlock2",
+    "source": "config/Hotkeys.java",
+    "line": 81,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  },
+  {
+    "category": "Hotkeys",
+    "key": "unloadCurrentSchematic",
+    "source": "config/Hotkeys.java",
+    "line": 82,
+    "status": "未完成",
+    "local": "尚未完成该独立配置或快捷键；不能以相邻功能代替此项"
+  }
+]

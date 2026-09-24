@@ -1,0 +1,14 @@
+package dev.betterlitematica.fabric;
+import net.minecraft.client.render.*;
+final class OverlayLayers extends RenderPhase {
+    private OverlayLayers(){super("betterlitematica_overlays",()->{},()->{});}
+    // Vanilla ALWAYS_DEPTH_TEST is a no-op: it inherits the previous pass's depth state.
+    private static final RenderPhase.DepthTest ON_TOP=new RenderPhase.DepthTest("betterlitematica_on_top",519){
+        private boolean previous;
+        @Override public void startDrawing(){previous=org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();}
+        @Override public void endDrawing(){if(previous)com.mojang.blaze3d.systems.RenderSystem.enableDepthTest();else com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();}
+    };
+    private static final RenderLayer[] LINES={make(false,false),make(false,true)},FACES={make(true,false),make(true,true)};
+    static RenderLayer lines(boolean through){return LINES[through?1:0];}static RenderLayer faces(boolean through){return FACES[through?1:0];}
+    private static RenderLayer make(boolean face,boolean through){return RenderLayer.of("betterlitematica_overlay_"+face+"_"+through,face?VertexFormats.POSITION_COLOR:VertexFormats.LINES,face?VertexFormat.DrawMode.QUADS:VertexFormat.DrawMode.LINES,32768,false,face,RenderLayer.MultiPhaseParameters.builder().program(face?RenderPhase.COLOR_PROGRAM:RenderPhase.LINES_PROGRAM).transparency(RenderPhase.TRANSLUCENT_TRANSPARENCY).depthTest(through?ON_TOP:RenderPhase.LEQUAL_DEPTH_TEST).writeMaskState(RenderPhase.COLOR_MASK).cull(RenderPhase.DISABLE_CULLING).build(false));}
+}

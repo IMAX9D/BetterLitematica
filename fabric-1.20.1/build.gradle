@@ -1,0 +1,50 @@
+plugins { id 'fabric-loom' version '1.6.12' }
+loom { accessWidenerPath = file('src/main/resources/betterlitematica.accesswidener') }
+base { archivesName = 'betterlitematica-fabric-1.20.1' }
+dependencies {
+    minecraft 'com.mojang:minecraft:1.20.1'
+    mappings 'net.fabricmc:yarn:1.20.1+build.10:v2'
+    modImplementation 'net.fabricmc:fabric-loader:0.15.11'
+    modImplementation 'net.fabricmc.fabric-api:fabric-api:0.92.2+1.20.1'
+    implementation project(':core')
+    implementation project(':blueprint-io')
+    implementation project(':runtime')
+}
+processResources { inputs.property 'version', project.version; filesMatching('fabric.mod.json') { expand version: project.version } }
+jar {
+    from project(':core').sourceSets.main.output
+    from project(':blueprint-io').sourceSets.main.output
+    from project(':runtime').sourceSets.main.output
+}
+tasks.register('adapterCheck', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.betterlitematica.fabric.HeadlessAdapterLauncher'
+    jvmArgs '-ea', '-Xmx1G'
+}
+tasks.named('check') { dependsOn tasks.named('adapterCheck') }
+
+// Opt-in: requires a real OpenGL driver, but creates only an invisible test window.
+tasks.register('projectionGlCheck', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.betterlitematica.fabric.ProjectionDrawGlChecks'
+    jvmArgs '-ea', '-Xmx512M'
+}
+
+// Keep only the installable artifact from the successful build. Failed builds retain prior versions.
+tasks.named('build') {
+    doLast {
+        def latest = tasks.named('remapJar').get().archiveFile.get().asFile
+        if (!latest.isFile() || latest.length() == 0) {
+            throw new GradleException('Latest remapped mod JAR is missing; old artifacts were retained.')
+        }
+        latest.parentFile.eachFileMatch(~/betterlitematica-fabric-1\.20\.1-.*\.jar/) { candidate ->
+            if (candidate.isFile() && candidate.name != latest.name &&
+                !java.nio.file.Files.isSymbolicLink(candidate.toPath())) {
+                java.nio.file.Files.delete(candidate.toPath())
+                logger.lifecycle("Removed previous mod artifact: ${candidate.name}")
+            }
+        }
+    }
+}
