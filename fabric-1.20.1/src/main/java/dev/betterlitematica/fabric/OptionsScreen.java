@@ -12,7 +12,7 @@ final class OptionsScreen extends MenuScreen {
     OptionsScreen(Screen parent,ProjectionController controller){super("设置与快捷键","",parent,controller,true);}
     private String on(boolean v){return v?"开启":"关闭";}
     private void save(){controller.saveOptions();refresh();}
-    private void bind(String value){String normalized=InputBindings.normalize(value),conflict=InputBindings.conflict(controller.options().keys,selected,normalized);if(!conflict.isEmpty())throw new IllegalArgumentException("快捷键已用于："+InputBindings.label(conflict));controller.options().keys.put(selected,normalized);drafts.put(selected,normalized);controller.saveOptions();refresh();}
+    private void bind(String value){String normalized=InputBindings.normalize(value),conflict=InputBindings.conflict(controller.options().keys,selected,normalized);if(selected.equals("wheel"))ModeWheelInput.bindingCode(normalized);if(!conflict.isEmpty())throw new IllegalArgumentException("快捷键已用于："+InputBindings.label(conflict));controller.options().keys.put(selected,normalized);drafts.put(selected,normalized);controller.saveOptions();refresh();}
     private void rows(){if(list!=null)list.rows(controller.options().keys.keySet().stream().filter(k->(InputBindings.label(k)+k).toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT))).map(k->new OverlayList.Row(k,InputBindings.label(k),!controller.options().keys.get(k).isEmpty())).toList(),selected);}
     @Override protected void buildMenu(){
         button("交互设置",0,3,0,()->{recording=false;keys=false;refresh();},true,!keys);button("显示",1,3,0,()->client.setScreen(new DisplayScreen(this,controller)));button("快捷键",2,3,0,()->{keys=true;refresh();},true,keys);var s=controller.options();
@@ -27,9 +27,12 @@ final class OptionsScreen extends MenuScreen {
             search=fieldAt("搜索",query,left,40,w,100);search.setChangedListener(v->{query=v;rows();});
             if(list==null)list=new OverlayList(left,w,Math.max(40,bodyBottom-bodyTop-88),id->{selected=id;recording=false;refresh();});rows();addBody(list,88);
             chord=fieldAt(InputBindings.label(selected),drafts.getOrDefault(selected,s.keys.get(selected)),right,40,rw,120);chord.setChangedListener(v->drafts.put(selected,v));chord.setEditable(!recording);
-            buttonAt(recording?"按下组合键…":"录入按键",right,92,rw,()->{recording=true;pressed.clear();if(Screen.hasControlDown())pressed.add("CTRL");if(Screen.hasAltDown())pressed.add("ALT");if(Screen.hasShiftDown())pressed.add("SHIFT");setFocused(null);refresh();},true,recording);
+            buttonAt(recording?(selected.equals("wheel")?"按下按键…":"按下组合键…"):"录入按键",right,92,rw,()->{recording=true;pressed.clear();if(Screen.hasControlDown())pressed.add("CTRL");if(Screen.hasAltDown())pressed.add("ALT");if(Screen.hasShiftDown())pressed.add("SHIFT");setFocused(null);refresh();},true,recording);
             int half=(rw-8)/2;buttonAt("保存",right,124,half,()->bind(chord.getText()),!recording,true);buttonAt("清除",right+half+8,124,half,()->bind(""),!recording,false);
             cancelRecord=buttonAt(recording?"取消":"恢复默认",right,156,rw,()->{if(recording){recording=false;refresh();}else bind(new InteractionOptions().keys.getOrDefault(selected,""));},true,false);
+            String current=InputBindings.normalize(s.keys.get(selected));
+            if(!current.isEmpty()&&!current.contains("+")){int code=InputBindings.code(current);if(code>=0){var overlaps=java.util.Arrays.stream(client.options.allKeys).filter(k->k.matchesKey(code,-1)).map(k->net.minecraft.text.Text.translatable(k.getTranslationKey()).getString()).distinct().toList();if(!overlaps.isEmpty())caption("游戏按键重叠："+String.join("、",overlaps),right,192,rw);}}
+
         }
     }
     @Override protected void updateMenu(){if(recording&&!client.isWindowFocused()){recording=false;pressed.clear();refresh();}}

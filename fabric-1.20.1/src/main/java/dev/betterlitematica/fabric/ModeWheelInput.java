@@ -12,20 +12,32 @@ final class ModeWheelInput {
     private final ProjectionController controller;
     private final Lifecycle lifecycle=new Lifecycle();
     private boolean mouseRelease;
+    private int boundKey=GLFW.GLFW_KEY_TAB;
     ModeWheelInput(MinecraftClient client,ProjectionController controller){this.client=client;this.controller=controller;}
-    static boolean reservesTab(MinecraftClient client){return client.world!=null&&client.player!=null;}
+    static int bindingCode(String chord){
+        String key=InputBindings.normalize(chord);if(key.isEmpty())return GLFW.GLFW_KEY_UNKNOWN;
+        if(key.contains("+")||InputBindings.code(key)<0||java.util.Set.of("CTRL","ALT","SHIFT","SUPER","ESCAPE").contains(key))throw new IllegalArgumentException("轮盘请选择单个非修饰键");
+        return InputBindings.code(key);
+    }
+    static boolean reservesKey(MinecraftClient client,int key){return key>=0&&key==BetterLitematicaClient.wheelKeyCode()&&client.world!=null&&client.player!=null;}
+    static boolean reservesTab(MinecraftClient client){return reservesKey(client,GLFW.GLFW_KEY_TAB);}
+    private boolean available(){return boundKey>=0&&client.world!=null&&client.player!=null;}
+    private void synchronizeBinding(){int next=bindingCode(controller.options().keys.getOrDefault("wheel","TAB"));if(next!=boundKey){clear();boundKey=next;}}
+
     boolean key(long window,int key,int scan,int action){
-        if(window!=client.getWindow().getHandle()||key!=GLFW.GLFW_KEY_TAB)return false;
+        synchronizeBinding();
+        if(window!=client.getWindow().getHandle()||boundKey<0||key!=boundKey)return false;
         boolean down=action!=GLFW.GLFW_RELEASE;
         var decision=lifecycle.update(client.world,client.getNetworkHandler(),client.isWindowFocused(),client.player!=null,client.currentScreen,down,action==GLFW.GLFW_PRESS);
         apply(decision);
-        if(decision.consume()||reservesTab(client))clearTab();
-        return decision.consume()||reservesTab(client)&&client.currentScreen==null;
+        if(decision.consume()||available())clearTab();
+        return decision.consume()||available()&&client.currentScreen==null;
     }
     void tick(){
-        boolean held=InputUtil.isKeyPressed(client.getWindow().getHandle(),GLFW.GLFW_KEY_TAB);
+        synchronizeBinding();
+        boolean held=boundKey>=0&&InputUtil.isKeyPressed(client.getWindow().getHandle(),boundKey);
         apply(lifecycle.update(client.world,client.getNetworkHandler(),client.isWindowFocused(),client.player!=null,client.currentScreen,held,false));
-        if(reservesTab(client))clearTab();
+        if(available())clearTab();
         if(mouseRelease&&!mouseDown())mouseRelease=false;
         if(blocksWorldInput())clearMouseBindings();
     }
@@ -54,10 +66,11 @@ final class ModeWheelInput {
     private void clearMouseBindings(){clear(client.options.attackKey);clear(client.options.useKey);clear(client.options.pickItemKey);}
     private static void clear(KeyBinding binding){binding.setPressed(false);while(binding.wasPressed()){};}
     private void clearTab(){
-        int scan=GLFW.glfwGetKeyScancode(GLFW.GLFW_KEY_TAB);
-        KeyBinding.setKeyPressed(InputUtil.Type.KEYSYM.createFromCode(GLFW.GLFW_KEY_TAB),false);
+        if(boundKey<0)return;
+        int scan=GLFW.glfwGetKeyScancode(boundKey);
+        KeyBinding.setKeyPressed(InputUtil.Type.KEYSYM.createFromCode(boundKey),false);
         if(scan>=0)KeyBinding.setKeyPressed(InputUtil.Type.SCANCODE.createFromCode(scan),false);
-        if(client.options.playerListKey.matchesKey(GLFW.GLFW_KEY_TAB,scan))clear(client.options.playerListKey);
+        if(client.options.playerListKey.matchesKey(boundKey,scan))clear(client.options.playerListKey);
     }
     /** Package-visible production state machine for deterministic lifecycle regressions. */
     static final class Lifecycle {

@@ -22,6 +22,7 @@ public final class CoreTests {
     public static void main(String[] args)throws Exception{
         long started=System.nanoTime();temp=Files.createTempDirectory("betterlitematica-test-");
         try{
+            test("complete bounded directory search and cancellation",()->{checks+=DirectorySearchChecks.run(temp);});
             test("draft persistence ordering and failure recovery",()->{checks+=DraftRecoveryChecks.run(temp.resolve("recovery"));});
             test("finite material batches avoid needless switches without starvation",()->{checks+=PrinterBatchChecks.run();});
             test("movement retains printer work and scans the advancing frontier",()->{checks+=PrinterMovementChecks.run();});

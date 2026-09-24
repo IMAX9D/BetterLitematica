@@ -5,12 +5,10 @@ import dev.betterlitematica.core.LayerRange;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.*;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.*;
 import net.fabricmc.fabric.api.resource.*;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.resource.*;
 import net.minecraft.util.Identifier;
@@ -41,6 +39,7 @@ public final class BetterLitematicaClient implements ClientModInitializer {
     public static void confirmedProjectionBlock(net.minecraft.util.math.BlockPos pos,net.minecraft.block.BlockState state){var controller=activeController;if(controller!=null)controller.printer().confirmed(pos,state);}
     public static void projectionBlockChanged(net.minecraft.world.BlockView world,net.minecraft.util.math.BlockPos pos){var controller=activeController;if(controller!=null)controller.worldBlockChanged(world,pos);}
     public static void projectionChunkChanged(net.minecraft.world.BlockView world,int x,int z){var controller=activeController;if(controller!=null)controller.worldChunkChanged(world,x,z);}
+    static int wheelKeyCode(){return activeController==null?GLFW.GLFW_KEY_TAB:ModeWheelInput.bindingCode(activeController.options().keys.getOrDefault("wheel","TAB"));}
     static BuildingInteractions interactions;
     public static boolean useProjection(){return interactions!=null&&interactions.use();}
     public static boolean pickProjection(){return interactions!=null&&interactions.pick();}
@@ -53,12 +52,10 @@ public final class BetterLitematicaClient implements ClientModInitializer {
         try{PrinterColdWarmup.initialize();}catch(RuntimeException e){LOGGER.warn("Printer read-only startup preparation unavailable",e);}
         ProjectionShaders.register();
         MinecraftClient client=MinecraftClient.getInstance();ProjectionController controller=new ProjectionController(client);activeController=controller;modeWheelInput=new ModeWheelInput(client,controller);
-        KeyBinding menu=KeyBindingHelper.registerKeyBinding(new KeyBinding("key.betterlitematica.menu",InputUtil.Type.KEYSYM,GLFW.GLFW_KEY_M,"category.betterlitematica"));
         interactions=new BuildingInteractions(client,controller);
         ClientTickEvents.START_CLIENT_TICK.register(mc->{modeWheelInput.tick();menuOpen.tick(mc.world,mc.getNetworkHandler(),mc.currentScreen);});
         // Shortcut transitions are captured by inputEvent, including taps between ticks.
-        // Drain vanilla's counter only; firing it as well would duplicate M and M+key actions.
-        ClientTickEvents.END_CLIENT_TICK.register(mc->{controller.tick();while(menu.wasPressed()){}interactions.tick();if(!controller.printer().running())PrinterColdWarmup.step(mc);controller.printer().tick();});
+        ClientTickEvents.END_CLIENT_TICK.register(mc->{controller.tick();interactions.tick();if(!controller.printer().running())PrinterColdWarmup.step(mc);controller.printer().tick();});
         net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player,world,hand,pos,direction)->{
             if(world==client.world&&interactions.blockClick(true,new net.minecraft.util.hit.BlockHitResult(net.minecraft.util.math.Vec3d.ofCenter(pos),direction,pos,false)))return net.minecraft.util.ActionResult.FAIL;return net.minecraft.util.ActionResult.PASS;
         });

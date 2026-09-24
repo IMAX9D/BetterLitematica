@@ -48,6 +48,16 @@ public final class ModeWheelChecks {
         bindings.poll(keys,session,()->true,k->false,actions::add);bindings.capture(keys,session,true,k->k.equals("M"));bindings.suspend();bindings.capture(keys,session,true,k->false);bindings.poll(keys,session,()->true,k->false,actions::add);
         check(actions.isEmpty(),"A wheel tap between ticks discards the earlier queued M press");
         bindings.capture(keys,session,true,k->k.equals("M"));bindings.capture(keys,session,true,k->false);bindings.poll(keys,session,()->true,k->false,actions::add);check(actions.equals(java.util.List.of("menu")),"A fresh M tap works after the wheel release barrier");
+        check(ModeWheelInput.bindingCode("TAB")==org.lwjgl.glfw.GLFW.GLFW_KEY_TAB,"Default wheel key");
+        check(ModeWheelInput.bindingCode("F8")==org.lwjgl.glfw.GLFW.GLFW_KEY_F8,"Wheel remap key");
+        check(ModeWheelInput.bindingCode("")==org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN,"Wheel can be unbound");
+        for(String invalid:java.util.List.of("CTRL+K","MOUSE4","SHIFT","ESCAPE")){boolean rejected=false;try{ModeWheelInput.bindingCode(invalid);}catch(IllegalArgumentException e){rejected=true;}check(rejected,"Invalid wheel binding rejected");}
+        check(InputBindings.conflict(java.util.Map.of("wheel","M"),"materials","M+L").equals("wheel"),"Wheel cannot swallow a configured chord");
+        check(InputBindings.conflict(java.util.Map.of("materials","M+L"),"wheel","M").equals("materials"),"Wheel subset conflict in reverse direction");
+        var remapped=new InputBindings();actions.clear();var changed=java.util.Map.of("menu","F7","wheel","F8");
+        remapped.poll(changed,session,()->true,k->false,actions::add);
+        remapped.capture(changed,session,true,k->k.equals("F8"));remapped.capture(changed,session,true,k->false);remapped.poll(changed,session,()->true,k->false,actions::add);check(actions.isEmpty(),"Wheel has no duplicate dispatcher action");
+        remapped.capture(changed,session,true,k->k.equals("F7"));remapped.capture(changed,session,true,k->false);remapped.poll(changed,session,()->true,k->false,actions::add);check(actions.equals(java.util.List.of("menu")),"Remapped menu fires exactly once");
         return checks;
     }
     public static void main(String[] args){System.out.println("Mode wheel checks passed: "+run());}

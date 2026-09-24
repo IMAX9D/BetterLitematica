@@ -1,14 +1,14 @@
 # BetterLitematica · Minecraft 1.20.1 / Fabric
 
-独立实现的投影模组，不 fork、不复制 Litematica 代码、不依赖 MaLiLib。行为对照固定为 Litematica 0.15.3（Minecraft 1.20.1）。**0.3.55-dev 仍未达到全部功能和逻辑等价。** 逐项差距见 [功能对照](docs/LITEMATICA-PARITY.md)。
+独立实现的投影模组，不 fork、不复制 Litematica 代码、不依赖 MaLiLib。行为对照固定为 Litematica 0.15.3（Minecraft 1.20.1）。**0.3.56-dev 仍未达到全部功能和逻辑等价。** 逐项差距见 [功能对照](docs/LITEMATICA-PARITY.md)。
 
 源码仓库仅包含代码、文档和生成的演示投影；游戏存档、个人投影、缓存、构建产物和本地验收资料不纳入版本管理。
 
 ## 当前验证
 
-Windows / JDK 17：119 项核心测试、562,980 次断言及 327,459 项适配检查通过，Fabric 构建成功。0.3.54 的轮盘独立开关和仅挖掘已有隔离游戏验证；0.3.55 的总渲染入口调整已通过构建与自动检查，未追加游戏内验收。历史证据和边界见 [VALIDATION.md](VALIDATION.md)，其中 `validation/` 路径为本地资料，不随仓库上传。
+Windows / JDK 17：120 项核心测试、563,002 次断言及 327,518 项适配检查通过，Fabric 构建成功。0.3.56 的轮盘及菜单改键通过 12 项隔离游戏操作检查；测试方式、退出竞态日志和边界见 [本批修复记录](docs/UX-FIXES-0.3.56.md)。历史证据见 [VALIDATION.md](VALIDATION.md)，其中 `validation/` 为本地资料，不随仓库上传。
 
-产物：`fabric-1.20.1/build/libs/betterlitematica-fabric-1.20.1-0.3.55-dev.jar`。需要 Minecraft 1.20.1、Fabric Loader 和 Fabric API。没有其他版本的兼容性声明。
+产物：`fabric-1.20.1/build/libs/betterlitematica-fabric-1.20.1-0.3.56-dev.jar`。需要 Minecraft 1.20.1、Fabric Loader 和 Fabric API。没有其他版本的兼容性声明。
 
 ## 启动与文件位置
 
@@ -39,7 +39,7 @@ Windows / JDK 17：119 项核心测试、562,980 次断言及 327,459 项适配�
 
 ## 快捷键与工具
 
-按住 Tab 打开轮盘：一级切换总渲染或进入模式选择，二级打印/挖掘/排流体/填充为可叠加的独立开关，松开 Tab 收起。隐藏投影不停止打印。
+按住 Tab 打开轮盘：一级切换总渲染或进入模式选择，二级打印/挖掘/排流体/填充为可叠加的独立开关，松开 Tab 收起。轮盘键可在模组设置中改为其他单键或清空禁用；主菜单键也统一在模组设置中修改。隐藏投影不停止打印。
 
 默认 M 打开菜单，M+P 摆放，M+L 材料，M+V 校验，M+S 选区，M+C 设置，M+R 总渲染，M+T 选区工具开关，PageUp/PageDown 调整分层。组合键可在设置中修改；M 单键在松开时打开，避免与组合键冲突。
 

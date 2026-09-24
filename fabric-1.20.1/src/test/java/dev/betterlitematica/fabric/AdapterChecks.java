@@ -28,7 +28,7 @@ public final class AdapterChecks {
         checks+=HighlightCuboidChecks.run();
         checks+=HighlightRangeChecks.run();
         checks+=ModeWheelGeometryChecks.run();
-        checks+=ModeWheelChecks.run();
+        checks+=ModeWheelChecks.run();checks+=SubregionAndSearchChecks.run();
         var heldLight=new net.minecraft.item.ItemStack(Items.LIGHT);heldLight.getOrCreateSubNbt("BlockStateTag").putString("level","5");check(StateResolver1201.itemState(Blocks.LIGHT.getDefaultState(),heldLight).get(LightBlock.LEVEL_15)==5,"Editing keeps held light level");heldLight.getOrCreateSubNbt("BlockStateTag").putString("level","99");check(StateResolver1201.itemState(Blocks.LIGHT.getDefaultState(),heldLight).equals(Blocks.LIGHT.getDefaultState()),"Invalid item property uses placement default");heldLight.getOrCreateSubNbt("BlockStateTag").putString("missing","anything");check(StateResolver1201.itemState(Blocks.STONE.getDefaultState(),heldLight).isOf(Blocks.STONE),"Unknown item property is ignored like vanilla");
         check(BuildMaterials.forState(Blocks.AIR.getDefaultState()).isEmpty(),"Air has no item cost");
         check(BuildMaterials.forState(Blocks.STONE.getDefaultState()).get(0).item()==Items.STONE,"Stone item");

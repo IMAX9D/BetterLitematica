@@ -19,7 +19,7 @@ final class InteractionOptions {
     CommandSettings commands=new CommandSettings();
     private JsonObject preserved=new JsonObject();
     final Map<String,String> keys=new LinkedHashMap<>();
-    InteractionOptions(){keys.put("editUndo","CTRL+Z");keys.put("editRedo","CTRL+Y");keys.put("menu","M");keys.put("placements","M+P");keys.put("materials","M+L");keys.put("verifier","M+V");keys.put("selection","M+S");keys.put("settings","M+C");keys.put("rendering","M+R");keys.put("tool","M+T");keys.put("easyPlace","M+E");keys.put("layerNext","PAGE_UP");keys.put("layerPrevious","PAGE_DOWN");keys.put("printer","M+B");keys.put("printerWork","CAPS_LOCK");keys.put("printerStop","CTRL+CAPS_LOCK");keys.put("printerMode","");keys.put("information","I");keys.put("layerMode","");keys.put("layerPlayer","");keys.put("pickLast","");for(String key:List.of("easyPlaceHold","restrictionHold","hideProjection","restriction","toolMode","layerModePrevious","layerFollow","selectionFirst","selectionSecond","selectionOrigin","selectionAdd","selectionRemove","selectionMode","placementHere","rotate","reload"))keys.put(key,"");}
+    InteractionOptions(){keys.put("editUndo","CTRL+Z");keys.put("editRedo","CTRL+Y");keys.put("menu","M");keys.put("wheel","TAB");keys.put("placements","M+P");keys.put("materials","M+L");keys.put("verifier","M+V");keys.put("selection","M+S");keys.put("settings","M+C");keys.put("rendering","M+R");keys.put("tool","M+T");keys.put("easyPlace","M+E");keys.put("layerNext","PAGE_UP");keys.put("layerPrevious","PAGE_DOWN");keys.put("printer","M+B");keys.put("printerWork","CAPS_LOCK");keys.put("printerStop","CTRL+CAPS_LOCK");keys.put("printerMode","");keys.put("information","I");keys.put("layerMode","");keys.put("layerPlayer","");keys.put("pickLast","");for(String key:List.of("easyPlaceHold","restrictionHold","hideProjection","restriction","toolMode","layerModePrevious","layerFollow","selectionFirst","selectionSecond","selectionOrigin","selectionAdd","selectionRemove","selectionMode","placementHere","rotate","reload"))keys.put(key,"");}
     static InteractionOptions read(Path file)throws IOException{
         var settings=new InteractionOptions();if(!Files.exists(file))return settings;if(Files.size(file)>65536)throw new IOException("Settings too large");
         try(var reader=Files.newBufferedReader(file,StandardCharsets.UTF_8)){settings.preserved=JsonParser.parseReader(reader).getAsJsonObject();var root=settings.preserved;
@@ -33,6 +33,7 @@ final class InteractionOptions {
             if(root.has("commands")){settings.commands=new Gson().fromJson(root.get("commands"),CommandSettings.class);if(settings.commands==null)throw new IOException("Invalid command settings");settings.commands.validate();}
             if(root.has("keys")){var old=root.getAsJsonObject("keys");if(settings.keys.get("information").isBlank()&&old.has("informationDetails"))settings.keys.put("information",old.get("informationDetails").getAsString());}
             settings.keys.replaceAll((key,chord)->InputBindings.normalize(chord));
+            ModeWheelInput.bindingCode(settings.keys.get("wheel"));
             return settings;
         }catch(RuntimeException e){throw new IOException("Malformed interaction settings",e);}
     }
