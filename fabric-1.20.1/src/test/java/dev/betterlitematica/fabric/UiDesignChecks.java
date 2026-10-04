@@ -10,8 +10,25 @@ public final class UiDesignChecks {
         var font=dev.betterlitematica.runtime.OutlineFont.system();
         for(int[] size:new int[][]{{960,540},{1280,720},{1440,900},{1920,1080},{2560,1440}}){
             var view=dev.betterlitematica.core.UiViewport.fit(size[0],size[1],size[0],size[1],1);
-            check(font.lineHeight(UiTypography.bodyPixels(view.scale()))/view.scale()<=14,"Input captions fit above their fields at "+size[0]+"x"+size[1]);
-            check(font.lineHeight(UiTypography.titlePixels(view.scale()))/view.scale()<=16,"Titles fit before the divider at "+size[0]+"x"+size[1]);
+            check(font.lineHeight(UiTypography.bodyPixels(view.scale(),font))/view.scale()<=14,"Input captions fit above their fields at "+size[0]+"x"+size[1]);
+            check(font.lineHeight(UiTypography.titlePixels(view.scale(),font))/view.scale()<=16,"Titles fit before the divider at "+size[0]+"x"+size[1]);
+            int requestedBody=Math.max(12,Math.min(64,(int)Math.round(view.scale()*9.5)));
+            int requestedTitle=Math.max(12,Math.min(64,(int)Math.round(view.scale()*11.5)));
+            check(font.lineHeight(requestedBody)>14*view.scale()||UiTypography.bodyPixels(view.scale(),font)==requestedBody,"Already fitting body text retains its original size");
+            check(font.lineHeight(requestedTitle)>16*view.scale()||UiTypography.titlePixels(view.scale(),font)==requestedTitle,"Already fitting titles retain their original size");
+            for(int guiScale:new int[]{2,3,4}){
+                var scaled=dev.betterlitematica.core.UiViewport.fit(size[0],size[1],size[0]/guiScale,size[1]/guiScale,guiScale);
+                check(UiTypography.bodyPixels(scaled.scale(),font)==UiTypography.bodyPixels(view.scale(),font)&&UiTypography.titlePixels(scaled.scale(),font)==UiTypography.titlePixels(view.scale(),font),"Font fitting is independent of Minecraft GUI scale");
+            }
+        }
+        for(int pixels:new int[]{10,11}){
+            var raster=font.raster("投影Ag",pixels,0xffffffff);
+            check(java.util.Arrays.stream(raster.argb()).anyMatch(color->(color>>>24)!=0),"Small fallback font produces visible glyphs");
+            check(raster.height()>=font.lineHeight(pixels)&&raster.bytes()<=dev.betterlitematica.runtime.OutlineFont.MAX_PIXELS*4L,"Small fallback raster retains line space and pixel budget");
+        }
+        for(int pixels:new int[]{9,65}){
+            boolean rejected=false;try{font.raster("Ag",pixels,0xffffffff);}catch(IllegalArgumentException expected){rejected=true;}
+            check(rejected,"Out-of-budget font size remains rejected");
         }
         near(UiMotion.easeOut(-1),0,"Entrance is held at its initial frame before start");
         near(UiMotion.easeOut(0),0,"Entrance starts exactly at zero");

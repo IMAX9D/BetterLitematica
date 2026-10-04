@@ -36,8 +36,9 @@ final class IndependentUi implements AutoCloseable {
     int pixels(){return textPixels;}
     boolean begin(DrawContext ctx,UiViewport viewport){
         offsetX=offsetY=0;opacity=1;
-        view=viewport;textPixels=UiTypography.bodyPixels(view.scale());
+        view=viewport;
         if(!ready())return false;
+        textPixels=UiTypography.bodyPixels(view.scale(),font);
         drain();context=ctx;ctx.draw();previousColor=RenderSystem.getShaderColor().clone();RenderSystem.setShaderColor(1,1,1,1);
         ctx.getMatrices().push();ctx.getMatrices().loadIdentity();ctx.getMatrices().scale((float)(1/view.guiScale()),(float)(1/view.guiScale()),1);
         active=true;return true;
@@ -154,7 +155,7 @@ final class IndependentUi implements AutoCloseable {
     }
     private int px(double x){return (int)Math.round(view.pixelX(x+offsetX));}private int py(double y){return (int)Math.round(view.pixelY(y+offsetY));}
     void text(String text,double x,double y,double maxWidth,int color){draw(trimAt(text,textPixels,maxWidth),px(x),py(y),textPixels,color);}
-    void title(String text,double x,double y,double maxWidth,int color){int size=UiTypography.titlePixels(view.scale());draw(trimAt(text,size,maxWidth),px(x),py(y),size,color);}
+    void title(String text,double x,double y,double maxWidth,int color){int size=UiTypography.titlePixels(view.scale(),font);draw(trimAt(text,size,maxWidth),px(x),py(y),size,color);}
     void centered(String text,double x,double y,double width,double height,int color){String shown=trim(text,width-12);int left=px(x)+(int)Math.round((width*view.scale()-measurePixels(shown,textPixels))/2);int top=py(y)+(int)Math.round((height*view.scale()-font.lineHeight(textPixels))/2);draw(shown,left,top,textPixels,color);}
     private void draw(String text,int x,int y,int pixels,int color){
         if(text.isEmpty())return;Texture run=texture(text,pixels,color);if(run==null)return;

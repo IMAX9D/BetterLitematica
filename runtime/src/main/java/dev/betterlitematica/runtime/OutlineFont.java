@@ -20,6 +20,7 @@ public final class OutlineFont {
         "Source Han Sans SC","思源黑体","WenQuanYi Micro Hei","WenQuanYi Zen Hei","Arial Unicode MS"};
     private final Font base;
     private final Map<Integer,Font> sizes=new ConcurrentHashMap<>();
+    private final Map<Integer,Float> lineHeights=new ConcurrentHashMap<>();
     public record Raster(int width,int height,int[] argb) {public long bytes(){return (long)width*height*4;}}
     private OutlineFont(Font base){this.base=base;}
     public static OutlineFont system(){
@@ -43,11 +44,11 @@ public final class OutlineFont {
         try(input){return new OutlineFont(Font.createFont(Font.TRUETYPE_FONT,input));}
         catch(FontFormatException e){throw new IOException("Invalid UI font",e);}
     }
-    private Font font(int pixels){if(pixels<12||pixels>64)throw new IllegalArgumentException("UI font size outside budget");return sizes.computeIfAbsent(pixels,p->base.deriveFont((float)p));}
+    private Font font(int pixels){if(pixels<10||pixels>64)throw new IllegalArgumentException("UI font size outside budget");return sizes.computeIfAbsent(pixels,p->base.deriveFont((float)p));}
     private TextLayout layout(String text,int pixels){if(text.length()>MAX_TEXT)throw new IllegalArgumentException("UI text outside budget");return new TextLayout(text,font(pixels),CONTEXT);}
     public boolean supports(String text){return base.canDisplayUpTo(text)<0;}
     public float width(String text,int pixels){return text.isEmpty()?0:layout(text,pixels).getAdvance();}
-    public float lineHeight(int pixels){var metrics=font(pixels).getLineMetrics("中文Ag",CONTEXT);return metrics.getHeight();}
+    public float lineHeight(int pixels){return lineHeights.computeIfAbsent(pixels,p->font(p).getLineMetrics("中文Ag",CONTEXT).getHeight());}
     public int hit(String text,int pixels,float x){return text.isEmpty()?0:Math.max(0,Math.min(text.length(),layout(text,pixels).hitTestChar(x,0).getInsertionIndex()));}
     public int startForCursor(String text,int cursor,int pixels,float width){
         cursor=Math.max(0,Math.min(cursor,text.length()));String prefix=text.substring(0,cursor);

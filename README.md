@@ -37,7 +37,7 @@ Linux/macOS 使用 `bash scripts/test-core.sh` 和 `bash scripts/build.sh`。中
 
 产物位于 `fabric-1.20.1/build/libs/`，完整构建成功后只保留最新可安装 JAR。Windows 开发客户端可通过 `Start-Test.cmd` 启动，游戏目录为 `fabric-1.20.1/run/`；该脚本使用 JAVA_HOME 或 PATH 中的 JDK。
 
-当前核心回归为 124 项测试、564,009 次断言，适配检查为 1,241,444 项。已有隔离游戏专项验证不代表所有服务器、投影或整合包均已通过。
+构建默认执行核心回归和 Fabric 适配检查。已有隔离游戏专项验证不代表所有服务器、投影或整合包均已通过。
 
 ## 目录
 
