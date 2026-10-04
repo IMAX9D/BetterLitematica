@@ -26,13 +26,16 @@ final class OverlayOpacitySlider extends SliderWidget {
     @Override protected void applyValue(){if(changed!=null)changed.accept(opacity());}
     @Override public void renderButton(DrawContext context,int mouseX,int mouseY,float delta){
         var ui=IndependentUi.INSTANCE;
-        ui.text(getMessage().getString(),getX(),getY(),width,UiTheme.TEXT);
-        double x=getX()+4+(width-8)*value,y=getY()+23;
-        double hover=motion.hover(isHovered()||isFocused()),radius=4.5+hover*.7-motion.pressed()*.5;
-        ui.roundRect(getX()+4,y-2,getX()+width-4,y+2,2,UiTheme.TRACK);
-        ui.roundRect(getX()+4,y-2,x,y+2,2,UiTheme.ACCENT);
+        String label=getMessage().getString();int split=label.indexOf('：');
+        if(split>0){String name=label.substring(0,split),value=label.substring(split+1);ui.text(name,getX(),getY(),width*.6,UiTheme.SECONDARY);double vw=ui.measure(value)+1;ui.text(value,getX()+width-vw,getY(),vw,UiTheme.TEXT);}
+        else ui.text(label,getX(),getY(),width,UiTheme.TEXT);
+        double x=getX()+5+(width-10)*value,y=getY()+23;
+        double hover=motion.hover(isHovered()||isFocused()),radius=5+hover*.6-motion.pressed()*.6;
+        ui.roundRect(getX()+5,y-1.5,getX()+width-5,y+1.5,1.5,UiTheme.TRACK);
+        ui.roundRect(getX()+5,y-1.5,x,y+1.5,1.5,UiTheme.ACCENT);
+        ui.ring(x-radius,y-radius,x+radius,y+radius,radius,isFocused()?1:hover*.6);
         ui.shadow(x-radius,y-radius,x+radius,y+radius,radius);
-        ui.roundRect(x-radius,y-radius,x+radius,y+radius,radius,UiTheme.INPUT);
-        ui.roundFrame(x-radius,y-radius,x+radius,y+radius,radius,UiMotion.mix(UiTheme.ACCENT,UiTheme.FOCUS,hover));
+        ui.roundRect(x-radius,y-radius,x+radius,y+radius,radius,UiTheme.DARK?UiTheme.TEXT:UiTheme.INPUT);
+        ui.roundFrame(x-radius,y-radius,x+radius,y+radius,radius,UiMotion.mix(UiTheme.BORDER_STRONG,UiTheme.ACCENT,hover));
     }
 }

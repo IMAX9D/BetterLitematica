@@ -128,7 +128,7 @@ final class ProjectionController implements AutoCloseable {
     void tick() {
         filePreviews.tick();
         cleanupEditorBaselines();releaseGpu(64,System.nanoTime()+1_000_000L);
-        if(optionsLoading!=null&&optionsLoading.isDone()){try{options=optionsLoading.join();}catch(CompletionException e){optionsWritable=false;report("设置读取失败，原文件保留："+e.getCause());}optionsLoading=null;}
+        if(optionsLoading!=null&&optionsLoading.isDone()){try{options=optionsLoading.join();}catch(CompletionException e){optionsWritable=false;report("设置读取失败，原文件保留："+e.getCause());}optionsLoading=null;UiTheme.apply(UiTheme.Palette.parse(options.display.uiTheme));}
         for (var iterator = background.entrySet().iterator(); iterator.hasNext();) {
             var task = iterator.next(); if (!task.getValue().isDone()) continue;
             try { String result=task.getValue().join();if(task.getKey().startsWith("设置保存-")||task.getKey().startsWith("选区保存-"))BetterLitematicaClient.LOGGER.info(result);else report(result); } catch (CompletionException e) { fail(task.getKey() + "失败：" + e.getCause()); } catch(CancellationException e){report(task.getKey()+"已取消");}

@@ -20,7 +20,7 @@ final class OverlayPreview extends ClickableWidget implements AutoCloseable {
     void drawRegion(int sourceX,int sourceY,int size,double x,double y,double width,double height){
         if(texture!=null)IndependentUi.INSTANCE.imageRegion(texture,side,sourceX,sourceY,size,size,x,y,width,height);
     }
-    @Override public void renderButton(DrawContext context,int mouseX,int mouseY,float delta){var ui=IndependentUi.INSTANCE;ui.roundRect(getX(),getY(),getX()+width,getY()+height,UiTheme.CARD_RADIUS,UiTheme.INPUT);if(texture!=null)ui.image(texture,side,getX()+3,getY()+3,width-6,height-6);ui.roundFrame(getX(),getY(),getX()+width,getY()+height,UiTheme.CARD_RADIUS,UiTheme.BORDER);}
+    @Override public void renderButton(DrawContext context,int mouseX,int mouseY,float delta){var ui=IndependentUi.INSTANCE;ui.roundRect(getX(),getY(),getX()+width,getY()+height,UiTheme.CARD_RADIUS,UiTheme.SUNKEN);if(texture!=null)ui.image(texture,side,getX()+3,getY()+3,width-6,height-6);ui.roundFrame(getX(),getY(),getX()+width,getY()+height,UiTheme.CARD_RADIUS,UiTheme.BORDER);}
     @Override protected void appendClickableNarrations(NarrationMessageBuilder builder){}
     @Override public void close(){if(texture!=null)MinecraftClient.getInstance().getTextureManager().destroyTexture(texture);else if(nativeTexture!=null)nativeTexture.close();texture=null;nativeTexture=null;}
 }

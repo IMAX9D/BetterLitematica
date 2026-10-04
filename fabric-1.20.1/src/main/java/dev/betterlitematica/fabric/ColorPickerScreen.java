@@ -63,7 +63,7 @@ final class ColorPickerScreen extends MenuScreen {
             var ui=IndependentUi.INSTANCE;Identifier id=texture();context.draw();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();try{ui.image(id,TEXTURE_SIZE,getX(),getY(),width,height);context.draw();}finally{RenderSystem.disableBlend();}
             double radius=(width-2)/2d,x=getX()+width/2d+Math.cos(hue*2*Math.PI)*saturation*radius,y=getY()+height/2d-Math.sin(hue*2*Math.PI)*saturation*radius;
             for(int row=-4;row<=4;row++){double extent=Math.sqrt(20-row*row);ui.rect(x-extent,y+row,x+extent,y+row+1,UiTheme.TEXT);if(Math.abs(row)<=2){double inner=Math.sqrt(8-row*row);ui.rect(x-inner,y+row,x+inner,y+row+1,UiTheme.INPUT);}}
-            if(isFocused())ui.roundFrame(getX()-2,getY()-2,getX()+width+2,getY()+height+2,(width+4)/2d,UiTheme.FOCUS);
+            if(isFocused())ui.roundFrame(getX()-2,getY()-2,getX()+width+2,getY()+height+2,(width+4)/2d,UiTheme.ACCENT);
         }
         @Override protected void appendClickableNarrations(NarrationMessageBuilder builder){appendDefaultNarrations(builder);}
     }

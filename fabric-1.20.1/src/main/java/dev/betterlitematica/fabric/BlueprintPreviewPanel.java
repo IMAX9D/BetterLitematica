@@ -69,7 +69,7 @@ final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseab
         }
     }
     private void drawView(int view,int x,int y,int size,boolean ready){
-        var ui=IndependentUi.INSTANCE;ui.roundRect(x,y,x+size,y+size,UiTheme.CARD_RADIUS,UiTheme.INPUT);
+        var ui=IndependentUi.INSTANCE;ui.roundRect(x,y,x+size,y+size,UiTheme.CARD_RADIUS,UiTheme.SUNKEN);
         if(ready)image.drawRegion((view%2)*256,(view/2)*256,256,x+3,y+3,size-6,size-6);
         ui.roundFrame(x,y,x+size,y+size,UiTheme.CARD_RADIUS,UiTheme.BORDER);
     }

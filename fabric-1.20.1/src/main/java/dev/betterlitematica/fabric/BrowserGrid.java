@@ -62,21 +62,20 @@ final class BrowserGrid extends ButtonWidget {
             for(int row=first;row<last;row++)for(int col=0;col<COLUMNS;col++){
                 int index=row*COLUMNS+col;if(index>=entries.size())break;var file=entries.get(index);
                 int x=getX()+col*(w+GAP);double y=getY()+row*ROW-scroll;
-                ui.roundRect(x,y,x+w,y+ROW-GAP,6,UiMotion.mix(file.path().equals(selected)?UiTheme.SELECTED:UiTheme.SURFACE,UiTheme.HOVER,motion(index).hover(index==hover)));
-                if(file.path().equals(selected))ui.roundFrame(x,y,x+w,y+ROW-GAP,6,UiTheme.ACCENT);
-                // A small folder/document silhouette avoids repeated type labels.
-                int color=file.directory()?UiTheme.ACCENT:UiTheme.SECONDARY;
-                ui.roundRect(x+5,y+8,x+13,y+17,1.5,color);
-                if(file.directory())ui.rect(x+5,y+6,x+9,y+9,color);
-                else ui.rect(x+7,y+10,x+11,y+11,UiTheme.SURFACE);
-                double tx=x+18,ty=y+(ROW-GAP-ui.lineHeight())/2.0,space=w-24;
+                boolean chosen=file.path().equals(selected);double over=motion(index).hover(index==hover);
+                int fill=chosen?UiMotion.mix(UiTheme.SELECTED,UiTheme.PRESSED,over*.6):UiMotion.alpha(UiTheme.HOVER,over);
+                if((fill>>>24)!=0)ui.roundRect(x,y,x+w,y+ROW-GAP,UiTheme.BUTTON_RADIUS,fill);
+                if(chosen)ui.roundRect(x+1,y+6,x+3,y+ROW-GAP-6,1,UiTheme.ACCENT);
+                // Folder and document glyphs replace repeated type labels.
+                ui.glyph(file.directory()?dev.betterlitematica.runtime.UiGlyphArt.Kind.FOLDER:dev.betterlitematica.runtime.UiGlyphArt.Kind.FILE,x+8,y+(ROW-GAP-13)/2.0,13,file.directory()||chosen?UiTheme.ACCENT:UiTheme.MUTED);
+                double tx=x+28,ty=y+(ROW-GAP-ui.lineHeight())/2.0-.5,space=w-34;
                 if(index==hover&&ui.measure(file.name())>space){
                     ui.clip(tx,y+2,x+w-6,y+ROW-GAP-2);
                     try{ui.rawText(file.name(),tx-marqueeOffset(ui.measure(file.name())-space,(now-hoverStart)/1e9),ty,UiTheme.TEXT);}finally{ui.unclip();}
-                }else ui.text(file.name(),tx,ty,space,UiTheme.TEXT);
+                }else ui.text(file.name(),tx,ty,space,chosen?UiTheme.TEXT:UiTheme.SECONDARY);
             }
         }finally{ui.unclip();}
-        if(maxScroll()>0){double thumb=Math.max(18,height*(double)height/content()),y=getY()+(height-thumb)*scroll/maxScroll();ui.roundRect(getX()+width-5,getY(),getX()+width-2,getY()+height,1.5,UiTheme.TRACK);ui.roundRect(getX()+width-5,y,getX()+width-2,y+thumb,1.5,UiTheme.ACCENT);}
-        if(isFocused())ui.roundFrame(getX(),getY(),getX()+width-9,getY()+height,6,UiTheme.FOCUS);
+        if(maxScroll()>0){double thumb=Math.max(18,height*(double)height/content()),y=getY()+(height-thumb)*scroll/maxScroll();ui.roundRect(getX()+width-4,getY(),getX()+width-2,getY()+height,1,UiMotion.alpha(UiTheme.TRACK,.8));ui.roundRect(getX()+width-4,y,getX()+width-2,y+thumb,1,UiTheme.THUMB);}
+        if(isFocused())ui.roundFrame(getX()-2,getY()-2,getX()+width-7,getY()+height+2,UiTheme.CARD_RADIUS,UiMotion.alpha(UiTheme.ACCENT,.5));
     }
 }

@@ -41,22 +41,28 @@ final class MaterialGrid extends ButtonWidget {
                 int index=row*COLUMNS+col;if(index>=rows.size())break;var material=rows.get(index);
                 int x=getX()+col*(cardWidth+GAP);double y=getY()+row*ROW-scroll;boolean over=mouseX>=x&&mouseX<x+cardWidth&&mouseY>=Math.max(getY(),y)&&mouseY<Math.min(getY()+height,y+ROW-GAP);
                 if(over)hover=index;
-                ui.roundRect(x,y,x+cardWidth,y+ROW-GAP,7,UiMotion.mix(UiTheme.SURFACE,UiTheme.HOVER,motion(index).hover(over)));
-                ui.item(icons.get(index),x+4,y+4,22);
-                ui.text(material.item().getName().getString(),x+30,y+7,cardWidth-34,UiTheme.TEXT);
-                ui.text("总 "+material.total(),x+5,y+29,cardWidth-10,UiTheme.SECONDARY);
+                double h=motion(index).hover(over),bottom=y+ROW-GAP;
+                ui.roundRect(x,y,x+cardWidth,bottom,UiTheme.CARD_RADIUS,UiMotion.mix(UiTheme.SURFACE,UiTheme.HOVER,h));
+                ui.roundFrame(x,y,x+cardWidth,bottom,UiTheme.CARD_RADIUS,UiMotion.mix(UiTheme.BORDER,UiTheme.BORDER_STRONG,h));ui.sheen(x,y+ui.pixel(),x+cardWidth,UiTheme.CARD_RADIUS);
+                ui.item(icons.get(index),x+6,y+6,20);
+                ui.text(material.item().getName().getString(),x+31,y+9,cardWidth-36,UiTheme.TEXT);
                 long missing=Math.max(0,material.total()-material.available());
-                ui.text("缺 "+missing,x+5,y+41,cardWidth-10,missing>0?UiTheme.WARNING:UiTheme.SUCCESS);
-                ui.text("有 "+material.available(),x+5,y+53,cardWidth-10,UiTheme.SECONDARY);
+                // Progress rail: how much of this material is already on hand.
+                double progress=material.total()<=0?1:Math.min(1,material.available()/(double)material.total()),rail=y+32;
+                ui.roundRect(x+6,rail,x+cardWidth-6,rail+2,1,UiTheme.TRACK);
+                if(progress>0)ui.roundRect(x+6,rail,x+6+(cardWidth-12)*progress,rail+2,1,missing>0?UiTheme.WARNING:UiTheme.SUCCESS);
+                String need=Long.toString(material.total());ui.text(need,x+6,y+38,cardWidth-12,UiTheme.TEXT);
+                ui.text(missing>0?"缺 "+missing:"已备齐",x+6,y+51,cardWidth-12,missing>0?UiTheme.WARNING:UiTheme.SUCCESS);
+                String have="有 "+material.available();double hw=Math.min(cardWidth*.5,ui.measure(have)+1);ui.text(have,x+cardWidth-6-hw,y+38,hw,UiTheme.MUTED);
             }
         }finally{ui.unclip();}
-        if(maxScroll()>0){double thumb=Math.max(18,height*(double)height/content()),y=getY()+(height-thumb)*scroll/maxScroll();ui.roundRect(getX()+width-5,getY(),getX()+width-2,getY()+height,1.5,UiTheme.TRACK);ui.roundRect(getX()+width-5,y,getX()+width-2,y+thumb,1.5,UiTheme.ACCENT);}
+        if(maxScroll()>0){double thumb=Math.max(18,height*(double)height/content()),y=getY()+(height-thumb)*scroll/maxScroll();ui.roundRect(getX()+width-4,getY(),getX()+width-2,getY()+height,1,UiMotion.alpha(UiTheme.TRACK,.8));ui.roundRect(getX()+width-4,y,getX()+width-2,y+thumb,1,UiTheme.THUMB);}
         if(hover>=0){var m=rows.get(hover);int x=Math.min(getX()+width-244,Math.max(getX(),mouseX+10)),y=Math.min(getY()+height-44,Math.max(getY(),mouseY+12));
             ctx.getMatrices().push();ctx.getMatrices().translate(0,0,400);
-            try{ui.shadow(x,y,x+240,y+42,7);ui.roundRect(x,y,x+240,y+42,7,UiTheme.TOOLTIP);ui.text(m.item().getName().getString(),x+6,y+4,228,UiTheme.TEXT);
+            try{MenuScreen.tooltip(ui,x,y,240,42);ui.text(m.item().getName().getString(),x+6,y+4,228,UiTheme.TEXT);
             int stack=Math.max(1,m.item().getMaxCount());ui.text(m.total()/stack+" 组 "+m.total()%stack+" 个 · "+(long)Math.ceil(m.total()/(stack*27.0))+" 盒",x+6,y+23,228,UiTheme.SECONDARY);
             }finally{ctx.getMatrices().pop();}
         }
-        if(isFocused())ui.roundFrame(getX(),getY(),getX()+width-9,getY()+height,7,UiTheme.FOCUS);
+        if(isFocused())ui.roundFrame(getX()-2,getY()-2,getX()+width-7,getY()+height+2,UiTheme.CARD_RADIUS,UiMotion.alpha(UiTheme.ACCENT,.5));
     }
 }

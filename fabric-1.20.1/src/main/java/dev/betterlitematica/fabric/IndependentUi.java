@@ -21,6 +21,9 @@ final class IndependentUi implements AutoCloseable {
     private final Map<Key,CompletableFuture<OutlineFont.Raster>> pending=new LinkedHashMap<>();
     private final WeightedLru<Key,Texture> textures=new WeightedLru<>(16L<<20,256,Texture::bytes,t->MinecraftClient.getInstance().getTextureManager().destroyTexture(t.id()));
     private final StatusBadgeTextures statusBadges=new StatusBadgeTextures();
+    private record GlyphKey(dev.betterlitematica.runtime.UiGlyphArt.Kind kind,int pixels){}
+    private final Map<GlyphKey,CompletableFuture<dev.betterlitematica.runtime.UiGlyphArt.Raster>> pendingGlyphs=new LinkedHashMap<>();
+    private final WeightedLru<GlyphKey,Texture> glyphs=new WeightedLru<>(4L<<20,192,Texture::bytes,t->MinecraftClient.getInstance().getTextureManager().destroyTexture(t.id()));
     private final LinkedHashMap<String,Float> widths=new LinkedHashMap<>(256,0.75f,true);
     private final LinkedHashMap<String,String> trims=new LinkedHashMap<>(256,0.75f,true);
     private final Deque<UiViewport.Clip> clips=new ArrayDeque<>();
@@ -39,7 +42,7 @@ final class IndependentUi implements AutoCloseable {
         view=viewport;
         if(!ready())return false;
         textPixels=UiTypography.bodyPixels(view.scale(),font);
-        drain();context=ctx;ctx.draw();previousColor=RenderSystem.getShaderColor().clone();RenderSystem.setShaderColor(1,1,1,1);
+        drain();drainGlyphs();context=ctx;ctx.draw();previousColor=RenderSystem.getShaderColor().clone();RenderSystem.setShaderColor(1,1,1,1);
         ctx.getMatrices().push();ctx.getMatrices().loadIdentity();ctx.getMatrices().scale((float)(1/view.guiScale()),(float)(1/view.guiScale()),1);
         active=true;return true;
     }
@@ -66,6 +69,28 @@ final class IndependentUi implements AutoCloseable {
             textures.put(entry.getKey(),new Texture(id,raster.width(),raster.height()));
         }
     }
+    private void drainGlyphs(){
+        int count=0;
+        for(var it=pendingGlyphs.entrySet().iterator();it.hasNext()&&count<8;){
+            var entry=it.next();if(!entry.getValue().isDone())continue;it.remove();count++;
+            dev.betterlitematica.runtime.UiGlyphArt.Raster raster;try{raster=entry.getValue().join();}catch(RuntimeException failed){continue;}
+            NativeImage image=new NativeImage(raster.size(),raster.size(),false);int[] argb=raster.argb();
+            for(int y=0;y<raster.size();y++)for(int x=0;x<raster.size();x++){int c=argb[x+y*raster.size()];image.setColor(x,y,(c&0xff00ff00)|((c&255)<<16)|((c>>>16)&255));}
+            NativeImageBackedTexture texture=new NativeImageBackedTexture(image);texture.setFilter(false,false);
+            Identifier id=MinecraftClient.getInstance().getTextureManager().registerDynamicTexture("betterlitematica-glyph",texture);
+            glyphs.put(entry.getKey(),new Texture(id,raster.size(),raster.size()));
+        }
+    }
+    /** Vector line icon at its exact physical size, tinted with any theme colour. */
+    void glyph(dev.betterlitematica.runtime.UiGlyphArt.Kind kind,double x,double y,double size,int color){
+        int pixels=Math.max(dev.betterlitematica.runtime.UiGlyphArt.MIN_PIXELS,Math.min(dev.betterlitematica.runtime.UiGlyphArt.MAX_PIXELS,(int)Math.round(size*view.scale())));
+        var key=new GlyphKey(kind,pixels);Texture ready=glyphs.get(key);
+        if(ready==null){if(pendingGlyphs.size()<48&&!pendingGlyphs.containsKey(key))try{pendingGlyphs.put(key,CompletableFuture.supplyAsync(()->dev.betterlitematica.runtime.UiGlyphArt.raster(kind,pixels),worker));}catch(RejectedExecutionException busy){}return;}
+        int left=(int)Math.round(view.pixelX(x+offsetX+size/2)-pixels/2d),top=(int)Math.round(view.pixelY(y+offsetY+size/2)-pixels/2d);
+        context.draw();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
+        try{RenderSystem.setShaderColor((color>>>16&255)/255f,(color>>>8&255)/255f,(color&255)/255f,(float)((color>>>24)/255d*opacity));context.drawTexture(ready.id(),left,top,0,0,pixels,pixels,pixels,pixels);context.draw();}
+        finally{RenderSystem.setShaderColor(1,1,1,1);RenderSystem.disableBlend();}
+    }
     private Texture texture(String text,int size,int color){
         Key key=new Key(text,size,color);Texture ready=textures.get(key);if(ready!=null)return ready;
         if(pending.size()<24&&!pending.containsKey(key))pending.put(key,CompletableFuture.supplyAsync(()->font.raster(text,size,color),worker));
@@ -86,10 +111,29 @@ final class IndependentUi implements AutoCloseable {
     void rect(double x,double y,double right,double bottom,int color){context.fill(px(x),py(y),px(right),py(bottom),UiMotion.alpha(color,opacity));}
     void roundRect(double x,double y,double right,double bottom,double radius,int color){rounded(x,y,right,bottom,radius,color,false);}
     void roundFrame(double x,double y,double right,double bottom,double radius,int color){rounded(x,y,right,bottom,radius,color,true);}
+    /** Small controls: a tight contact shadow. */
     void shadow(double x,double y,double right,double bottom,double radius){
-        roundRect(x-3,y+1,right+3,bottom+5,radius+3,0x05232b3e);
-        roundRect(x-1.5,y+1,right+1.5,bottom+3,radius+1.5,0x08232b3e);
-        roundRect(x-.5,y+1,right+.5,bottom+2,radius+.5,UiTheme.SHADOW);
+        roundRect(x-2,y+1,right+2,bottom+4,radius+2,UiTheme.SHADOW_AMBIENT);
+        roundRect(x-1,y+1,right+1,bottom+2.5,radius+1,UiTheme.SHADOW_AMBIENT);
+        roundRect(x-.5,y+.5,right+.5,bottom+1.5,radius+.5,UiMotion.alpha(UiTheme.SHADOW,.55));
+    }
+    /** Resting controls on light paper: one crisp pixel of contact, no blur. */
+    void contact(double x,double y,double right,double bottom,double radius){roundRect(x,y+1,right,bottom+1,radius,UiMotion.alpha(UiTheme.SHADOW,.7));}
+    /** Floating surfaces: a wide, soft ambient falloff under a crisp key shadow. */
+    void elevation(double x,double y,double right,double bottom,double radius){
+        for(int i=6;i>=1;i--){double spread=i*3.2;roundRect(x-spread,y-spread*.45+i*1.4,right+spread,bottom+spread+i*1.6,radius+spread,UiMotion.alpha(UiTheme.SHADOW_AMBIENT,1.15-i*.12));}
+        roundRect(x-1,y+1,right+1,bottom+3,radius+1,UiMotion.alpha(UiTheme.SHADOW,.6));
+    }
+    /** Soft focus halo drawn outside a control. */
+    void ring(double x,double y,double right,double bottom,double radius,double strength){
+        if(strength<=.01)return;
+        roundFrame(x-2,y-2,right+2,bottom+2,radius+2,UiMotion.alpha(UiTheme.RING,strength*.55));
+        roundFrame(x-1,y-1,right+1,bottom+1,radius+1,UiMotion.alpha(UiTheme.RING,strength));
+    }
+    /** One physical pixel of light along the inside top edge; gives dark surfaces their lift. */
+    void sheen(double x,double y,double right,double radius){
+        if((UiTheme.SHEEN>>>24)==0)return;double inset=Math.max(radius*.7,1);
+        rect(x+inset,y,right-inset,y+1/view.scale(),UiTheme.SHEEN);
     }
     /** Rounded coverage is batched in the normal GUI layer; no extra shader/FBO per control. */
     private void rounded(double x,double y,double right,double bottom,double radius,int color,boolean outline){
@@ -144,10 +188,10 @@ final class IndependentUi implements AutoCloseable {
         try{RenderSystem.setShaderColor(1,1,1,(float)opacity);context.drawTexture(id,px(x),py(y),px(x+width)-px(x),py(y+height)-py(y),sourceX,sourceY,sourceWidth,sourceHeight,pixels,pixels);context.draw();}
         finally{RenderSystem.setShaderColor(1,1,1,1);RenderSystem.disableBlend();}
     }
-    void prepareStatusBadges(double diameter){statusBadges.prepare(statusBadgePixels(diameter));}
+    void prepareStatusBadges(double diameter){statusBadges.prepare(statusBadgePixels(diameter),UiTheme.DARK);}
     private int statusBadgePixels(double diameter){return Math.max(12,Math.min(192,(int)Math.round(diameter*view.scale())));}
     void statusBadge(dev.betterlitematica.runtime.StatusBadgeArt.Kind kind,double x,double y,double diameter){
-        var texture=statusBadges.get(kind,statusBadgePixels(diameter));if(texture==null)return;
+        var texture=statusBadges.get(kind,statusBadgePixels(diameter),UiTheme.DARK);if(texture==null)return;
         context.draw();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
         // Exact physical-pixel blit: supersampled curves must not be rescaled with the game GUI.
         try{RenderSystem.setShaderColor(1,1,1,(float)opacity);context.drawTexture(texture.id(),px(x)-texture.padding(),py(y)-texture.padding(),0,0,texture.size(),texture.size(),texture.size(),texture.size());context.draw();}
@@ -170,6 +214,9 @@ final class IndependentUi implements AutoCloseable {
     String fittingText(String text,double width){return font.trim(text,textPixels,(float)Math.min(rasterWidthLimit(textPixels),width*view.scale()),false);}
     void rawText(String text,double x,double y,int color){draw(text,px(x),py(y),textPixels,color);}
     double lineHeight(){return font.lineHeight(textPixels)/view.scale();}
-    void clearTextures(){for(var future:pending.values())future.cancel(false);pending.clear();worker.getQueue().clear();textures.close();widths.clear();trims.clear();statusBadges.clear();}
+    double titleLineHeight(){return font.lineHeight(UiTypography.titlePixels(view.scale(),font))/view.scale();}
+    double measureTitle(String text){if(!ready())return 0;int size=UiTypography.titlePixels(view.scale(),font);return measurePixels(bounded(text),size)/view.scale();}
+    double pixel(){return 1/view.scale();}
+    void clearTextures(){for(var future:pending.values())future.cancel(false);pending.clear();worker.getQueue().clear();textures.close();widths.clear();trims.clear();statusBadges.clear();for(var future:pendingGlyphs.values())future.cancel(false);pendingGlyphs.clear();glyphs.close();}
     @Override public void close(){worker.shutdownNow();pending.clear();clearTextures();statusBadges.close();}
 }

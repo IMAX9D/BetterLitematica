@@ -25,7 +25,7 @@ final class PrinterScreen extends MenuScreen {
         readers.clear();fields.clear();
         addBody(new OverlayLabel(left,innerWidth,"启用投影 · "+controller.printerPlacements().size()),0);
         String[] tabs={"施工","通用","策略","过滤","性能","高亮"};
-        for(int i=0;i<tabs.length;i++){int next=i;buttonAt(tabs[i],cellX(i,tabs.length),26,cellWidth(tabs.length),()->{read();tab=next;refresh();},true,tab==i);}
+        for(int i=0;i<tabs.length;i++){int next=i;tabAt(tabs[i],cellX(i,tabs.length),26,cellWidth(tabs.length),()->{read();tab=next;refresh();},tab==i);}
         if(tab==0)workPage();else if(tab==1)settingsPage();else if(tab==2)strategyPage();else if(tab==3)filtersPage();else if(tab==4)performancePage();else highlightPage();
         work=fixed("开始",0,72,()->{
             var engine=controller.printer();

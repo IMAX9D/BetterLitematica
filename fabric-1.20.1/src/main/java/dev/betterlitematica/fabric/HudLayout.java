@@ -23,7 +23,10 @@ record HudLayout(UiViewport viewport,double left,double top,double right,double 
     }
     double toolBottom(){return bottom-32;}
     static void card(IndependentUi ui,double x,double y,double width,double height){
-        ui.shadow(x,y,x+width,y+height,7);
-        ui.roundRect(x,y,x+width,y+height,7,UiTheme.OVERLAY_PANEL);
+        double radius=UiTheme.CARD_RADIUS;
+        ui.shadow(x,y,x+width,y+height,radius);
+        ui.roundRect(x,y,x+width,y+height,radius,UiTheme.OVERLAY_PANEL);
+        ui.roundFrame(x,y,x+width,y+height,radius,UiMotion.alpha(UiTheme.BORDER,.85));
+        ui.sheen(x,y+ui.pixel(),x+width,radius);
     }
 }

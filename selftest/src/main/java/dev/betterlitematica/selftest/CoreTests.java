@@ -23,6 +23,7 @@ public final class CoreTests {
         long started=System.nanoTime();temp=Files.createTempDirectory("betterlitematica-test-");
         try{
             test("antialiased status badges and bounded physical rasters",()->{checks+=StatusBadgeChecks.run();});
+            test("tintable vector glyphs at exact physical sizes",()->{checks+=UiGlyphChecks.run();});
             test("complete source previews, embedded digests and bounded cache",()->{checks+=SchematicPreviewChecks.run(temp.resolve("previews"));});
             test("axis handle geometry and stable signed grid dragging",()->{checks+=AxisGizmoChecks.run();});
             test("placement quantity uses byte budgets not fixed counts",()->{checks+=UnlimitedPlacementChecks.run();});

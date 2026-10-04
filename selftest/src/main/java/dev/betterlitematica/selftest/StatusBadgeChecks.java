@@ -41,6 +41,17 @@ public final class StatusBadgeChecks {
             boolean equalCoverage=true;for(int n=0;n<running.length;n++)equalCoverage&=(running[n]>>>24)==(stopped[n]>>>24);
             check(equalCoverage,"Printer changes color without changing geometry or coverage");
         }
+        for(int diameter:new int[]{12,24,48,192}){
+            int edge=diameter+StatusBadgeArt.padding(diameter)*2;
+            var lightEye=StatusBadgeArt.raster(StatusBadgeArt.Kind.EYE_OPEN,diameter,false);var darkEye=StatusBadgeArt.raster(StatusBadgeArt.Kind.EYE_OPEN,diameter,true);
+            check(darkEye.width()==edge&&darkEye.height()==edge,"Dark badges keep the same footprint and hit target");
+            check(!Arrays.equals(lightEye.argb(),darkEye.argb()),"Dark badges use a graphite surface");
+            int[] on=StatusBadgeArt.raster(StatusBadgeArt.Kind.PRINTER_ON,diameter,true).argb(),off=StatusBadgeArt.raster(StatusBadgeArt.Kind.PRINTER_OFF,diameter,true).argb();
+            int green=0;for(int p:on){int a=p>>>24,r=(p>>>16)&255,g=(p>>>8)&255,b=p&255;if(a>220&&g>r+35&&g>b+20)green++;}
+            int offGreen=0;for(int p:off){int a=p>>>24,r=(p>>>16)&255,g=(p>>>8)&255,b=p&255;if(a>220&&g>r+35&&g>b+20)offGreen++;}
+            check(green>0&&offGreen==0,"Only the running dark printer is green");
+            boolean clear=true;for(int n=0;n<edge;n++)clear&=on[n]==0&&on[on.length-1-n]==0;check(clear,"Dark shadow stays inside its padding");
+        }
         for(int diameter:new int[]{Integer.MIN_VALUE,-1,0,11,193,Integer.MAX_VALUE}){
             try{StatusBadgeArt.raster(StatusBadgeArt.Kind.EYE_OPEN,diameter);throw new AssertionError("Unsupported diameter accepted");}
             catch(IllegalArgumentException expected){checks++;}

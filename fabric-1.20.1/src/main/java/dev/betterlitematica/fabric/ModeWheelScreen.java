@@ -92,26 +92,41 @@ final class ModeWheelScreen extends MenuScreen {
         client.setScreen(null);
     }
     private void drawCard(IndependentUi ui,DrawContext ctx,int x,int y,float delta){
-        int bottom=controller.wheelRenderMode()==WheelRenderMode.RANGE?242:200;ui.shadow(CARD_X,CARD_TOP,CARD_RIGHT,bottom,8);ui.roundRect(CARD_X,CARD_TOP,CARD_RIGHT,bottom,8,UiTheme.OVERLAY_PANEL);ui.roundFrame(CARD_X,CARD_TOP,CARD_RIGHT,bottom,8,UiTheme.BORDER);
-        ui.text(controller.wheelRenderMode().label(),CARD_X+10,CARD_TOP+9,CARD_RIGHT-CARD_X-20,UiTheme.TEXT);
-        for(var field:new OverlayTextField[]{firstField,secondField})if(field!=null){ui.text(field.getMessage().getString(),CARD_X+10,field.getY()-14,CARD_RIGHT-CARD_X-20,UiTheme.SECONDARY);ui.roundRect(field.getX()-6,field.getY()-1,field.getX()+field.getWidth()+6,field.getY()+21,4,UiTheme.INPUT);ui.roundFrame(field.getX()-6,field.getY()-1,field.getX()+field.getWidth()+6,field.getY()+21,4,field.isFocused()?UiTheme.ACCENT:UiTheme.BORDER);field.render(ctx,x,y,delta);}
+        int bottom=controller.wheelRenderMode()==WheelRenderMode.RANGE?242:200;HudLayout.card(ui,CARD_X,CARD_TOP,CARD_RIGHT-CARD_X,bottom-CARD_TOP);
+        ui.text(controller.wheelRenderMode().label(),CARD_X+10,CARD_TOP+9,CARD_RIGHT-CARD_X-20,UiTheme.TEXT);ui.rect(CARD_X+10,CARD_TOP+26,CARD_RIGHT-10,CARD_TOP+26+ui.pixel(),UiTheme.DIVIDER);
+        for(var field:new OverlayTextField[]{firstField,secondField})if(field!=null){ui.text(field.getMessage().getString(),CARD_X+10,field.getY()-14,CARD_RIGHT-CARD_X-20,UiTheme.MUTED);MenuScreen.paintFieldStatic(ui,field);field.render(ctx,x,y,delta);}
         for(var control:new ButtonWidget[]{firstPlayer,secondPlayer})if(control!=null)control.render(ctx,x,y,delta);
     }
     private void drawWheel(IndependentUi ui,DrawContext ctx,int x,int y,float delta){
         double progress=UiMotion.easeOut(Math.min(1,(System.nanoTime()-transition)/160_000_000d));ui.effect(0,0,progress);
         try{
-            double cx=centerX();ui.sector(cx,CY+3,0,OUTER+5,0,Math.PI*2,UiMotion.alpha(UiTheme.TEXT,.06));double centerHover=centerMotion.hover(page!=Page.MAIN&&Math.hypot(x-cx,y-CY)<INNER-5);
-            ui.sector(cx,CY,0,INNER-5,0,Math.PI*2,UiMotion.mix(UiTheme.OVERLAY_PANEL,UiTheme.OVERLAY_SELECTED,centerHover));ui.sector(cx,CY,INNER-6,INNER-5,0,Math.PI*2,UiTheme.BORDER);
+            double cx=centerX();
+            // Soft halo under the ring, then a hairline rim; no hard drop shadow over the world.
+            for(int i=4;i>=1;i--)ui.sector(cx,CY+2,0,OUTER+i*3,0,Math.PI*2,UiMotion.alpha(UiTheme.SHADOW_AMBIENT,UiTheme.DARK?1.6:1.2));
+            double centerHover=centerMotion.hover(page!=Page.MAIN&&Math.hypot(x-cx,y-CY)<INNER-5);
+            ui.sector(cx,CY,0,INNER-5,0,Math.PI*2,UiMotion.mix(UiTheme.OVERLAY_PANEL,UiTheme.OVERLAY_SELECTED,centerHover));ui.sector(cx,CY,INNER-5.6,INNER-5,0,Math.PI*2,UiMotion.mix(UiTheme.BORDER,UiTheme.ACCENT,centerHover));
             int count=page==Page.MAIN?4:page==Page.MODES?MODES.length:RENDER_MODES.length+2,hover=sectorAt(x,y,count,cx);double step=Math.PI*2/count;
             for(int i=0;i<count;i++){
                 boolean on=page==Page.MODES?MODES[i].enabled(controller.options().printer):page==Page.RENDER?i<RENDER_MODES.length&&RENDER_MODES[i]==controller.wheelRenderMode():i==1&&controller.projectionRenderingEnabled();
                 double center=-Math.PI/2+i*step,start=center-step/2+.02,end=center+step/2-.02;var motion=page==Page.MODES?modeMotion[i]:page==Page.RENDER?renderMotion[i]:mainMotion[i];boolean enabled=page!=Page.RENDER||i<RENDER_MODES.length||controller.wheelRenderMode().editable();double over=motion.hover(enabled&&hover==i);
-                int fill=enabled?UiMotion.mix(on?UiTheme.OVERLAY_SELECTED:UiTheme.OVERLAY_SURFACE,UiTheme.OVERLAY_SELECTED,over):UiTheme.DISABLED;fill=UiMotion.mix(fill,UiTheme.OVERLAY_PANEL,motion.pressed()*.4);ui.sector(cx,CY,INNER,OUTER,start,end,fill);ui.sector(cx,CY,OUTER-.6,OUTER,start,end,UiMotion.mix(UiTheme.BORDER,UiTheme.FOCUS,over));if(on)ui.sector(cx,CY,OUTER-3,OUTER-1.5,start+.12,end-.12,UiTheme.ACCENT);
+                int fill=enabled?UiMotion.mix(UiTheme.OVERLAY_PANEL,UiTheme.OVERLAY_SELECTED,Math.max(over,on?.55:0)):UiMotion.alpha(UiTheme.DISABLED,.85);fill=UiMotion.mix(fill,UiTheme.OVERLAY_SURFACE,motion.pressed()*.5);ui.sector(cx,CY,INNER,OUTER,start,end,fill);
+                ui.sector(cx,CY,OUTER-.6,OUTER,start,end,UiMotion.alpha(UiTheme.BORDER,.9));ui.sector(cx,CY,INNER,INNER+.6,start,end,UiMotion.alpha(UiTheme.BORDER,.9));
+                if(over>.01)ui.sector(cx,CY,OUTER-2.2,OUTER,start+.04,end-.04,UiMotion.alpha(UiTheme.ACCENT,over));
+                if(on)ui.sector(cx,CY,INNER+3,INNER+5,center-.18,center+.18,UiTheme.ACCENT);
                 double lx=cx+Math.cos(center)*94,ly=CY+Math.sin(center)*94;String label=page==Page.MODES?MODES[i].label():page==Page.RENDER?(i<RENDER_MODES.length?RENDER_MODES[i].label():i==RENDER_MODES.length?"下一层":"上一层"):i==0?"模式选择":i==1?"总渲染":i==2?"渲染":"执行操作";
-                ui.centered(label,lx-42,ly-(page==Page.RENDER?10:13),84,22,!enabled?UiTheme.DISABLED_TEXT:hover==i||on?UiTheme.TEXT:UiTheme.SECONDARY);
-                if(page==Page.MODES||page==Page.MAIN&&i==1)ui.centered(page==Page.MODES&&MODES[i].mixed(controller.options().printer)?"部分":on?"开":"关",lx-24,ly+8,48,14,on?UiTheme.ACCENT:UiTheme.MUTED);
+                int labelColor=!enabled?UiTheme.DISABLED_TEXT:hover==i||on?UiTheme.TEXT:UiTheme.SECONDARY;
+                if(page==Page.MAIN){
+                    var glyph=i==0?dev.betterlitematica.runtime.UiGlyphArt.Kind.TUNE:i==1?(on?dev.betterlitematica.runtime.UiGlyphArt.Kind.EYE:dev.betterlitematica.runtime.UiGlyphArt.Kind.EYE_OFF):i==2?dev.betterlitematica.runtime.UiGlyphArt.Kind.VERSIONS:dev.betterlitematica.runtime.UiGlyphArt.Kind.SELECTION;
+                    ui.glyph(glyph,lx-8,ly-(i==1?24:20),16,hover==i||on?UiTheme.ACCENT:UiTheme.MUTED);
+                    ui.centered(label,lx-42,ly-(i==1?7:3),84,22,labelColor);
+                    if(i==1)ui.centered(on?"开":"关",lx-24,ly+12,48,14,on?UiTheme.ACCENT:UiTheme.MUTED);
+                }else{
+                    ui.centered(label,lx-42,ly-(page==Page.RENDER?10:13),84,22,labelColor);
+                    if(page==Page.MODES)ui.centered(MODES[i].mixed(controller.options().printer)?"部分":on?"开":"关",lx-24,ly+8,48,14,on?UiTheme.ACCENT:UiTheme.MUTED);
+                }
             }
-            boolean back=page!=Page.MAIN&&Math.hypot(x-cx,y-CY)<INNER-5;ui.centered(page!=Page.MAIN?"返回":"快捷操作",cx-45,CY-12,90,24,back?UiTheme.ACCENT:UiTheme.SECONDARY);
+            boolean back=page!=Page.MAIN&&Math.hypot(x-cx,y-CY)<INNER-5;if(page!=Page.MAIN){ui.glyph(dev.betterlitematica.runtime.UiGlyphArt.Kind.BACK,cx-7,CY-17,14,back?UiTheme.ACCENT:UiTheme.MUTED);ui.centered("返回",cx-45,CY-4,90,22,back?UiTheme.ACCENT:UiTheme.SECONDARY);}
+            else{ui.glyph(dev.betterlitematica.runtime.UiGlyphArt.Kind.BRAND,cx-8,CY-19,16,UiTheme.ACCENT);ui.centered("快捷操作",cx-45,CY-3,90,22,UiTheme.SECONDARY);}
             if(page==Page.MODES&&hover==1)ui.centered("投影内：错误 · 多余 · 错误状态",cx-110,CY+OUTER+14,220,20,UiTheme.SECONDARY);
             if(page==Page.RENDER&&controller.wheelRenderMode().editable())drawCard(ui,ctx,x,y,delta);if(!error.isEmpty())ui.centered(error,70,365,460,22,UiTheme.ERROR);
         }finally{ui.effect(0,0,1);}

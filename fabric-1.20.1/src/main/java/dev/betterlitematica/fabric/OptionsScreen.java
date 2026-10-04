@@ -18,7 +18,7 @@ final class OptionsScreen extends MenuScreen {
     private void rows(){if(list!=null)list.rows(controller.options().keys.keySet().stream().filter(k->(InputBindings.label(k)+k).toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT))).map(k->new OverlayList.Row(k,InputBindings.label(k),!controller.options().keys.get(k).isEmpty())).toList(),selected);}
     @Override protected void buildMenu(){
         chord=null;search=null;cancelRecord=null;
-        tabs[0]=button("交互设置",0,3,0,()->selectTab(0),true,tab==0);tabs[1]=button("显示",1,3,0,()->selectTab(1),true,tab==1);tabs[2]=button("快捷键",2,3,0,()->selectTab(2),true,tab==2);var s=controller.options();
+        tabs[0]=tab("交互设置",0,3,0,()->selectTab(0),tab==0);tabs[1]=tab("显示",1,3,0,()->selectTab(1),tab==1);tabs[2]=tab("快捷键",2,3,0,()->selectTab(2),tab==2);var s=controller.options();
         if(tab==1){DisplayScreen.buildControls(this,controller,2,()->client.setScreen(new LayerScreen(this,controller)),this::save);}
         else if(tab==0){
             button("选区工具："+on(s.tool),0,2,2,()->{s.tool=!s.tool;save();});button("工具设置",1,2,2,()->client.setScreen(new ToolScreen(this,controller)));

@@ -23,7 +23,7 @@ final class ColorPickerSlider extends SliderWidget {
         var ui=IndependentUi.INSTANCE;ui.text(getMessage().getString(),getX(),getY(),width,UiTheme.TEXT);
         double left=getX()+4,right=getX()+width-4,y=getY()+23;
         for(int i=0;i<32;i++){double a=left+(right-left)*i/32,b=left+(right-left)*(i+1)/32;ui.rect(a,y-4,b,y+4,(i&1)==0?UiTheme.INPUT:UiTheme.TRACK);ui.rect(a,y-4,b,y+4,color.applyAsInt(i/31d));}
-        ui.roundFrame(left,y-4,right,y+4,3,UiTheme.BORDER);double x=left+(right-left)*value,hover=motion.hover(isFocused()||isHovered());
-        ui.shadow(x-4,y-7,x+4,y+7,4);ui.roundRect(x-4,y-7,x+4,y+7,4,UiTheme.INPUT);ui.roundFrame(x-4,y-7,x+4,y+7,4,UiMotion.mix(UiTheme.BORDER,UiTheme.FOCUS,hover));
+        ui.roundFrame(left,y-4,right,y+4,3,UiTheme.BORDER_STRONG);double x=left+(right-left)*value,hover=motion.hover(isFocused()||isHovered());
+        ui.ring(x-4,y-7,x+4,y+7,4,isFocused()?1:hover*.6);ui.shadow(x-4,y-7,x+4,y+7,4);ui.roundRect(x-4,y-7,x+4,y+7,4,UiTheme.DARK?UiTheme.TEXT:UiTheme.INPUT);ui.roundFrame(x-4,y-7,x+4,y+7,4,UiMotion.mix(UiTheme.BORDER_STRONG,UiTheme.ACCENT,hover));
     }
 }

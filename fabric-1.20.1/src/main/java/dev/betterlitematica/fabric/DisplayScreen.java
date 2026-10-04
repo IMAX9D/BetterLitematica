@@ -5,6 +5,7 @@ final class DisplayScreen extends MenuScreen {
     private static void toggle(MenuScreen page,String name,boolean value,int column,int row,Runnable change,Runnable save){page.button(name+"："+(value?"开":"关"),column,2,row,()->{change.run();save.run();},true,value);}
     @Override protected void buildMenu(){buildControls(this,controller,0,()->client.setScreen(new LayerScreen(this,controller)),()->{controller.saveOptions();refresh();});}
     static void buildControls(MenuScreen page,ProjectionController controller,int row,Runnable layers,Runnable save){var s=controller.options().display;
+        page.button("界面主题："+UiTheme.Palette.parse(s.uiTheme).label,1,2,row+6,()->{var next=UiTheme.Palette.parse(s.uiTheme).next();s.uiTheme=next.name();UiTheme.apply(next);save.run();},true,false);
         toggle(page,"投影方块",s.projection,0,row,()->s.projection=!s.projection,save);toggle(page,"选区边框",controller.options().boxes,1,row,()->controller.options().boxes=!controller.options().boxes,save);
         toggle(page,"摆放边框",s.placementBounds,0,row+1,()->s.placementBounds=!s.placementBounds,save);toggle(page,"子区域边框",s.regionBounds,1,row+1,()->s.regionBounds=!s.regionBounds,save);
         toggle(page,"原点",s.origins,0,row+2,()->s.origins=!s.origins,save);page.button("分层",1,2,row+2,layers);
