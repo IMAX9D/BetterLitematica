@@ -11,6 +11,14 @@
 
 # Local validation captures, copied worlds and frozen binaries
 /validation/
+**/.mixin.out/
+**/crash-reports/
+**/.betterlitematica-cache/
+**/saves/
+*.log
+*.hprof
+*.jfr
+hs_err_pid*
 # Personal schematics; only generated demo fixtures belong in source control
 *.litematic
 *.schem
@@ -25,6 +33,8 @@
 .env.*
 *.pem
 *.key
+*.p12
+*.pfx
 .vscode/
 .DS_Store
 Thumbs.db

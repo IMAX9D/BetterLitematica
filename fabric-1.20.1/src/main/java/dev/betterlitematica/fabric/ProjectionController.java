@@ -31,6 +31,7 @@ final class ProjectionController implements AutoCloseable {
         void close() { if (renderer != null) renderer.close(); renderer = null; metadata = null; counts = null; materials=null; queryStates=null; }
     }
     private final MinecraftClient client;
+    private final ToolInteractions tool;private final ToolWorldOperations toolWorld;
     private final PrinterEngine printer;private final InventoryTransfers inventoryTransfers;
     private final NearbyProjectionHighlights nearbyHighlights=new NearbyProjectionHighlights();
     private final DraftWriter draftWriter=new DraftWriter();private Path draftFile;private CompletableFuture<DraftStore.Draft> draftReading;private DraftStore.Draft recoveringDraft;private CompletableFuture<SchematicEdits> draftRecovering;private CompletableFuture<Path> draftArchiving;private boolean draftRetrySource;private String draftError="";private long checkpointRevision=-1;private Placement checkpointPlacement;private String checkpointFailure="";
@@ -47,6 +48,7 @@ final class ProjectionController implements AutoCloseable {
     private final SessionIo io = new SessionIo();
     private final Path schematicDirectory, cacheDirectory, settingsDirectory;
     private final TemporarySources temporarySources;
+    private final FilePreviews filePreviews;
     private final java.util.concurrent.atomic.AtomicBoolean cleanupWarning=new java.util.concurrent.atomic.AtomicBoolean();
     private final LinkedHashMap<UUID, Entry> entries = new LinkedHashMap<>();
     private final LinkedHashMap<String,LoadCoordinator.Loaded> resources=new LinkedHashMap<>();
@@ -71,8 +73,7 @@ final class ProjectionController implements AutoCloseable {
     private ProjectionScene scene=new ProjectionScene(List.of());
     private final WorldSectionChanges renderChanges=new WorldSectionChanges(2048);
     private PlacementAnalysis analysis;
-    private boolean errorOverlay, materialHud;
-    private List<PlacementAnalysis.Material> cachedMaterials = List.of();
+    private boolean errorOverlay;
     private final Map<String, CompletableFuture<String>> background = new LinkedHashMap<>();
     private final Map<UUID,CompletableFuture<String>> editingJobs=new HashMap<>();
     private AreaSelection selection = AreaSelection.EMPTY;
@@ -86,6 +87,7 @@ final class ProjectionController implements AutoCloseable {
     private WorldCapture capture;
     private String captureName;
     private Vec3i captureOrigin;
+    private boolean captureWithPreview;private CompletableFuture<String> captureSaving;
     private boolean captureTemporary;private CompletableFuture<String> capturePreparing;private long capturePreparingEpoch;private Vec3i temporaryOrigin;private String temporaryName;
     private final AtomicReference<CreativePasteTask> serverPaste = new AtomicReference<>();
     private final AtomicLong pasteEpoch = new AtomicLong();
@@ -108,25 +110,28 @@ final class ProjectionController implements AutoCloseable {
     private CompletableFuture<int[]> previewCapture;
 
     ProjectionController(MinecraftClient client) {
-        this.client = client;editor=new SchematicEditor(client,this);inventoryTransfers=new InventoryTransfers(client,()->options);printer=new PrinterEngine(client,this);
+        this.client = client;editor=new SchematicEditor(client,this);inventoryTransfers=new InventoryTransfers(client,()->options);printer=new PrinterEngine(client,this);toolWorld=new ToolWorldOperations(client,this);tool=new ToolInteractions(client,this);
         Path game = FabricLoader.getInstance().getGameDir().toAbsolutePath();
         schematicDirectory = game.resolve("schematics"); cacheDirectory = game.resolve(".betterlitematica-cache");
         temporarySources=new TemporarySources(cacheDirectory);
+        filePreviews=new FilePreviews(cacheDirectory);
         settingsDirectory = game.resolve("config/betterlitematica/placements");
         optionsFile=game.resolve("config/betterlitematica/options.json");optionsLoading=io.submit(()->InteractionOptions.read(optionsFile));
         try { Files.createDirectories(schematicDirectory); } catch (IOException e) { report(e.toString()); }
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(server -> {
+            toolWorld.serverTick(server);
             WorldCapture task = serverCapture.get(); if (task != null) { task.tick(); if (task.result().isDone()) serverCapture.compareAndSet(task,null); }
             CreativePasteTask write = serverPaste.get(); if (write != null) { write.tick(); if (write.result().isDone()) serverPaste.compareAndSet(write,null); }
             CreativeFillTask filling=serverFill.get();if(filling!=null){filling.tick();if(filling.result().isDone())serverFill.compareAndSet(filling,null);}
         });
     }
     void tick() {
+        filePreviews.tick();
         cleanupEditorBaselines();releaseGpu(64,System.nanoTime()+1_000_000L);
         if(optionsLoading!=null&&optionsLoading.isDone()){try{options=optionsLoading.join();}catch(CompletionException e){optionsWritable=false;report("设置读取失败，原文件保留："+e.getCause());}optionsLoading=null;}
         for (var iterator = background.entrySet().iterator(); iterator.hasNext();) {
             var task = iterator.next(); if (!task.getValue().isDone()) continue;
-            try { String result=task.getValue().join();if(task.getKey().startsWith("设置保存-"))BetterLitematicaClient.LOGGER.info(result);else report(result); } catch (CompletionException e) { fail(task.getKey() + "失败：" + e.getCause()); } catch(CancellationException e){report(task.getKey()+"已取消");}
+            try { String result=task.getValue().join();if(task.getKey().startsWith("设置保存-")||task.getKey().startsWith("选区保存-"))BetterLitematicaClient.LOGGER.info(result);else report(result); } catch (CompletionException e) { fail(task.getKey() + "失败：" + e.getCause()); } catch(CancellationException e){report(task.getKey()+"已取消");}
             iterator.remove();
         }
         if (client.world != lastWorld) {
@@ -145,10 +150,11 @@ final class ProjectionController implements AutoCloseable {
         }
         tickCapture();
         tickPaste();
+        toolWorld.tick();tool.tick();
         tickFill();
         tickCommands();
         if(projectLoading!=null&&projectLoading.isDone()){
-            try{var version=projectLoading.join();if(version.placements().size()!=1)throw new IllegalStateException("无效项目版本");if(projectReplacement!=null&&!entries.containsKey(projectReplacement))throw new IllegalStateException("目标摆放已移除");if(projectReplacement==null&&entries.size()>=PlacementSession.MAX_PLACEMENTS)throw new IllegalStateException("摆放数量已达上限");
+            try{var version=projectLoading.join();if(version.placements().size()!=1)throw new IllegalStateException("无效项目版本");if(projectReplacement!=null&&!entries.containsKey(projectReplacement))throw new IllegalStateException("目标摆放已移除");
                 var placement=version.placements().get(0).identity(projectReplacement==null?UUID.randomUUID():projectReplacement);UUID id=placement.id();
                 projectActivation=new ProjectActivation(id,placement,version,projectReplacement!=null);
                 if(id.equals(importing)){loader.cancel();importing=null;}queued.remove(id);queued.addFirst(id);
@@ -185,13 +191,12 @@ final class ProjectionController implements AutoCloseable {
         if(ready&&client.player!=null&&options.followLayer&&layer.mode()!=LayerRange.Mode.ALL)layerAtPlayer();
         if (analysis != null) {analysis.tick();if(errorOverlay&&client.player!=null){var position=net.minecraft.util.math.BlockPos.ofFloored(client.player.getEyePos());analysis.updateHighlights(new Vec3i(position.getX(),position.getY(),position.getZ()));}}
         nearbyHighlights.tick(client,this);
-        var fileMaterials=materialTotals();
+        materialTotals();
         // A screen can remain pinned to a placement after the global selection changes.
         var pendingMaterials=entries.values().stream().map(e->e.materials).filter(Objects::nonNull).filter(m->!m.finished()).toList();
         if(!pendingMaterials.isEmpty())pendingMaterials.get(Math.floorMod(materialTurn++,pendingMaterials.size())).tick();
         if (++ticks % 20 == 0) save();
         if(ticks%100==0&&temporarySources.cleanupPending())cleanupTemporary();
-        if (ticks % 20 == 0) cachedMaterials = materialHud && fileMaterials != null ? fileMaterials.materials(client,1,true,"").stream().limit(8).toList() : List.of();
         String error = io.takeError(); if (error != null) { dirty = true; report(error); }
         if (ticks % 5 == 0) cachedHud = hudStatus();
     }
@@ -232,7 +237,7 @@ final class ProjectionController implements AutoCloseable {
         LayerRange previousLayer=layer;float previousOpacity=opacity;boolean previousRendering=rendering;UUID previousSelection=selected;
         if(old==null&&pending.existing()||client.world==null){closeLoaded(loaded);return;}
         try{
-            guardEditing(pending.id());if(!pending.existing()&&entries.size()>=PlacementSession.MAX_PLACEMENTS)throw new IllegalStateException("摆放数量已达上限");
+            guardEditing(pending.id());
             if(!loaded.detailsError().isEmpty())throw new IllegalStateException(loaded.detailsError());loaded=canonicalResource(next.placement.source(),loaded);next.metadata=loaded.cache().metadata();next.counts=loaded.cache().copyBlockStateCounts();
             next.renderer=new ProjectionRenderer1201(client,loaded,gpuResources);next.renderer.place(next.placement);next.renderer.layer(pending.settings().layer());next.renderer.visible(next.placement.enabled()&&next.placement.renderBlocks());next.renderer.opacity(next.placement.opacity());
             printer.stop();cancelPaste();cancelCommands();cancelAnalysis();layer=pending.settings().layer();opacity=pending.settings().opacity();rendering=pending.settings().rendering();
@@ -249,6 +254,12 @@ final class ProjectionController implements AutoCloseable {
         if(!entry.renderer.layer().equals(layer))entry.renderer.layer(layer);
     }
     private void rebuildScene(){var renderers=entries.values().stream().filter(e->e.renderer!=null).map(e->e.renderer).toList();scene=new ProjectionScene(renderers);for(var renderer:renderers)renderer.scene(scene);}
+    boolean entityOverlayMaskNeeded(WorldRenderContext context){
+        if(!rendering||temporarilyHidden)return false;
+        var gizmo=tool.gizmo();gizmo.prepareFrame();
+        return gizmo.visible(context)||editor.marker()!=null||(errorOverlay&&analysis!=null&&!analysis.highlightBoxes().isEmpty())
+            ||(options.printer.highlights&&options.printer.highlightOnTop&&(!nearbyHighlights.boxes().isEmpty()||!printer.actionMarks(System.nanoTime()).isEmpty()));
+    }
     void render(WorldRenderContext context) {
         gpuResources.nextFrame();
         if(renderChanges.takeAll()){for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldAllChanged();}
@@ -258,7 +269,8 @@ final class ProjectionController implements AutoCloseable {
         for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.prepareFrame(context,show&&entry.placement.enabled()&&entry.placement.renderBlocks());
         cleanupEditorBaselines();releaseGpu(64,System.nanoTime()+1_000_000L);
         if (!rendering||temporarilyHidden) return;
-        if(options.boxes)ProjectionOverlays.selection(client,context,selection,selectionTarget);
+        var gizmo=tool.gizmo();boolean toolBounds=gizmo.showBounds();
+        if(options.boxes||toolBounds)ProjectionOverlays.selection(client,context,gizmo.selectionPreview(),selectionTarget,toolBounds);
         for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.drain();
         List<Entry> active=entries.values().stream().filter(e->e.renderer!=null&&e.placement.enabled()&&e.placement.renderBlocks()).toList();
         if(!active.isEmpty()&&options.display.projection){
@@ -269,22 +281,26 @@ final class ProjectionController implements AutoCloseable {
             }finally{composite.finish(client,1f);}
         }
 
-        ProjectionOverlays.placements(client,context,entries.values().stream().filter(e->e.renderer!=null&&e.placement.enabled()).map(e->e.renderer.layout()).toList(),selected,options.display);
+        ProjectionOverlays.placements(client,context,entries.values().stream().filter(e->e.renderer!=null&&e.placement.enabled()).map(e->e.renderer.layout()).toList(),selected,options.display,toolBounds,gizmo.previewPlacement(),gizmo.previewOffset());
         if(options.printer.highlights)ProjectionOverlays.nearbyBoxes(client,context,nearbyHighlights.boxes(),options.printer,options.display.extraColor,false);
         printer.render(context);ProjectionOverlays.marker(client,context,editor.marker());
         if(options.printer.highlights)ProjectionOverlays.nearbyBoxes(client,context,nearbyHighlights.boxes(),options.printer,options.display.extraColor,true);
         if (errorOverlay && analysis != null) ProjectionOverlays.errorBoxes(client,context,analysis.highlightBoxes(),options.display,true,options.printer.highlightLimit);
+        gizmo.render(context);
     }
     List<Placement> placements() { return entries.values().stream().map(e -> e.placement).toList(); }
     UUID selectedId() { return selected; }
     SchematicEditor editor(){return editor;}
     ProjectionScene editorScene(){return scene;}
     ProjectionRenderer1201 editorRenderer(UUID id){ensureDraftReady();if(projectLoading!=null&&Objects.equals(id,projectReplacement)||projectActivation!=null&&id.equals(projectActivation.id()))throw new IllegalStateException("请等待版本恢复完成");var entry=require(id);if(entry.renderer==null)throw new IllegalStateException("请等待投影加载完成");return entry.renderer;}
+    ToolInteractions tool(){return tool;}
+    ToolWorldOperations toolWorld(){return toolWorld;}
+    boolean toolRenderingEnabled(){return rendering&&!temporarilyHidden;}
     InventoryTransfers inventoryTransfers(){return inventoryTransfers;}
     PrinterEngine printer(){return printer;}
     NearbyProjectionHighlights nearbyHighlights(){return nearbyHighlights;}
     Placement placement(UUID id){Entry e=entries.get(id);return e==null?null:e.placement;}
-    boolean worldWriteBusy(){return pasteStarting!=null||paste!=null||fillStarting!=null||fill!=null||commands!=null||commandsLoading!=null;}
+    boolean worldWriteBusy(){return toolWorld.busy()||pasteStarting!=null||paste!=null||fillStarting!=null||fill!=null||commands!=null||commandsLoading!=null;}
     record PrinterSample(boolean inside,net.minecraft.block.BlockState state){}
     record PrinterSource(Placement placement,ProjectionRenderer1201 renderer,BlueprintMetadata metadata){
         @Override public boolean equals(Object value){return value instanceof PrinterSource other&&placement.equals(other.placement)&&renderer==other.renderer&&metadata==other.metadata;}
@@ -358,8 +374,10 @@ final class ProjectionController implements AutoCloseable {
     }
     void worldChunkChanged(net.minecraft.world.BlockView world,int x,int z){
         if(world!=client.world||client.world==null||!client.isOnThread())return;
-        nearbyHighlights.chunkChanged(x,z,client.world.isChunkLoaded(x,z));
-        if(!client.world.isChunkLoaded(x,z))for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldChunkUnloaded(x,z);
+        boolean loaded=client.world.getChunkManager().isChunkLoaded(x,z);
+        if(commands!=null&&loaded)commands.chunkLoaded(x,z);
+        nearbyHighlights.chunkChanged(x,z,loaded);
+        if(!loaded)for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldChunkUnloaded(x,z);
         if(!entries.isEmpty())renderChanges.chunk(x,z,client.world.getBottomY(),client.world.getTopY());
         if(analysis!=null&&analysis.world(client.world))analysis.chunkChanged(x,z);
     }
@@ -369,8 +387,6 @@ final class ProjectionController implements AutoCloseable {
     void cancelAnalysis() { errorOverlay = false; if (analysis != null) analysis.cancel(); }
     boolean errorOverlayEnabled() { return errorOverlay; }
     void toggleErrorOverlay() { errorOverlay = !errorOverlay; }
-    void toggleMaterialHud() { materialHud = !materialHud; }
-    List<PlacementAnalysis.Material> materialHudRows() { return materialHud ? cachedMaterials : List.of(); }
     void exportMaterials() { exportMaterials(1,false,""); }
     void exportMaterials(int multiplier,boolean missingOnly,String query){exportMaterials(selected,multiplier,missingOnly,query);}
     void exportMaterials(UUID id,int multiplier,boolean missingOnly,String query) {
@@ -410,7 +426,7 @@ final class ProjectionController implements AutoCloseable {
     void retryDraftRecovery(){if(!hasDraftRecovery()||draftFile==null||draftArchiving!=null)return;draftRetrySource=true;draftError="";recoveringDraft=null;draftRecovering=null;draftReading=draftWriter.read(draftFile);}
     boolean canRecoverDraftSeparately(){return recoveringDraft!=null&&!draftError.isEmpty()&&draftArchiving==null;}
     void recoverDraftSeparately(){
-        if(!canRecoverDraftSeparately())throw new IllegalStateException("草稿尚未就绪");if(entries.size()>=PlacementSession.MAX_PLACEMENTS)throw new IllegalStateException("请先移除一个摆放");
+        if(!canRecoverDraftSeparately())throw new IllegalStateException("草稿尚未就绪");
         var next=new DraftStore.Draft(recoveringDraft.worldKey(),recoveringDraft.placement().identity(UUID.randomUUID()),recoveringDraft.checkpoint());draftWriter.write(draftFile,next);draftRecovering=null;recoveringDraft=next;draftError="";
     }
     void archiveDraftRecovery(){if(!hasDraftRecovery()||draftFile==null||draftArchiving!=null)return;draftRetrySource=false;draftRecovering=null;draftReading=null;draftArchiving=draftWriter.archive(draftFile);}
@@ -419,7 +435,7 @@ final class ProjectionController implements AutoCloseable {
         if(draftReading!=null&&draftReading.isDone()){var result=draftReading;draftReading=null;try{recoveringDraft=result.join();if(recoveringDraft!=null&&!recoveringDraft.worldKey().equals(sessionFile.getFileName().toString()))throw new IllegalStateException("草稿所属世界不符");}catch(RuntimeException failure){draftError="草稿读取失败："+failure.getMessage();}}
         if(!ready||recoveringDraft==null||draftArchiving!=null||!draftError.isEmpty())return;
         var saved=recoveringDraft.placement();var entry=entries.get(saved.id());
-        if(entry==null){if(entries.size()>=PlacementSession.MAX_PLACEMENTS){draftError="摆放已满，请先移除一个投影";return;}entry=new Entry(saved);entries.put(saved.id(),entry);queued.add(saved.id());dirty=true;}
+        if(entry==null){entry=new Entry(saved);entries.put(saved.id(),entry);queued.add(saved.id());dirty=true;}
         if(!entry.placement.source().equals(saved.source())){draftError="摆放已关联其他源文件";return;}
         if(draftRetrySource){
             draftRetrySource=false;if(saved.id().equals(importing)){loader.cancel();importing=null;}queued.remove(saved.id());entry.close();var resource=resources.remove(sourceKey(saved.source()));if(resource!=null)closeLoaded(resource);entry.state="Loading";queued.add(saved.id());rebuildScene();
@@ -509,7 +525,7 @@ final class ProjectionController implements AutoCloseable {
     CompletableFuture<String> deleteVersion(String project,String version){return io.submit(()->{ProjectVersions.delete(schematicDirectory,project,version);return "";});}
     CompletableFuture<List<String>> versions(String project){return io.submit(()->ProjectVersions.list(schematicDirectory,project));}
     void restoreVersion(String project,String version){restoreVersion(project,version,null);}
-    void restoreVersion(String project,String version,UUID target){requireWorld();if(target!=null)guardEditing(target);if(projectLoading!=null||projectActivation!=null)throw new IllegalStateException("版本正在加载");if(target==null&&entries.size()>=PlacementSession.MAX_PLACEMENTS)throw new IllegalStateException("摆放数量已达上限");if(target!=null&&!entries.containsKey(target))throw new IllegalStateException("目标摆放已移除");projectReplacement=target;projectLoading=io.submit(()->ProjectVersions.load(schematicDirectory,project,version));}
+    void restoreVersion(String project,String version,UUID target){requireWorld();if(target!=null)guardEditing(target);if(projectLoading!=null||projectActivation!=null)throw new IllegalStateException("版本正在加载");if(target!=null&&!entries.containsKey(target))throw new IllegalStateException("目标摆放已移除");projectReplacement=target;projectLoading=io.submit(()->ProjectVersions.load(schematicDirectory,project,version));}
     private CompletableFuture<String> submit(String label, Callable<String> task) { if (background.size() >= 16) throw new IllegalStateException("后台任务已满");var job=io.submit(task);background.put(label + "-" + UUID.randomUUID(),job);return job; }
     Placement selectedPlacement() { Entry entry = entries.get(selected); return entry == null ? null : entry.placement; }
     String entryStatus(UUID id) { Entry entry = entries.get(id); return entry == null ? "已移除" : switch(entry.state){case "Queued"->"排队中";case "Loading"->"加载中";case "Ready"->"已加载";default->entry.state;}; }
@@ -517,6 +533,11 @@ final class ProjectionController implements AutoCloseable {
     CompletableFuture<SessionIo.Listing> files(String relative,String query) { return io.list(schematicDirectory,relative,query); }
     private Path sourcePath(String relative)throws IOException{return temporarySources.reference(schematicDirectory,relative).read();}
     CompletableFuture<SchematicFileInfo> fileInfo(String relative){return io.submit(()->SchematicFileInfo.read(sourcePath(relative),Cancellation.THREAD));}
+    CompletableFuture<SchematicPreview.Images> previewFile(String relative){return filePreviews.request(temporarySources.reference(schematicDirectory,relative));}
+    CompletableFuture<FilePreviews.Preview> interactivePreview(String relative){return filePreviews.interactive(temporarySources.reference(schematicDirectory,relative));}
+    CompletableFuture<FilePreviews.Preview> interactivePreview(String relative,Map<String,RegionPlacement> regions){return filePreviews.interactive(temporarySources.reference(schematicDirectory,relative),regions);}
+    FilePreviews.Orbit previewOrbit(SchematicPreview.OrbitModel model){return filePreviews.orbit(model);}
+    FilePreviews.Stats previewStats(){return filePreviews.stats();}
     CompletableFuture<String> exportFile(String relative,String output,String format,String name,String author,String description,int[] preview){Path filename=exportPath(output,"."+format).getFileName();var reference=temporarySources.reference(schematicDirectory,relative);int[] pixels=preview==null?null:preview.clone();return io.submit(()->{Path source=reference.read(),target=(reference.temporary()?schematicDirectory.toRealPath():source.getParent()).resolve(filename);SchematicFileInfo.export(source,target,format,name,author,description,pixels,Cancellation.THREAD);return schematicDirectory.toRealPath().relativize(target).toString().replace((char)92,(char)47);});}
     CompletableFuture<String> createDirectory(String relative,String name){return io.submit(()->{if(!name.matches("[\\p{L}\\p{N}_ -]{1,80}"))throw new IOException("无效目录名称");Path root=schematicDirectory.toRealPath(),parent=root.resolve(relative).normalize().toRealPath();if(!parent.startsWith(root))throw new IOException("目录越界");Files.createDirectory(parent.resolve(name));return name;});}
     CompletableFuture<int[]> preview(){requireWorld();if(previewCapture!=null&&!previewCapture.isDone())throw new IllegalStateException("预览图正在获取");previewCapture=new CompletableFuture<>();return previewCapture;}
@@ -543,12 +564,12 @@ final class ProjectionController implements AutoCloseable {
         if(!writable)return "配置文件异常，自动保存已停用";
         if(restoring!=null)return "正在恢复摆放…";
         var entry=entries.get(selected);
-        return entries.size()+" / "+PlacementSession.MAX_PLACEMENTS+" 个摆放  ·  "+(rendering?"渲染开启":"渲染关闭")+"  ·  "+(entry==null?"未选择摆放":"已选："+entry.placement.name());
+        return entries.size()+" 个摆放  ·  "+(rendering?"渲染开启":"渲染关闭")+"  ·  "+(entry==null?"未选择摆放":"已选："+entry.placement.name());
     }
     String status() {
         if (!actionError.isEmpty()) return actionError;
         Entry entry = entries.get(selected);
-        String prefix = "Partial preview | " + entries.size() + "/" + PlacementSession.MAX_PLACEMENTS + " placements";
+        String prefix = "Partial preview | " + entries.size() + " placements";
         if (!writable) prefix = "SAVE DISABLED (settings error) | " + prefix;
         if (!rendering) prefix += " | Rendering OFF";
         if (restoring != null) return "Restoring placements...";
@@ -567,7 +588,7 @@ final class ProjectionController implements AutoCloseable {
     void selectionCoordinates(Vec3i first,Vec3i second,Vec3i origin){requireSelection();var box=new SelectionBox(selection.current().name(),first,second);box.region();selection=selection.put(box).origin(origin);selectionDirty=true;}
     void selectionApply(AreaSelection value){requireSelection();selection=value;selectionTarget=null;selectionDirty=true;}
     SelectionTarget selectionTarget(){return selectionTarget;}
-    void selectionTarget(SelectionTarget value){requireSelection();selectionTarget=value;if(value!=null&&value.part()!=SelectionTarget.Part.ORIGIN)selection=selection.select(value.name());selectionDirty=true;}
+    void selectionTarget(SelectionTarget value){requireSelection();selectionTarget=value;if(value==null)selection=selection.select("");if(value!=null&&value.part()!=SelectionTarget.Part.ORIGIN)selection=selection.select(value.name());selectionDirty=true;}
     void selectionDrag(AreaSelection original,SelectionTarget target,Vec3i offset){requireSelection();selection=target.translate(original,offset);selectionDirty=true;}
     void selectionExpand(Vec3i direction,int amount){requireSelection();selection=selection.put(selection.current().expand(direction,amount));selectionDirty=true;}
     private Path selectionLibrary(){requireSelection();return settingsDirectory.resolve("selections").resolve(worldKey());}
@@ -588,13 +609,13 @@ final class ProjectionController implements AutoCloseable {
     void capture(String name) {
         capture(name,false);
     }
+    void captureTemporary(String name){capture(name,true);}
     void captureTemporary(){capture(selection.selected().isBlank()?"选区":selection.selected(),true);}
     private void capture(String name,boolean temporary){
-        requireSelection(); if(capture!=null||captureStarting!=null||capturePreparing!=null)throw new IllegalStateException("已有捕获任务，请先完成或取消");
-        if(temporary&&entries.size()>=PlacementSession.MAX_PLACEMENTS)throw new IllegalStateException("摆放数量已达上限");
+        requireSelection(); if(capture!=null||captureStarting!=null||capturePreparing!=null||captureSaving!=null&&!captureSaving.isDone())throw new IllegalStateException("已有捕获任务，请先完成或取消");
         if(!temporary&&(!name.matches("[\\p{L}\\p{N}_ .-]{1,100}")||name.equals(".")||name.equals("..")))throw new IllegalArgumentException("文件名只能包含文字、数字、空格、下划线、点和短横线");
         if(selection.boxes().isEmpty())throw new IllegalStateException("请先设置选区");
-        captureTemporary=temporary;captureName=temporary?name.substring(0,Math.min(name.length(),110)):name.endsWith(".litematic")?name:name+".litematic";captureOrigin=selection.origin();List<SelectionBox> boxes=selection.boxes();
+        captureTemporary=temporary;captureWithPreview=options.capturePreviews&&!temporary;captureName=temporary?name.substring(0,Math.min(name.length(),110)):name.endsWith(".litematic")?name:name+".litematic";captureOrigin=selection.origin();List<SelectionBox> boxes=selection.boxes();
         long epoch=captureEpoch.incrementAndGet();var key=client.world.getRegistryKey();var server=client.getServer();
         if(server==null){capture=new WorldCapture(client.world,boxes);report("多人捕获只能保存客户端收到的数据，库存和计划刻可能缺失");}
         else {var starting=new CompletableFuture<WorldCapture>();captureStarting=starting;server.execute(()->{
@@ -603,8 +624,8 @@ final class ProjectionController implements AutoCloseable {
             }catch(RuntimeException e){starting.completeExceptionally(e);}
         });}
     }
-    String captureStatus() { return capturePreparing!=null?(capturePreparingEpoch==captureEpoch.get()?"准备临时投影":"取消中"):captureStarting!=null?"准备捕获...":capture==null?"没有捕获任务":capture.status(); }
-    void cancelCapture() { synchronized(captureEpoch){captureEpoch.incrementAndGet();if(capture!=null)capture.cancel();WorldCapture serverTask=serverCapture.getAndSet(null);if(serverTask!=null)serverTask.cancel();captureStarting=null;capture=null;} }
+    String captureStatus() { return captureSaving!=null&&!captureSaving.isDone()?"正在保存投影":capturePreparing!=null?(capturePreparingEpoch==captureEpoch.get()?"准备临时投影":"取消中"):captureStarting!=null?"准备捕获...":capture==null?"没有捕获任务":capture.status(); }
+    void cancelCapture() { synchronized(captureEpoch){captureEpoch.incrementAndGet();if(capture!=null)capture.cancel();if(captureSaving!=null)captureSaving.cancel(true);captureSaving=null;WorldCapture serverTask=serverCapture.getAndSet(null);if(serverTask!=null)serverTask.cancel();captureStarting=null;capture=null;} }
     private void tickCapture() {
         if(capturePreparing!=null&&capturePreparing.isDone()){
             try{String key=capturePreparing.join();if(capturePreparingEpoch!=captureEpoch.get()||client.world==null)removeTemporary(key);else try{add(new Placement(UUID.randomUUID(),temporaryName+" · 临时",key,new PlacementTransform(temporaryOrigin,0,false,false),true,false,opacity));report("已创建临时投影");}catch(RuntimeException e){removeTemporary(key);throw e;}}
@@ -619,7 +640,12 @@ final class ProjectionController implements AutoCloseable {
         if(capture.result().isDone()){
             try{var data=capture.result().join();String name=captureName;Vec3i origin=captureOrigin;int version=SharedConstants.getGameVersion().getSaveVersion().getId();String author=client.getSession().getUsername();Path output=schematicDirectory.resolve(name);
                 if(captureTemporary){long epoch=captureEpoch.get();capturePreparingEpoch=epoch;temporaryOrigin=origin;temporaryName=name;capturePreparing=io.submit(()->temporarySources.create(LitematicExport.create(name,author,version,origin,data),()->Thread.currentThread().isInterrupted()||captureEpoch.get()!=epoch));}
-                else submit("投影保存",()->{var root=LitematicExport.create(name,author,version,origin,data);NbtWriter.writeNew(output,root,Cancellation.THREAD);return "投影已保存："+output.getFileName();});
+                else {boolean attach=captureWithPreview;long epoch=captureEpoch.get();captureSaving=submit("投影保存",()->{
+                    Cancellation cancel=()->Thread.currentThread().isInterrupted()||captureEpoch.get()!=epoch;cancel.check();
+                    var root=LitematicExport.create(name,author,version,origin,data);
+                    if(attach)FilePreviews.await(filePreviews.attach(root,cancel),cancel);
+                    NbtWriter.writeNew(output,root,cancel);return "投影已保存："+output.getFileName();
+                });}
             }catch(CompletionException|CancellationException e){fail("捕获未完成："+e);}capture=null;
         }
     }
@@ -654,7 +680,7 @@ final class ProjectionController implements AutoCloseable {
         if(paste!=null&&paste.result().isDone()){try{creativeResult=paste.result().join();report(creativeResult);}catch(CompletionException e){pasteFailure(e);}paste=null;}
     }
     void fill(String state,String match){
-        requireSelection();if(!client.player.isCreative()||client.getServer()==null)throw new IllegalStateException("此入口要求单人创造模式");if(fill!=null||fillStarting!=null)throw new IllegalStateException("已有填充任务");
+        requireSelection();if(!client.player.isCreative()||client.getServer()==null)throw new IllegalStateException("此入口要求单人创造模式");if(worldWriteBusy())throw new IllegalStateException("已有施工任务");printer.pause("工具操作");
         var server=client.getServer();var dimension=client.world.getRegistryKey();UUID actor=client.player.getUuid();var boxes=selection.boxes();BlockStateSpec target=BlockStateSpec.parse(state),from=match==null?null:BlockStateSpec.parse(match);long epoch=pasteEpoch.get();
         var future=new CompletableFuture<CreativeFillTask>();fillStarting=future;server.execute(()->{try{if(pasteEpoch.get()!=epoch)throw new CancellationException("世界已切换");var task=new CreativeFillTask(server.getWorld(dimension),actor,boxes,target,from);synchronized(pasteEpoch){if(pasteEpoch.get()!=epoch)throw new CancellationException("填充已取消");serverFill.set(task);future.complete(task);}}catch(RuntimeException e){future.completeExceptionally(e);}});
     }
@@ -676,7 +702,7 @@ final class ProjectionController implements AutoCloseable {
     CreativeJob creativeJob(UUID target){return creativeJob!=null&&creativeJob.target().equals(target)?creativeJob:null;}
     boolean creativeActive(UUID id){return creativeJob!=null&&creativeJob.id().equals(id)&&(creativeJob.commands()?commands!=null&&!commands.result().isDone()||commandsLoading!=null:paste!=null&&!paste.result().isDone()||pasteStarting!=null);}
     boolean creativePaused(UUID id){return creativeActive(id)&&(creativeJob.commands()?commands==null?creativePauseRequested:commands.paused():paste==null?creativePauseRequested:paste.paused());}
-    String creativeStatus(UUID id){if(creativeJob==null||!creativeJob.id().equals(id))return "";if(creativePaused(id))return "已暂停";return creativeActive(id)?creativeJob.commands()?commands==null?"读取中":commands.status():pasteStatus():creativeResult;}
+    String creativeStatus(UUID id){if(creativeJob==null||!creativeJob.id().equals(id))return "";if(creativePaused(id))return "已暂停";if(creativeActive(id))return creativeJob.commands()?commands==null?"读取中":commands.status():pasteStatus();if(!creativeResult.isEmpty())return creativeResult;return creativeJob.commands()?commands==null?"":commands.status():paste==null?"":paste.status();}
     void pauseCreative(UUID id){if(!creativeActive(id))return;boolean value=!creativePaused(id);if(creativeJob.commands()){creativePauseRequested=value;if(commands!=null)commands.paused(value);}else synchronized(pasteEpoch){creativePauseRequested=value;if(paste!=null)paste.paused(value);var task=serverPaste.get();if(task!=null)task.paused(value);}}
     void cancelCreative(UUID id){if(!creativeActive(id))return;if(creativeJob.commands()){if(!cancelCommands())return;}else cancelPaste();creativeResult="已取消";}
     private boolean cancelCommands(){if(commands!=null&&!commands.cancel())return false;if(commandsLoading!=null)commandsLoading.cancel(true);commands=null;commandsLoading=null;return true;}
@@ -684,20 +710,20 @@ final class ProjectionController implements AutoCloseable {
         if(commandsLoading!=null&&commandsLoading.isDone()){try{commands=new CommandOperation(client,commandsLoading.join(),commandPlacement,commandLayer,commandRule,commandNbt,commandEntities,commandOutput,commandSettings);commands.paused(creativePauseRequested);}catch(RuntimeException e){creativeResult="命令任务失败："+(e.getCause()==null?e.getMessage():e.getCause().getMessage());fail(creativeResult);}commandsLoading=null;}
         if(commands!=null){commands.tick();if(commands.result().isDone()){try{creativeResult=commands.result().join();report(creativeResult);}catch(CompletionException e){creativeResult="命令任务失败："+e.getCause().getMessage();fail(creativeResult);}commands=null;}}
     }
-    List<String> tasks(){List<String> list=new ArrayList<>();if(hasDraftRecovery())list.add("编辑草稿："+draftRecoveryStatus());if(editor.busy())list.add("投影编辑："+editor.status);if(projectLoading!=null||projectActivation!=null)list.add("项目版本加载中");if(printer.state()!=PrinterEngine.State.STOPPED)list.add("打印机："+printer.status());if(importing!=null)list.add("投影导入："+loader.status().phase());if(analysis!=null)list.add(analysis.status());if(capture!=null||captureStarting!=null||capturePreparing!=null)list.add(captureStatus());if(paste!=null||pasteStarting!=null)list.add(pasteStatus());if(fill!=null||fillStarting!=null)list.add(fill==null?"准备填充":fill.status());if(commands!=null)list.add(commands.status());if(commandsLoading!=null)list.add("命令任务读取中");list.addAll(background.keySet());return list;}
-    void cancelTasks(){editor.cancel();for(var id:List.copyOf(draftAdoptions.keySet()))draftLoadFailed(id);cancelProjectActivation(null);printer.stop();cancelAnalysis();cancelCapture();cancelPaste();loader.cancel();if(importing!=null){var entry=entries.get(importing);if(entry!=null)entry.state="已取消，可重新加载";}importing=null;for(var request:resourceRequests.entrySet())resourceFailures.put(request.getValue(),"已取消");resourceRequests.clear();for(var id:queued){var entry=entries.get(id);if(entry!=null)entry.state="已取消，可重新加载";}queued.clear();if(projectLoading!=null)projectLoading.cancel(true);projectLoading=null;if(commands!=null)commands.cancel();if(commandsLoading!=null)commandsLoading.cancel(true);commandsLoading=null;commands=null;var task=serverFill.getAndSet(null);if(task!=null)task.cancel();fillStarting=null;fill=null;for(var job:background.values())job.cancel(true);}
+    List<String> tasks(){List<String> list=new ArrayList<>();if(toolWorld.busy())list.add(toolWorld.status());if(hasDraftRecovery())list.add("编辑草稿："+draftRecoveryStatus());if(editor.busy())list.add("投影编辑："+editor.status);if(projectLoading!=null||projectActivation!=null)list.add("项目版本加载中");if(printer.state()!=PrinterEngine.State.STOPPED)list.add("打印机："+printer.status());if(importing!=null)list.add("投影导入："+loader.status().phase());if(analysis!=null)list.add(analysis.status());if(capture!=null||captureStarting!=null||capturePreparing!=null)list.add(captureStatus());if(paste!=null||pasteStarting!=null)list.add(pasteStatus());if(fill!=null||fillStarting!=null)list.add(fill==null?"准备填充":fill.status());if(commands!=null)list.add(commands.status());if(commandsLoading!=null)list.add("命令任务读取中");list.addAll(background.keySet());return list;}
+    void cancelTasks(){toolWorld.cancel();editor.cancel();for(var id:List.copyOf(draftAdoptions.keySet()))draftLoadFailed(id);cancelProjectActivation(null);printer.stop();cancelAnalysis();cancelCapture();cancelPaste();loader.cancel();if(importing!=null){var entry=entries.get(importing);if(entry!=null)entry.state="已取消，可重新加载";}importing=null;for(var request:resourceRequests.entrySet())resourceFailures.put(request.getValue(),"已取消");resourceRequests.clear();for(var id:queued){var entry=entries.get(id);if(entry!=null)entry.state="已取消，可重新加载";}queued.clear();if(projectLoading!=null)projectLoading.cancel(true);projectLoading=null;if(commands!=null)commands.cancel();if(commandsLoading!=null)commandsLoading.cancel(true);commandsLoading=null;commands=null;var task=serverFill.getAndSet(null);if(task!=null)task.cancel();fillStarting=null;fill=null;for(var job:background.values())job.cancel(true);}
     private Entry require() { requireWorld(); Entry entry = entries.get(selected); if (entry == null) throw new IllegalStateException("Select a placement first"); return entry; }
     private Entry require(UUID id){requireWorld();Entry entry=entries.get(id);if(entry==null)throw new IllegalStateException("目标投影已移除");return entry;}
     record ResourceView(String source,String name,int placements,String status){}
     private static String sourceKey(String source){return Path.of(source).normalize().toString().replace('\\','/');}
     private void admitResource(String source,LoadCoordinator.Loaded loaded){String key=sourceKey(source);var previous=resources.get(key);if(previous!=null&&previous.cache().metadata().sourceSha256().equals(loaded.cache().metadata().sourceSha256())&&(previous.detailsError().isEmpty()||!loaded.detailsError().isEmpty()))return;
-        long used=resources.values().stream().mapToLong(LoadCoordinator.Loaded::estimatedBytes).sum()-(previous==null?0:previous.estimatedBytes());if(previous==null&&resources.size()>=16||used+loaded.estimatedBytes()>(1L<<30))throw new IllegalStateException("已加载投影达到内存上限，请卸载不使用的投影");
+        long used=resources.values().stream().mapToLong(LoadCoordinator.Loaded::estimatedBytes).sum()-(previous==null?0:previous.estimatedBytes());if(used+loaded.estimatedBytes()>(1L<<30))throw new IllegalStateException("已加载投影达到内存上限，请卸载不使用的投影");
         resources.put(key,loaded.retain());resourceFailures.remove(key);if(previous!=null)closeLoaded(previous);
     }
     private LoadCoordinator.Loaded canonicalResource(String source,LoadCoordinator.Loaded loaded){admitResource(source,loaded);var canonical=resources.get(sourceKey(source)).retain();closeLoaded(loaded);return canonical;}
     private void cancelResourceProject(String source){if(projectLoading!=null)cancelProjectActivation(null);else if(projectActivation!=null&&sourceKey(projectActivation.placement().source()).equals(source))cancelProjectActivation(projectActivation.id());}
     List<ResourceView> resources(){var paths=new LinkedHashSet<>(resources.keySet());paths.addAll(resourceRequests.values());paths.addAll(resourceFailures.keySet());var result=new ArrayList<ResourceView>();for(String path:paths){var value=resources.get(path);String name=value==null?Path.of(path).getFileName().toString():value.cache().metadata().name();int references=(int)entries.values().stream().filter(e->sourceKey(e.placement.source()).equals(path)).count();result.add(new ResourceView(path,name,references,value!=null?"":resourceFailures.getOrDefault(path,"加载中")));}return List.copyOf(result);}
-    void loadResource(String filename){requireWorld();String key=sourceKey(filename);if(resources.containsKey(key)||resourceRequests.containsValue(key))return;if(resources.size()+resourceRequests.size()>=16)throw new IllegalStateException("最多保留 16 份投影资源");UUID id=UUID.randomUUID();resourceRequests.put(id,key);resourceFailures.remove(key);queued.add(id);}
+    void loadResource(String filename){requireWorld();String key=sourceKey(filename);if(resources.containsKey(key)||resourceRequests.containsValue(key))return;UUID id=UUID.randomUUID();resourceRequests.put(id,key);resourceFailures.remove(key);queued.add(id);}
     private void cleanupTemporary(){temporarySources.cleanupAsync().whenComplete((v,e)->{if(e==null)cleanupWarning.set(false);else if(!cleanupWarning.getAndSet(true))BetterLitematicaClient.LOGGER.warn("Temporary source cleanup will be retried",e);});}
     private void removeTemporary(String key){temporarySources.remove(key);if(temporarySources.cleanupPending())cleanupTemporary();}
     void promoteTemporary(String source,String saved){
@@ -718,7 +744,6 @@ final class ProjectionController implements AutoCloseable {
             new PlacementTransform(new Vec3i(p.getX(), p.getY(), p.getZ()), 0, false, false), true, false,opacity));
     }
     private void add(Placement placement) {
-        if (entries.size() >= PlacementSession.MAX_PLACEMENTS) throw new IllegalStateException("Preview placement limit: " + PlacementSession.MAX_PLACEMENTS);
         entries.put(placement.id(), new Entry(placement)); queued.add(placement.id()); selected = placement.id(); dirty = true;
     }
     void select(UUID id) { requireWorld(); if (id != null && !entries.containsKey(id)) throw new IllegalArgumentException("Placement not found"); selected = id; dirty = true; }
@@ -764,9 +789,17 @@ final class ProjectionController implements AutoCloseable {
         if (!List.of("none", "x", "z", "xz").contains(axis)) throw new IllegalArgumentException("Mirror must be none, x, z or xz");
         update(p -> p.placed(new PlacementTransform(p.transform().origin(), p.transform().quarterTurns(), axis.contains("x"), axis.contains("z"))));
     }
+    WheelRenderMode wheelRenderMode(){return WheelRenderMode.selected(layer,options.followLayer,options.wheelRenderMode);}
+    void explicitLayerMode(LayerRange.Mode mode){var next=WheelRenderMode.valueOf(mode.name());if(options.wheelRenderMode!=next){options.wheelRenderMode=next;saveOptions();}}
+    void wheelRendering(WheelRenderMode mode,int first,int second){
+        requireWorld();var next=mode.range(first,second,playerPosition().y());
+        boolean settingsChanged=options.followLayer!=mode.follows()||options.wheelRenderMode!=mode;
+        layer(next.axis(),next.min(),next.max());options.followLayer=mode.follows();options.wheelRenderMode=mode;
+        if(settingsChanged)saveOptions();
+    }
     void layer(LayerRange.Axis axis, int min, int max) { requireWorld();var next=new LayerRange(axis,min,max);if(next.equals(layer))return;cancelAnalysis();layer=next;for (Entry entry : entries.values()) apply(entry); dirty = true; }
     void cycleLayer(){cycleLayer(1);}
-    void cycleLayer(int step){var mode=LayerRange.Mode.values()[Math.floorMod(layer.mode().ordinal()+step,LayerRange.Mode.values().length)];var p=playerPosition();int value=layer.min()==Integer.MIN_VALUE?layer.max()==Integer.MAX_VALUE?switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();}:layer.max():layer.min();var next=LayerRange.of(layer.axis(),mode,value,value);layer(next.axis(),next.min(),next.max());}
+    void cycleLayer(int step){var mode=LayerRange.Mode.values()[Math.floorMod(layer.mode().ordinal()+step,LayerRange.Mode.values().length)];var p=playerPosition();int value=layer.min()==Integer.MIN_VALUE?layer.max()==Integer.MAX_VALUE?switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();}:layer.max():layer.min();var next=LayerRange.of(layer.axis(),mode,value,value);layer(next.axis(),next.min(),next.max());explicitLayerMode(mode);}
     void layerAtPlayer(){var p=playerPosition();int value=switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();};int last=layer.mode()==LayerRange.Mode.RANGE?Math.addExact(value,Math.subtractExact(layer.max(),layer.min())):value;var next=LayerRange.of(layer.axis(),layer.mode()==LayerRange.Mode.ALL?LayerRange.Mode.SINGLE:layer.mode(),value,last);layer(next.axis(),next.min(),next.max());}
     void allLayers() { layer(LayerRange.ALL.axis(), LayerRange.ALL.min(), LayerRange.ALL.max()); }
     void shiftLayer(int amount) {
@@ -803,6 +836,8 @@ final class ProjectionController implements AutoCloseable {
         temporarySources.clear();if(temporarySources.cleanupPending())cleanupTemporary();
     }
     void disconnect() {
+        filePreviews.cancelAll();
+        tool.clear();toolWorld.cancel();
         for(var id:List.copyOf(draftAdoptions.keySet()))draftLoadFailed(id);
         sessionEpoch++;ProjectionInfoData.clear();AccuratePlacement.disconnect();InventoryReceipts.clear();inventoryTransfers.clear();
         if(previewCapture!=null)previewCapture.cancel(false);previewCapture=null;
@@ -810,6 +845,8 @@ final class ProjectionController implements AutoCloseable {
         if(projectLoading!=null)projectLoading.cancel(true);projectLoading=null;
         if(commands!=null)commands.cancel();if(commandsLoading!=null)commandsLoading.cancel(true);commands=null;commandsLoading=null;
         cancelPaste();
+        creativeJob=null;creativeResult="";creativePauseRequested=false;
+        commandPlacement=null;commandLayer=null;commandRule=null;commandOutput=null;commandSettings=null;commandNbt=false;commandEntities=false;
         var writing=serverFill.getAndSet(null);if(writing!=null)writing.cancel();fillStarting=null;fill=null;
         cancelCapture();
         save(); restoring = null; release(); ready = false; writable = true; dirty = false; sessionFile = null; lastWorld = null;
@@ -822,5 +859,5 @@ final class ProjectionController implements AutoCloseable {
     long sessionEpoch(){return sessionEpoch;}
     private void fail(String text){actionError=text;report(text);}
     int action(Runnable task) { try { actionError = "";task.run();return 1; } catch (RuntimeException e) {fail("操作失败：" + e.getMessage());return 0; } }
-    @Override public void close() {printer.close(); composite.close();disconnect(); releaseGpu(Integer.MAX_VALUE,Long.MAX_VALUE);loader.close();cleanupEditorBaselines();io.close();for(var job:editorBaselines)if(job.abandoned&&job.result.isDone()&&!job.result.isCompletedExceptionally())try{Files.deleteIfExists(job.path);}catch(IOException failure){BetterLitematicaClient.LOGGER.error("临时底本清理失败",failure);}try{draftWriter.close();}catch(IOException failure){BetterLitematicaClient.LOGGER.error("草稿保存未完成",failure);}temporarySources.close(); String error = io.takeError(); if (error != null) BetterLitematicaClient.LOGGER.error(error); }
+    @Override public void close() {toolWorld.close();printer.close(); composite.close();disconnect(); releaseGpu(Integer.MAX_VALUE,Long.MAX_VALUE);loader.close();cleanupEditorBaselines();filePreviews.close();io.close();for(var job:editorBaselines)if(job.abandoned&&job.result.isDone()&&!job.result.isCompletedExceptionally())try{Files.deleteIfExists(job.path);}catch(IOException failure){BetterLitematicaClient.LOGGER.error("临时底本清理失败",failure);}try{draftWriter.close();}catch(IOException failure){BetterLitematicaClient.LOGGER.error("草稿保存未完成",failure);}temporarySources.close(); String error = io.takeError(); if (error != null) BetterLitematicaClient.LOGGER.error(error); }
 }

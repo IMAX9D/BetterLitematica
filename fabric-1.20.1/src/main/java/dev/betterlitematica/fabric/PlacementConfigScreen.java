@@ -1,9 +1,12 @@
 package dev.betterlitematica.fabric;
 
 import dev.betterlitematica.core.Placement;
+import dev.betterlitematica.core.RegionPlacement;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import java.util.UUID;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 final class PlacementConfigScreen extends MenuScreen {
     private final UUID id;
@@ -12,30 +15,36 @@ final class PlacementConfigScreen extends MenuScreen {
     private boolean opacityDirty;
     private OverlayOpacitySlider opacitySlider;
     private boolean previewing,previousHudHidden;
+    private BlueprintPreviewPanel schematicPreview;
+    private CompletableFuture<FilePreviews.Preview> previewPending;
+    private String previewSource="";
+    private Map<String,RegionPlacement> previewRegions=Map.of();
     private long lastOpacityUpdate=System.nanoTime();
-    PlacementConfigScreen(Screen p,ProjectionController c){super("摆放设置","",p,c,false);id=c.selectedId();}
+    PlacementConfigScreen(Screen p,ProjectionController c){super("摆放设置","",p,c,true);id=c.selectedId();}
     @Override protected int preferredHeight(){return 380;}
-    private TextFieldWidget coordinate(String axis,String value,int y,int width){
-        var field=new OverlayTextField(left+40,0,width-46,axis);field.setMaxLength(12);field.setText(value);addBody(field,y);return field;
+    private TextFieldWidget coordinate(String axis,String value,int x,int y,int width){
+        var field=new OverlayTextField(x+40,0,width-46,axis);field.setMaxLength(12);field.setText(value);addBody(field,y);return field;
     }
     private Placement placement(){return controller.placements().stream().filter(v->v.id().equals(id)).findFirst().orElse(null);}
     private void act(Runnable r){controller.select(id);r.run();}
     private void resetCoordinates(){px=py=pz=null;refresh();}
     @Override protected void buildMenu(){
         Placement p=placement();
-        if(p==null){label("此摆放已被移除。",0);return;}
-        int columnWidth=(innerWidth-16)/2,right=left+columnWidth+16;
+        if(p==null){cancelPreview();label("此摆放已被移除。",0);return;}
+        int previewWidth=196,controlsLeft=left+previewWidth+16,columnWidth=(innerWidth-previewWidth-32)/2,right=controlsLeft+columnWidth+16;
         name=fieldAt("摆放名称",name==null?p.name():name.getText(),left,0,innerWidth-88,120);
         buttonAt("保存名称",left+innerWidth-80,14,80,()->act(()->controller.rename(name.getText())),true,true);
+        if(schematicPreview==null)schematicPreview=new BlueprintPreviewPanel(controller,left,previewWidth,196,false);
+        addBody(schematicPreview,44);syncPreview(p);
 
-        caption("位置",left,42,columnWidth);
-        buttonAt("移到玩家位置",left,58,columnWidth,()->act(()->{controller.here();resetCoordinates();}),!p.locked(),false);
-        px=coordinate("X",px==null?""+p.transform().origin().x():px.getText(),84,columnWidth);
-        py=coordinate("Y",py==null?""+p.transform().origin().y():py.getText(),110,columnWidth);
-        pz=coordinate("Z",pz==null?""+p.transform().origin().z():pz.getText(),136,columnWidth);
-        for(int axis=0;axis<3;axis++){final int a=axis;boolean locked=(p.lockedAxes()&(1<<axis))!=0;buttonAt(new String[]{"X","Y","Z"}[axis]+(locked?" ×":""),left,84+axis*26,30,()->act(()->{controller.axisLock(a);switch(a){case 0->px=null;case 1->py=null;case 2->pz=null;}refresh();}),!p.locked(),locked);}
+        caption("位置",controlsLeft,42,columnWidth);
+        buttonAt("移到玩家位置",controlsLeft,58,columnWidth,()->act(()->{controller.here();resetCoordinates();}),!p.locked(),false);
+        px=coordinate("X",px==null?""+p.transform().origin().x():px.getText(),controlsLeft,84,columnWidth);
+        py=coordinate("Y",py==null?""+p.transform().origin().y():py.getText(),controlsLeft,110,columnWidth);
+        pz=coordinate("Z",pz==null?""+p.transform().origin().z():pz.getText(),controlsLeft,136,columnWidth);
+        for(int axis=0;axis<3;axis++){final int a=axis;boolean locked=(p.lockedAxes()&(1<<axis))!=0;buttonAt(new String[]{"X","Y","Z"}[axis]+(locked?" ×":""),controlsLeft,84+axis*26,30,()->act(()->{controller.axisLock(a);switch(a){case 0->px=null;case 1->py=null;case 2->pz=null;}refresh();}),!p.locked(),locked);}
         px.setEditable(!p.locked()&&(p.lockedAxes()&1)==0);py.setEditable(!p.locked()&&(p.lockedAxes()&2)==0);pz.setEditable(!p.locked()&&(p.lockedAxes()&4)==0);
-        buttonAt("应用坐标",left,172,columnWidth,()->act(()->controller.move(Integer.parseInt(px.getText()),Integer.parseInt(py.getText()),Integer.parseInt(pz.getText()))),!p.locked(),true);
+        buttonAt("应用坐标",controlsLeft,172,columnWidth,()->act(()->controller.move(Integer.parseInt(px.getText()),Integer.parseInt(py.getText()),Integer.parseInt(pz.getText()))),!p.locked(),true);
 
         caption("方向与显示",right,42,columnWidth-48);
         addBody(new ClipboardIconButton(right+columnWidth-44,false,()->controller.action(()->{applyOpacity();client.keyboard.setClipboard(PlacementClipboard.encode(placement(),controller.regions(id)));})),36);
@@ -51,7 +60,7 @@ final class PlacementConfigScreen extends MenuScreen {
         opacitySlider=new OverlayOpacitySlider(right,columnWidth,pendingOpacity,value->{pendingOpacity=(float)value;opacityDirty=true;});
         opacitySlider.previewCallbacks(this::beginPreview,this::endPreview);
         addBody(opacitySlider,168);
-        buttonAt(p.renderBlocks()?"渲染：是":"渲染：否",left,206,columnWidth,()->act(()->{controller.toggleBlocks();refresh();}),true,false);
+        buttonAt(p.renderBlocks()?"渲染：是":"渲染：否",controlsLeft,206,columnWidth,()->act(()->{controller.toggleBlocks();refresh();}),true,false);
         buttonAt("重叠："+switch(p.overlapRule()){case ALL->"替换全部";case NON_AIR->"忽略空气";case NONE->"仅填空白";},right,206,columnWidth,()->act(()->{controller.overlapNext();refresh();}),true,false);
         buttonAt("材料清单",cellX(0,4),246,cellWidth(4),()->act(()->client.setScreen(new AnalysisScreen(this,controller,true))),true,false);
         buttonAt("投影校验",cellX(1,4),246,cellWidth(4),()->act(()->client.setScreen(new AnalysisScreen(this,controller,false))),true,false);
@@ -59,6 +68,17 @@ final class PlacementConfigScreen extends MenuScreen {
         buttonAt("子区域",cellX(3,4),246,cellWidth(4),()->client.setScreen(new SubregionScreen(this,controller,id)),true,false);
         fixed("另存投影",0,80,()->client.setScreen(controller.editor().owns(p.id())?new EditingScreen(this,controller,p.id()):new SchematicFileScreen(this,controller,p.source())));
 
+    }
+    private void syncPreview(Placement p){
+        if(schematicPreview==null)return;
+        schematicPreview.orientation(p.transform());
+        if(previewSource.equals(p.source())&&previewRegions.equals(p.regions()))return;
+        cancelPreview();previewSource=p.source();previewRegions=p.regions();schematicPreview.selected(p.name());
+        try{previewPending=controller.interactivePreview(previewSource,previewRegions);}catch(RuntimeException e){schematicPreview.failed();}
+    }
+    private void cancelPreview(){
+        if(previewPending!=null)previewPending.cancel(true);previewPending=null;previewSource="";previewRegions=Map.of();
+        if(schematicPreview!=null)schematicPreview.close();
     }
     private void beginPreview(){
         if(previewing)return;
@@ -70,7 +90,8 @@ final class PlacementConfigScreen extends MenuScreen {
     }
     @Override protected net.minecraft.client.gui.widget.ClickableWidget previewControl(){return previewing?opacitySlider:null;}
     @Override public boolean mouseReleased(double x,double y,int button){
-        try{return super.mouseReleased(x,y,button);}finally{if(button==0)endPreview();}
+        boolean released=schematicPreview!=null&&schematicPreview.releaseDrag(button);
+        try{return super.mouseReleased(x,y,button)||released;}finally{if(button==0)endPreview();}
     }
     @Override public boolean keyPressed(int key,int scan,int modifiers){
         if(previewing){
@@ -86,9 +107,18 @@ final class PlacementConfigScreen extends MenuScreen {
     }
     @Override protected void updateMenu(){
         if(previewing&&!client.isWindowFocused())endPreview();
+        Placement p=placement();
+        if(p==null){if(schematicPreview!=null){cancelPreview();schematicPreview=null;refresh();}}
+        else{
+            syncPreview(p);
+            if(previewPending!=null&&previewPending.isDone()){
+                var completed=previewPending;previewPending=null;
+                try{schematicPreview.images(completed.join());}catch(RuntimeException e){schematicPreview.failed();}
+            }
+        }
         long now=System.nanoTime();
         if(now-lastOpacityUpdate>=200_000_000L){lastOpacityUpdate=now;applyOpacity();}
     }
     // Preserve the last drag value when closing before the next 200 ms update.
-    @Override public void removed(){endPreview();applyOpacity();super.removed();}
+    @Override public void removed(){cancelPreview();schematicPreview=null;endPreview();applyOpacity();super.removed();}
 }

@@ -26,7 +26,7 @@ final class NearbyProjectionHighlights {
     void tick(MinecraftClient client,ProjectionController controller){
         if(client.world==null||client.player==null||client.interactionManager==null||!controller.projectionRenderingEnabled()||!controller.options().printer.highlights){clear();return;}
         var sources=controller.printerSources();if(sources.isEmpty()){clear();return;}
-        advance(client.world,sources,controller.layerRange(),client.player.getEyePos(),controller.options().printer.highlightRange,controller::printerSampler,p->client.world.isChunkLoaded(p)?client.world.getBlockState(p):null,System::nanoTime);
+        advance(client.world,sources,controller.layerRange(),client.player.getEyePos(),controller.options().printer.highlightRange,controller::printerSampler,p->WorldChunks.loaded(client.world,p)?client.world.getBlockState(p):null,System::nanoTime);
     }
     void advance(Object nextWorld,List<?> nextSources,LayerRange nextLayer,Vec3d nextEye,double nextReach,Supplier<Function<Vec3i,ProjectionController.PrinterSample>> source,Function<BlockPos,BlockState> actual,LongSupplier clock){
         if(!Double.isFinite(nextReach)||nextReach<0||nextReach>32)throw new IllegalArgumentException("Highlight range must be 0–32");

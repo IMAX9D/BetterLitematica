@@ -91,7 +91,21 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     }
     PlacementTransform transform(){return layout.placement().transform();}
     PlacementLayout layout(){return layout;}
-    void scene(ProjectionScene value){scene=value;invalidate();}
+    void scene(ProjectionScene value){
+        var changes=value.changesFrom(scene,this);scene=value;if(changes.empty())return;
+        // The moved renderer already invalidated its own layout. Other renderers keep unrelated
+        // buffers, spatial queries and in-flight builds, including off-screen warm meshes.
+        var affected=new HashSet<SectionKey>();
+        meshes.forEach((key,mesh)->{if(changes.affects(sceneBounds(key)))affected.add(key);});
+        for(var key:failed)if(changes.affects(sceneBounds(key)))affected.add(key);
+        for(var key:deferred)if(changes.affects(sceneBounds(key)))affected.add(key);
+        if(job!=null&&changes.affects(sceneBounds(job.key))){affected.add(job.key);discardJob();}
+        for(var key:affected){meshes.remove(key);failed.remove(key);deferred.remove(key);}
+        blockEntities.keySet().removeIf(pos->changes.affects(new PlacementBounds(new Vec3i(pos.getX()-1,pos.getY()-1,pos.getZ()-1),new Vec3i(pos.getX()+1,pos.getY()+1,pos.getZ()+1))));
+        entities.sceneChanged(changes,entityCandidates);
+        if(!affected.isEmpty())wakeWorldRefresh();
+    }
+    private PlacementBounds sceneBounds(SectionKey key){var box=bounds(key);return new PlacementBounds(new Vec3i((int)box.minX-1,(int)box.minY-1,(int)box.minZ-1),new Vec3i((int)box.maxX,(int)box.maxY,(int)box.maxZ));}
     void drain(){stream.drain();}
     StateResolver1201 resolver(int region){var t=layout.part(region).transform();var linear=new PlacementTransform(Vec3i.ZERO,t.quarterTurns(),t.mirrorX(),t.mirrorZ());return resolvers.computeIfAbsent(linear,k->new StateResolver1201(metadata().palette(),k));}
     BlockState resolve(int region,int id){return resolver(region).resolve(id);}
@@ -152,7 +166,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     void worldBlockChanged(BlockPos pos,BlockState actual){
         var world=new Vec3i(pos.getX(),pos.getY(),pos.getZ());
         if(!layer.contains(world))return;
-        boolean changed=false;int raw=Block.getRawIdFromState(actual);boolean loaded=client.world.isChunkLoaded(pos);
+        boolean changed=false;int raw=Block.getRawIdFromState(actual);boolean loaded=WorldChunks.loaded(client.world,pos);
         var parts=layout.at(world,64);if(parts==null){worldAllChanged();return;}
         for(var part:parts){
             var local=part.local(world);var key=part.section(local);int cell=part.cell(local);
@@ -334,7 +348,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                 if(owner==null||owner.renderer()!=this||owner.region().index()!=current.key.region()){current.cursor++;processed++;continue;}
                 boolean pending=false;for(var direction:DIRECTIONS){var other=scene.sample(current.overlaps,world.add(new Vec3i(direction.getOffsetX(),direction.getOffsetY(),direction.getOffsetZ())));if(other!=null&&other.unknown())pending=true;}if(pending)return;
             }
-            BlockState state=states.resolve(id);var worldPos=new BlockPos(world.x(),world.y(),world.z());boolean loaded=client.world.isChunkLoaded(worldPos);
+            BlockState state=states.resolve(id);var worldPos=new BlockPos(world.x(),world.y(),world.z());boolean loaded=WorldChunks.loaded(client.world,worldPos);
             BlockState actual=loaded?client.world.getBlockState(worldPos):null;
             boolean complete=!states.unresolvedState(id)&&completedBlock(loaded,actual,state);
             current.mask.set(i,complete);current.wrong.set(i,!states.unresolvedState(id)&&wrongBlock(loaded,actual,state));

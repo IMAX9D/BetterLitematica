@@ -12,7 +12,7 @@ final class PrinterSettings {
     boolean stripLogs,noteTuning=true,bonemeal,composter,breakWrong,breakExtra,breakState,flowing=true;
     boolean forceSneak;
     PrinterSupply.Source supply=PrinterSupply.Source.NONE;
-    boolean iceWater,coralSubstitute,safeObserver=true,highlights=true,highlightOnTop=true;
+    boolean iceWater,coralSubstitute,safeObserver=true,containerFill=true,highlights=true,highlightOnTop=true;
     HighlightStyle highlightStyle=HighlightStyle.OUTLINE;
     int highlightMillis=1500,highlightRange=8,highlightLimit=0,placeColor=0xaa57c8d6,adjustColor=0xaae6cf70,breakColor=0xaad780ce,failedColor=0xaaf06464;
     boolean hud=true,missingHud=true,reverseX,reverseY,reverseZ;

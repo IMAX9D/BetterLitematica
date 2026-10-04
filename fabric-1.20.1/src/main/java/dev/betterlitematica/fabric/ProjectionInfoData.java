@@ -42,7 +42,7 @@ final class ProjectionInfoData {
             projection=side(data,at->{var cell=controller.informationCell(vector(at));return cell==null||cell.unknown()?new BlockData(null,null,"投影数据未加载"):projectionBlock(cell,vector(at));},bp);
         }
         Side actual;
-        if(client.world==null||!client.world.isChunkLoaded(bp))actual=unavailable(null,"未加载");
+        if(client.world==null||!WorldChunks.loaded(client.world,bp))actual=unavailable(null,"未加载");
         else {
             var state=client.world.getBlockState(bp);
             var server=client.getServer();
@@ -74,7 +74,7 @@ final class ProjectionInfoData {
                 if(result.isCancelled())return;
                 try {
                     var world=server.getWorld(dimension);
-                    if(world==null||!world.isChunkLoaded(pos)){result.complete(new ActualResult(null,unavailable(null,"未加载")));return;}
+                    if(world==null||!WorldChunks.loaded(world,pos)){result.complete(new ActualResult(null,unavailable(null,"未加载")));return;}
                     var data=actualBlock(world,pos);
                     result.complete(new ActualResult(data.state(),side(data,at->actualBlock(world,at),pos)));
                 }catch(RuntimeException e){result.complete(new ActualResult(null,unavailable(null,"数据读取失败")));}
@@ -86,7 +86,7 @@ final class ProjectionInfoData {
         return ready.side();
     }
     private static BlockData actualBlock(World world,BlockPos pos){
-        if(!world.isChunkLoaded(pos))return new BlockData(null,null,"未加载");
+        if(!WorldChunks.loaded(world,pos))return new BlockData(null,null,"未加载");
         var state=world.getBlockState(pos);
         try {
             var be=world.getBlockEntity(pos);var tag=be==null?null:be.createNbtWithId();
@@ -94,7 +94,7 @@ final class ProjectionInfoData {
             return new BlockData(state,tag,state.hasBlockEntity()&&be==null?"方块数据缺失":"");
         }catch(RuntimeException e){return new BlockData(state,null,"数据超过显示预算或读取失败");}
     }
-    private static BlockData projectionBlock(ProjectionScene.Cell cell,Vec3i pos){
+    static BlockData projectionBlock(ProjectionScene.Cell cell,Vec3i pos){
         var owner=cell.renderer();var state=owner.resolve(cell.region().index(),cell.id());
         if(owner.resolver(cell.region().index()).unresolved(cell.id()))return new BlockData(null,null,"未知方块");
         if(!state.hasBlockEntity())return new BlockData(state,null,"");

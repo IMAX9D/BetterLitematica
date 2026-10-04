@@ -10,6 +10,7 @@ public final class ModeWheelChecks {
         boolean focused=true,player=true;
         Input(){update(false,false);}
         ModeWheelInput.Lifecycle.Decision update(boolean down,boolean press){return state.update(world,connection,focused,player,screen,down,press);}
+        ModeWheelInput.Lifecycle.Decision update(boolean down,boolean press,boolean retained){return state.update(world,connection,focused,player,screen,down,press,retained);}
         void open(){var result=update(true,true);check(result.open()&&result.consume(),"Physical rising press opens and consumes");screen=new Object();state.bind(screen);}
         void release(){var previous=screen;var result=update(false,false);check(result.close()==previous&&result.consume(),"Release closes exactly the owned screen");screen=null;check(!state.claimed()&&state.owned()==null,"Release clears ownership");}
     }
@@ -27,6 +28,29 @@ public final class ModeWheelChecks {
             check(!in.update(true,true).open(),"Old physical hold cannot cross connection generation");in.update(false,false);in.open();in.release();
         }
         in=new Input();in.player=false;check(!in.update(true,true).open(),"No player cannot open wheel");in.player=true;check(!in.update(true,true).open(),"Player becoming ready does not replay old press");in.update(false,false);in.open();in.state.reset();in.screen=null;check(!in.update(true,true).open(),"Lifecycle reset does not resurrect a held Tab");in.update(false,false);in.open();in.release();
+        in=new Input();in.open();owned=in.screen;
+        for(int i=0;i<30;i++){
+            result=in.update(false,false,true);
+            check(result.consume()&&!result.open()&&result.close()==null&&in.state.owned()==owned&&in.state.claimed(),"Editing retains screen and world-input barrier after release");
+        }
+        result=in.update(true,true,true);check(result.close()==owned&&result.consume()&&!result.open(),"Fresh wheel key closes retained editor");in.screen=null;
+        for(int i=0;i<10;i++)check(!in.update(true,i%2==0,true).open(),"Closing retained editor cannot reopen during same hold");
+        in.update(false,false);in.open();in.release();
+        for(int change=0;change<6;change++){
+            in=new Input();in.open();owned=in.screen;in.update(false,false,true);
+            if(change==0)in.focused=false;
+            else if(change==1)in.world=new Object();
+            else if(change==2)in.connection=new Object();
+            else if(change==3){in.world=null;in.connection=null;in.player=false;}
+            else if(change==4)in.screen=null;
+            else in.screen=new Object();
+            result=in.update(false,false,true);
+            check(result.close()==(change<4?owned:null)&&!result.open()&&in.state.owned()==null,"Retained editor respects focus, session, Esc and external-screen ownership");
+            in.screen=null;in.focused=true;in.world=new Object();in.connection=new Object();in.player=true;in.update(false,false);
+            check(!in.update(false,false,true).open(),"Retained editor never resurrects without a new press");in.open();in.release();
+        }
+        in=new Input();in.open();in.update(false,false,true);in.state.reset();in.screen=null;
+        check(!in.state.claimed()&&in.state.owned()==null&&!in.update(false,false,true).open(),"Binding reset clears retained ownership");in.open();in.release();
         for(int bits=0;bits<16;bits++)for(var mode:WheelModes.values()){
             var original=new PrinterSettings();original.print=(bits&1)!=0;original.breakWrong=original.breakExtra=original.breakState=(bits&2)!=0;original.fluid=(bits&4)!=0;original.fill=(bits&8)!=0;
             original.highlightRange=31;original.highlightLimit=731;original.placeColor=0x11223344;original.interval=7;original.cooldown=13;original.skip.add("minecraft:diamond_block");

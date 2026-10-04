@@ -15,11 +15,10 @@ final class AnalysisScreen extends MenuScreen {
         var search=fieldAt("搜索",materials?materialQuery:errorQuery,left,22,innerWidth-100,120);
         if(materials){
             buttonAt(sort.label(),left+innerWidth-92,36,62,()->{sort=FileMaterials.Sort.values()[(sort.ordinal()+1)%FileMaterials.Sort.values().length];updateGrid(true);refresh();},true,false);buttonAt(descending?"↓":"↑",left+innerWidth-24,36,24,()->{descending=!descending;updateGrid(true);refresh();},true,false);
-            buttonAt("刷新",cellX(0,5),64,cellWidth(5),()->{controller.startMaterials(target);updateGrid(true);},placement!=null,true);
-            export=buttonAt("导出",cellX(1,5),64,cellWidth(5),()->controller.exportMaterials(target,multiplier,missingOnly,materialQuery,sort,descending),false,false);
-            buttonAt(missingOnly?"仅缺料":"全部材料",cellX(2,5),64,cellWidth(5),()->{missingOnly=!missingOnly;updateGrid(true);refresh();},true,false);
-            caption("倍数",cellX(3,5),67,28);multiplierInput=new OverlayTextField(cellX(3,5)+36,0,cellWidth(5)-42,"倍数");multiplierInput.setMaxLength(10);multiplierInput.setTextPredicate(AnalysisScreen::validMultiplierInput);multiplierInput.setText(Integer.toString(multiplier));addBody(multiplierInput,64);multiplierInput.setChangedListener(v->{if(!v.isEmpty()){multiplier=Integer.parseInt(v);updateGrid(false);}});
-            buttonAt("材料 HUD",cellX(4,5),64,cellWidth(5),()->{controller.select(target);controller.toggleMaterialHud();},placement!=null,false);
+            buttonAt("刷新",cellX(0,4),64,cellWidth(4),()->{controller.startMaterials(target);updateGrid(true);},placement!=null,true);
+            export=buttonAt("导出",cellX(1,4),64,cellWidth(4),()->controller.exportMaterials(target,multiplier,missingOnly,materialQuery,sort,descending),false,false);
+            buttonAt(missingOnly?"仅缺料":"全部材料",cellX(2,4),64,cellWidth(4),()->{missingOnly=!missingOnly;updateGrid(true);refresh();},true,false);
+            caption("倍数",cellX(3,4),67,28);multiplierInput=new OverlayTextField(cellX(3,4)+36,0,cellWidth(4)-42,"倍数");multiplierInput.setMaxLength(10);multiplierInput.setTextPredicate(AnalysisScreen::validMultiplierInput);multiplierInput.setText(Integer.toString(multiplier));addBody(multiplierInput,64);multiplierInput.setChangedListener(v->{if(!v.isEmpty()){multiplier=Integer.parseInt(v);updateGrid(false);}});
             if(placement!=null){if(grid==null)grid=new MaterialGrid(left,innerWidth,bodyBottom-bodyTop-94);addBody(grid,94);updateGrid(false);}search.setChangedListener(v->{materialQuery=v;updateGrid(true);});
         }else{
             multiplierInput=null;buttonAt(ignored?"已忽略":"错误",left+innerWidth-92,36,92,()->{ignored=!ignored;rows(true);refresh();},true,false);

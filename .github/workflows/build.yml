@@ -9,6 +9,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Install system fonts for Chinese UI checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y fonts-noto-cjk
       - run: bash scripts/test-core.sh
       - run: bash scripts/build.sh coreCheck :fabric-1.20.1:build
-# This workflow is provided as source. No remote CI run has been performed for this delivery.

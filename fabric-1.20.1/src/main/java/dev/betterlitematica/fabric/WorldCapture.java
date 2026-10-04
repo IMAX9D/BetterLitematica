@@ -47,7 +47,7 @@ final class WorldCapture {
         parts=regions.stream().map(Part::new).toList();queue=new DeferredSections(regions);for(var part:parts)extrasRemaining=Math.addExact(extrasRemaining,part.chunks());paletteEntries=parts.size();
     }
     World world(){return world;}CompletableFuture<List<LitematicExport.Capture>> result(){return result;}String status(){return status;}void cancel(){cancelled=true;}
-    private boolean available(SectionKey key){var part=parts.get(key.region());var region=part.region;var base=region.sectionOrigin(key);for(int x:new int[]{0,Math.min(15,region.size().x()-key.x()*16-1)})for(int z:new int[]{0,Math.min(15,region.size().z()-key.z()*16-1)})if(world.isChunkLoaded((base.x()+x)>>4,(base.z()+z)>>4))return true;return false;}
+    private boolean available(SectionKey key){var part=parts.get(key.region());var region=part.region;var base=region.sectionOrigin(key);for(int x:new int[]{0,Math.min(15,region.size().x()-key.x()*16-1)})for(int z:new int[]{0,Math.min(15,region.size().z()-key.z()*16-1)})if(WorldChunks.loaded(world,(base.x()+x)>>4,(base.z()+z)>>4))return true;return false;}
     private BlockStateSpec spec(BlockState state){var known=specs.get(state);if(known!=null)return known;if(specs.size()>=65536)throw new IllegalStateException("捕获方块状态过多");Map<String,String> properties=new TreeMap<>();state.getEntries().forEach((p,v)->properties.put(p.getName(),v.toString().toLowerCase(Locale.ROOT)));var value=state.isAir()?BlockStateSpec.AIR:new BlockStateSpec(Registries.BLOCK.getId(state.getBlock()).toString(),properties);specs.put(state,value);return value;}
     void tick(){
         if(result.isDone())return;if(cancelled){status="已取消捕获";result.cancel(false);return;}ticks++;
@@ -58,7 +58,7 @@ final class WorldCapture {
                 var work=queue.poll(ticks);if(work==null)break;var part=parts.get(work.key.region());var region=part.region;var base=region.sectionOrigin(work.key);
                 if(!available(work.key)){work.retryAt=ticks+20;queue.unavailable(work);continue;}
                 while(work.cursor<4096&&budget>0&&System.nanoTime()<deadline){
-                    int cell=work.cursor++;if(work.done.get(cell))continue;var at=base.add(new Vec3i(cell&15,cell>>>8,(cell>>>4)&15));if(!region.contains(at)){work.done.set(cell);continue;}var pos=new BlockPos(at.x(),at.y(),at.z());if(!world.isChunkLoaded(pos))continue;budget--;
+                    int cell=work.cursor++;if(work.done.get(cell))continue;var at=base.add(new Vec3i(cell&15,cell>>>8,(cell>>>4)&15));if(!region.contains(at)){work.done.set(cell);continue;}var pos=new BlockPos(at.x(),at.y(),at.z());if(!WorldChunks.loaded(world,pos))continue;budget--;
                     var state=spec(world.getBlockState(pos));Integer id=part.palette.get(state);if(id==null){if(part.palette.size()>=65536||paletteEntries>=262144)throw new IllegalStateException("捕获调色板过大");id=part.palette.size();part.palette.put(state,id);paletteEntries++;}
                     var offset=at.subtract(region.min());part.blocks[offset.x()+offset.z()*region.size().x()+offset.y()*region.size().x()*region.size().z()]=id;
                     var entity=world.getBlockEntity(pos);if(entity!=null){if(++blockEntityCount>65536)throw new IllegalStateException("方块实体超过捕获预算");var tag=NbtBridge.compound(entity.createNbtWithIdentifyingData(),nbtBudget);tag.put("x",offset.x());tag.put("y",offset.y());tag.put("z",offset.z());part.blockEntities.add(tag);}
@@ -69,8 +69,8 @@ final class WorldCapture {
             }
             // Cycle across parts and chunks. One missing chunk cannot block all other extras.
             if(queue.finished()){
-                if(extras!=null&&!world.isChunkLoaded(extras.chunkX,extras.chunkZ))extras=null;
-                int attempts=256;while(extras==null&&extrasRemaining>0&&attempts-->0&&System.nanoTime()<deadline){var part=parts.get(extraPart);extraPart=(extraPart+1)%parts.size();int index=part.extraCursor++;if(part.extraCursor>=part.chunks())part.extraCursor=0;if(part.extrasDone.get(index))continue;int chunkX=part.firstX+index%part.chunksX,chunkZ=part.firstZ+index/part.chunksX;if(world.isChunkLoaded(chunkX,chunkZ))extras=new Extras(part,index);}
+                if(extras!=null&&!WorldChunks.loaded(world,extras.chunkX,extras.chunkZ))extras=null;
+                int attempts=256;while(extras==null&&extrasRemaining>0&&attempts-->0&&System.nanoTime()<deadline){var part=parts.get(extraPart);extraPart=(extraPart+1)%parts.size();int index=part.extraCursor++;if(part.extraCursor>=part.chunks())part.extraCursor=0;if(part.extrasDone.get(index))continue;int chunkX=part.firstX+index%part.chunksX,chunkZ=part.firstZ+index/part.chunksX;if(WorldChunks.loaded(world,chunkX,chunkZ))extras=new Extras(part,index);}
                 if(extras!=null&&System.nanoTime()<deadline)captureExtras(deadline);
             }
             if(queue.finished()&&extrasRemaining==0){status="捕获完成";result.complete(parts.stream().map(Part::capture).toList());}

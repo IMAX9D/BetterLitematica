@@ -30,7 +30,8 @@ final class SelectionScreen extends MenuScreen {
             for(int axis=0;axis<3;axis++){int a=axis;int x=right+axis*(cw+8);caption(new String[]{"X","Y","Z"}[axis],x,y+26,12);var field=new OverlayTextField(x+18,0,cw-24,"坐标");field.setMaxLength(12);field.setText(draft[row][axis]==null?Integer.toString(values[axis]):draft[row][axis]);field.setChangedListener(v->draft[r][a]=v);field.setEditable(has);coordinates[row][axis]=field;addBody(field,y+24);}
         }
         buttonAt("应用坐标",right,214,w,()->{controller.selectionCoordinates(read(0),read(1),read(2));draft=null;refresh();},has,true);
-        output=fieldAt("文件名",fileName,left,244,innerWidth-162,100);output.setChangedListener(v->fileName=v);
+        output=fieldAt("文件名",fileName,left,244,innerWidth-262,100);output.setChangedListener(v->fileName=v);
+        buttonAt(controller.options().capturePreviews?"附带预览：开":"附带预览：关",left+innerWidth-254,258,92,()->{controller.options().capturePreviews=!controller.options().capturePreviews;controller.saveOptions();refresh();},true,controller.options().capturePreviews);
         buttonAt("保存投影",left+innerWidth-154,258,76,()->{controller.selectionCoordinates(read(0),read(1),read(2));seen=controller.selection();controller.capture(fileName);draft=null;refresh();},has,true);
         buttonAt("取消捕获",left+innerWidth-70,258,70,controller::cancelCapture,true,false);
         fixed("创建投影",0,80,()->{controller.selectionCoordinates(read(0),read(1),read(2));seen=controller.selection();controller.captureTemporary();draft=null;refresh();}).active=has;

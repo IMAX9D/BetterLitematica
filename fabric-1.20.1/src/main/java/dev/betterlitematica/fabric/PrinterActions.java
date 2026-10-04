@@ -25,7 +25,9 @@ final class PrinterActions {
     private static final Direction[] SIDES=Direction.values();private static final double[] HEIGHTS={0.25,0.75};
     private final Map<BlockState,PlacementHint> placementHints=new LinkedHashMap<>();
     private final java.util.function.Supplier<AccuratePlacement.Mode> protocol;
-    PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed){this.client=client;this.protocol=protocol;this.transfers=transfers;this.supply=new PrinterSupply(client);this.miner=new ExternalMiner(client,allowed);}
+    private final PrinterContainers containers;
+    PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed){this(client,transfers,protocol,allowed,null);}
+    PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed,PrinterContainers containers){this.client=client;this.protocol=protocol;this.transfers=transfers;this.supply=new PrinterSupply(client);this.miner=new ExternalMiner(client,allowed);this.containers=containers;}
     void checkMiner(){miner.check();}
     String cleanupError(){return miner.problem();}
     boolean supplyTick(int tick){boolean work=supply.tick(tick);if(work)reason=supply.reason();return work;}
@@ -69,8 +71,18 @@ final class PrinterActions {
         ItemStack requested=place.isOf(Blocks.LIGHT)
             ?LightBlock.addNbtForLevel(new ItemStack(item),place.get(LightBlock.LEVEL_15))
             :stack(item);
+        ContainerPrintTarget container=null;
+        if(settings.containerFill&&containers!=null&&ContainerPrintTarget.supported(place)){
+            try{container=containers.placement(pos);}catch(RuntimeException pending){return fail(Outcome.RETRY,pending.getMessage());}
+            if(client.player.isCreative())requested=container.placementStack();
+            else{int slot=InventoryTransfers.find(client.player.getInventory(),container::safeSurvivalItem);if(slot>=0)requested=client.player.getInventory().getStack(slot);else{missing=item;return fail(Outcome.MISSING,"缺少可用容器");}}
+        }
         var plan=placement(pos,place,settings,requested);if(plan==null)return fail(Outcome.RETRY,"等待可用放置面");
-        if(place.isOf(Blocks.LIGHT)){
+        if(container!=null){
+            var selected=client.player.isCreative()?transfers.equipContainerForPrinter(requested,tick):transfers.equipForPrinter(container::safeSurvivalItem,tick);
+            if(selected==InventoryTransfers.Result.WAIT)return fail(Outcome.WAIT,"等待换手");
+            if(selected==InventoryTransfers.Result.MISSING){missing=item;return fail(Outcome.MISSING,"缺少可用容器");}
+        }else if(place.isOf(Blocks.LIGHT)){
             var selected=transfers.equipForPrinter(requested,tick);
             if(selected==InventoryTransfers.Result.WAIT)return fail(Outcome.WAIT,"等待换手");
             if(selected==InventoryTransfers.Result.MISSING)return fail(Outcome.MISSING,"缺少匹配光源方块");
@@ -118,9 +130,9 @@ final class PrinterActions {
         }
         return found!=Items.AIR?found:first;
     }
-    private boolean dry(BlockPos pos,BlockState state){if(state.contains(Properties.WATERLOGGED)&&state.get(Properties.WATERLOGGED))return false;for(Direction side:Direction.values()){BlockPos next=pos.offset(side);if(!client.world.isChunkLoaded(next)||!client.world.getFluidState(next).isEmpty())return false;}return true;}
+    private boolean dry(BlockPos pos,BlockState state){if(state.contains(Properties.WATERLOGGED)&&state.get(Properties.WATERLOGGED))return false;for(Direction side:Direction.values()){BlockPos next=pos.offset(side);if(!WorldChunks.loaded(client.world,next)||!client.world.getFluidState(next).isEmpty())return false;}return true;}
     private Outcome iceWater(PrinterQueue.Job job,BlockPos pos,BlockState actual,PrinterSettings settings,int tick){
-        boolean eligible=!client.player.isCreative()&&!client.world.getDimension().ultrawarm()&&client.world.isChunkLoaded(pos.down())&&(client.world.getBlockState(pos.down()).blocksMovement()||!client.world.getFluidState(pos.down()).isEmpty());
+        boolean eligible=!client.player.isCreative()&&!client.world.getDimension().ultrawarm()&&WorldChunks.loaded(client.world,pos.down())&&(client.world.getBlockState(pos.down()).blocksMovement()||!client.world.getFluidState(pos.down()).isEmpty());
         if(!eligible){reset();return fail(Outcome.UNSUPPORTED,"此处无法破冰成水");}
         if(ice==null){var plan=placement(pos,Blocks.ICE.getDefaultState(),settings,stack(Items.ICE));if(plan==null)return fail(Outcome.RETRY,"等待可用放置面");var selected=equip(Items.ICE,tick);if(selected!=null)return selected;var placed=use(plan.hit(),plan.yaw(),plan.pitch(),plan.sneak(),pos,Blocks.ICE.getDefaultState());if(placed!=Outcome.SENT)return placed;ice=new dev.betterlitematica.core.IceWaterPlan(job.generation(),job.position(),tick);icePosition=pos.toImmutable();return fail(Outcome.WAIT,"等待放冰确认");}
         var step=ice.next(tick,observation(actual),eligible);if(step==dev.betterlitematica.core.IceWaterPlan.Step.ABORT){reset();return fail(Outcome.UNSUPPORTED,"破冰放水未完成");}if(step==dev.betterlitematica.core.IceWaterPlan.Step.DONE){reset();return Outcome.SENT;}

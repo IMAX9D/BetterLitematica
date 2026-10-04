@@ -11,6 +11,7 @@
     "PickBlockMixin",
     "ToolScrollMixin",
     "VerificationBlockMixin",
+    "PasteBlockMixin",
     "VerificationChunkMixin",
     "PrinterBlockUpdateMixin",
     "SupplyInteractionMixin",

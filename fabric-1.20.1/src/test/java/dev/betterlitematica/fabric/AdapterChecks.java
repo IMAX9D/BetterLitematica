@@ -14,6 +14,18 @@ public final class AdapterChecks {
     private static void check(boolean value,String message){checks++;if(!value)throw new AssertionError(message);}
     public static void main(String[] args)throws Exception{
         SharedConstants.createGameVersion();Bootstrap.initialize();
+        checks+=PreviewAdapterChecks.run();
+        checks+=UiDesignChecks.run();checks+=HudNumberChecks.run();checks+=ToolHudChecks.run();
+        checks+=ToolEditorChecks.run();checks+=ToolInventoryChecks.run();checks+=ToolInteractionChecks.run();checks+=ToolSelectionResizeChecks.run();
+        checks+=ToolWorldOperationChecks.run();
+        checks+=PasteSchedulingChecks.run();
+        checks+=CommandWakeupChecks.run();
+        checks+=PrinterContainerSettingsChecks.run();
+        checks+=ContainerFillPlanChecks.run();
+        checks+=ContainerPrintTargetChecks.run();
+        checks+=SceneChangesChecks.run();
+        checks+=WheelRenderModeChecks.run();
+        checks+=WheelRenderUiChecks.run();
         checks+=PrinterThroughputChecks.run();
         checks+=PlacementValidationChecks.run();
         checks+=InputEntryChecks.run();
@@ -203,15 +215,15 @@ public final class AdapterChecks {
         var files=new java.util.ArrayList<dev.betterlitematica.runtime.SessionIo.FileEntry>();
         for(int i=0;i<30;i++)files.add(new dev.betterlitematica.runtime.SessionIo.FileEntry("file"+i,"file"+i,i==0));
         browser.entries(files,"");browser.mouseClicked(370,10,0);
-        check(opened.size()==1&&opened.get(0).equals(files.get(2)),"Browser third column opens correct file");
-        browser.mouseClicked(179,10,0);browser.mouseClicked(10,27,0);
+        check(opened.size()==1&&opened.get(0).equals(files.get(0)),"Browser entire row opens its file");
+        browser.mouseClicked(543,10,0);browser.mouseClicked(10,27,0);
         check(opened.size()==1,"Browser gaps do not open files");
         browser.mouseScrolled(10,10,-1);browser.mouseClicked(10,10,0);
-        check(browser.scrollOffset()==30&&opened.get(1).equals(files.get(3)),"Browser scrolled hit matches visible row");
-        browser.mouseScrolled(10,10,-1000);check(browser.scrollOffset()==210,"Browser clamps final row");
+        check(browser.scrollOffset()==30&&opened.get(1).equals(files.get(1)),"Browser scrolled hit matches visible row");
+        browser.mouseScrolled(10,10,-1000);check(browser.scrollOffset()==810,"Browser clamps final row");
         int openedBefore=opened.size();browser.mouseClicked(548,20,0);browser.mouseReleased(548,20,0);
         check(opened.size()==openedBefore,"Scrollbar does not open files");
-        browser.keyPressed(269,0,0);check(browser.scrollOffset()==210,"Browser End reaches final row");
+        browser.keyPressed(269,0,0);check(browser.scrollOffset()==810,"Browser End reaches final row");
         browser.entries(files.subList(0,1),"");check(browser.scrollOffset()==0,"Directory change resets scroll");
         check(BrowserGrid.marqueeOffset(56,0.4)==0,"Marquee pauses at start");
         check(Math.abs(BrowserGrid.marqueeOffset(56,1.8)-28)<0.001,"Marquee moves forward");

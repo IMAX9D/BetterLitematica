@@ -9,15 +9,17 @@ import java.util.*;
 /** Complete temporary sources, distinct from lossy/resident render caches and persistent user files. */
 public final class TemporarySources implements AutoCloseable {
     private static final String PREFIX="@temporary/";
+    private static final long ENTRY_BYTES=4096,MAX_BYTES=256L*1024*1024;
     public record Reference(Path path,Path root,boolean temporary){
         public Path read()throws IOException{Path base=root.toRealPath(),source=path.toRealPath();if(!source.startsWith(base)||!Files.isRegularFile(source))throw new IOException("投影源文件越界或不存在");return source;}
     }
     private static final class Entry {final Path path;long bytes;int readers;boolean ready;Entry(Path path){this.path=path;}}
-    private final Path directory;
+    private final Path directory;private final long maxBytes;
     private final Map<String,Entry> entries=new LinkedHashMap<>();private final Map<Path,Entry> retired=new LinkedHashMap<>();private long generation,bytes;private boolean closed;
     private final java.util.concurrent.ExecutorService cleaner=new java.util.concurrent.ThreadPoolExecutor(1,1,0,java.util.concurrent.TimeUnit.MILLISECONDS,new java.util.concurrent.ArrayBlockingQueue<>(1),r->{var thread=new Thread(r,"betterlitematica-source-cleanup");thread.setDaemon(true);return thread;});
     private java.util.concurrent.CompletableFuture<Void> cleaning;
-    public TemporarySources(Path cache){directory=cache.resolve("temporary-sources").resolve(UUID.randomUUID().toString()).toAbsolutePath().normalize();}
+    public TemporarySources(Path cache){this(cache,MAX_BYTES);}
+    public TemporarySources(Path cache,long maxBytes){if(maxBytes<ENTRY_BYTES||maxBytes>MAX_BYTES)throw new IllegalArgumentException("Invalid temporary source byte budget");this.maxBytes=maxBytes;directory=cache.resolve("temporary-sources").resolve(UUID.randomUUID().toString()).toAbsolutePath().normalize();}
     public static boolean temporary(String source){return source.startsWith(PREFIX);}
     public synchronized Reference reference(Path schematics,String source){
         if(!temporary(source))return new Reference(schematics.resolve(source),schematics,false);
@@ -32,10 +34,10 @@ public final class TemporarySources implements AutoCloseable {
     public synchronized Lease lease(Path schematics,String source){var reference=reference(schematics,source);var entry=entries.get(source);if(entry!=null)entry.readers++;return new Lease(reference,entry);}
     public String create(Map<String,Object> root,Cancellation cancellation)throws IOException{
         String name=UUID.randomUUID()+".litematic",key=PREFIX+name;Entry entry=new Entry(directory.resolve(name));long epoch;
-        synchronized(this){if(closed)throw new IOException("临时资源已关闭");if(entries.size()+retired.size()>=16)throw new IOException("临时投影已达上限");epoch=generation;entries.put(key,entry);}
+        synchronized(this){if(closed)throw new IOException("临时资源已关闭");if(bytes>maxBytes-ENTRY_BYTES)throw new IOException("临时投影超过缓存预算");epoch=generation;entry.bytes=ENTRY_BYTES;bytes+=ENTRY_BYTES;entries.put(key,entry);}
         boolean committed=false;
         try{cancellation.check();Files.createDirectories(directory);NbtWriter.writeNew(entry.path,root,()->cancellation.cancelled()||stale(epoch));long size=Files.size(entry.path);
-            synchronized(this){cancellation.check();if(epoch!=generation)throw new InterruptedIOException("临时投影已取消");if(size>64L*1024*1024||bytes+size>256L*1024*1024)throw new IOException("临时投影超过缓存预算");entry.bytes=size;entry.ready=true;bytes+=size;committed=true;return key;}
+            synchronized(this){cancellation.check();if(epoch!=generation)throw new InterruptedIOException("临时投影已取消");if(size>64L*1024*1024||bytes>maxBytes-size)throw new IOException("临时投影超过缓存预算");entry.bytes+=size;entry.ready=true;bytes+=size;committed=true;return key;}
         }finally{if(!committed){synchronized(this){if(entries.remove(key,entry))bytes-=entry.bytes;}Files.deleteIfExists(entry.path);}}
     }
     private synchronized boolean stale(long epoch){return epoch!=generation;}

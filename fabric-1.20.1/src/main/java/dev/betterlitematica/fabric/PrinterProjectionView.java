@@ -16,7 +16,6 @@ final class PrinterProjectionView implements Function<Vec3i,ProjectionController
     private final boolean unboundedPending;
     private final Map<Vec3i,Section> sections=new HashMap<>();
     PrinterProjectionView(List<ProjectionController.PrinterSource> sources){
-        if(sources.size()>PlacementSession.MAX_PLACEMENTS)throw new IllegalArgumentException("Too many printer sources");
         var ready=new ArrayList<ProjectionRenderer1201>();var pending=new ArrayList<PlacementLayout>();boolean unknown=false;
         for(var source:sources){if(!source.placement().enabled())continue;
             if(source.renderer()!=null)ready.add(source.renderer());
@@ -38,7 +37,7 @@ final class PrinterProjectionView implements Function<Vec3i,ProjectionController
     private Section section(Vec3i key){
         var min=new Vec3i(key.x()<<4,key.y()<<4,key.z()<<4);var box=new PlacementBounds(min,min.add(new Vec3i(15,15,15)));
         var readyParts=new ArrayList<ProjectionScene.Part>();var pendingParts=new ArrayList<PlacementLayout.Part>();
-        // Layout trees are already built. Metadata caps each at1024 regions, with at most8 sources.
+        // Source count is unrestricted; only local query results and cached sections are bounded.
         for(var renderer:ready){for(var part:renderer.layout().overlapping(box)){if(readyParts.size()+pendingParts.size()==MAX_PARTS)return new Section(List.of(),List.of(),true);readyParts.add(new ProjectionScene.Part(renderer,part));}}
         for(var layout:pending){for(var part:layout.overlapping(box)){if(readyParts.size()+pendingParts.size()==MAX_PARTS)return new Section(List.of(),List.of(),true);pendingParts.add(part);}}
         return new Section(List.copyOf(readyParts),List.copyOf(pendingParts),false);

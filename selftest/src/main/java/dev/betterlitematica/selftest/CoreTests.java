@@ -22,6 +22,10 @@ public final class CoreTests {
     public static void main(String[] args)throws Exception{
         long started=System.nanoTime();temp=Files.createTempDirectory("betterlitematica-test-");
         try{
+            test("antialiased status badges and bounded physical rasters",()->{checks+=StatusBadgeChecks.run();});
+            test("complete source previews, embedded digests and bounded cache",()->{checks+=SchematicPreviewChecks.run(temp.resolve("previews"));});
+            test("axis handle geometry and stable signed grid dragging",()->{checks+=AxisGizmoChecks.run();});
+            test("placement quantity uses byte budgets not fixed counts",()->{checks+=UnlimitedPlacementChecks.run();});
             test("complete bounded directory search and cancellation",()->{checks+=DirectorySearchChecks.run(temp);});
             test("draft persistence ordering and failure recovery",()->{checks+=DraftRecoveryChecks.run(temp.resolve("recovery"));});
             test("finite material batches avoid needless switches without starvation",()->{checks+=PrinterBatchChecks.run();});
@@ -109,7 +113,7 @@ public final class CoreTests {
                 catalog.delete(catalog.clear());check(!Files.exists(ref.path())&&Files.exists(schematics.resolve(restored.placements().get(0).source())),"Clearing session resources deletes only owned temporary files");expect(IllegalArgumentException.class,()->catalog.reference(schematics,key));
                 expect(InterruptedIOException.class,()->catalog.create(root,()->true));var began=new java.util.concurrent.CountDownLatch(1);var resume=new java.util.concurrent.CountDownLatch(1);var error=new AtomicReference<Throwable>();var first=new AtomicBoolean(true);
                 Thread worker=new Thread(()->{try{catalog.create(root,()->{if(first.getAndSet(false)){began.countDown();try{resume.await();}catch(InterruptedException e){Thread.currentThread().interrupt();}}return false;});}catch(Throwable e){error.set(e);}});worker.start();check(began.await(5,java.util.concurrent.TimeUnit.SECONDS),"Temporary creation reaches cancellation boundary");var stale=catalog.clear();resume.countDown();worker.join(5000);check(!worker.isAlive()&&error.get() instanceof InterruptedIOException,"World switch prevents an in-flight temporary source from publishing");catalog.delete(stale);
-                for(int i=0;i<16;i++)catalog.create(root,Cancellation.NEVER);expect(IOException.class,()->catalog.create(root,Cancellation.NEVER));catalog.delete(catalog.clear());
+                for(int i=0;i<32;i++){String extra=catalog.create(root,Cancellation.NEVER);check(Files.isRegularFile(catalog.reference(schematics,extra).read()),"Temporary sources beyond 16 retain full documents");}catalog.delete(catalog.clear());
                 try(var busy=new SessionIo()){var release=new java.util.concurrent.CountDownLatch(1);var startedCleanup=new java.util.concurrent.CountDownLatch(1);busy.submit(()->{startedCleanup.countDown();release.await();return null;});check(startedCleanup.await(5,java.util.concurrent.TimeUnit.SECONDS),"Settings worker blocked for cleanup isolation check");for(int i=0;i<32;i++)busy.submit(()->null);String extra=catalog.create(root,Cancellation.NEVER);Path path=catalog.reference(schematics,extra).read();catalog.remove(extra);try{catalog.cleanupAsync().get(5,java.util.concurrent.TimeUnit.SECONDS);check(!Files.exists(path)&&!catalog.cleanupPending(),"Owned source cleanup succeeds even while settings IO is full");}finally{release.countDown();}}catalog.close();
             });
             test("command transactions park independently and resume",()->{
@@ -530,7 +534,7 @@ public final class CoreTests {
                 expect(IllegalArgumentException.class,()->new PlacementSession(List.of(p),UUID.randomUUID(),LayerRange.ALL,0.5f,true));
                 expect(IllegalArgumentException.class,()->new PlacementSession(List.of(p),p.id(),LayerRange.ALL,Float.NaN,true));
                 List<Placement> list=new ArrayList<>();for(int i=0;i<9;i++)list.add(p.duplicate());
-                expect(IllegalArgumentException.class,()->new PlacementSession(list,null,LayerRange.ALL,0.5f,true));
+                check(new PlacementSession(list,null,LayerRange.ALL,0.5f,true).placements().size()==9,"Session accepts more than eight independent identities");
                 var snapshot=new PlacementSession(List.of(p),p.id(),LayerRange.ALL,0.5f,true);
                 expect(UnsupportedOperationException.class,()->snapshot.placements().clear());
             });

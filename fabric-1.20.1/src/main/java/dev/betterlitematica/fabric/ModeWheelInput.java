@@ -22,13 +22,14 @@ final class ModeWheelInput {
     static boolean reservesKey(MinecraftClient client,int key){return key>=0&&key==BetterLitematicaClient.wheelKeyCode()&&client.world!=null&&client.player!=null;}
     static boolean reservesTab(MinecraftClient client){return reservesKey(client,GLFW.GLFW_KEY_TAB);}
     private boolean available(){return boundKey>=0&&client.world!=null&&client.player!=null;}
+    private boolean retained(){return client.currentScreen instanceof ModeWheelScreen wheel&&wheel.retained();}
     private void synchronizeBinding(){int next=bindingCode(controller.options().keys.getOrDefault("wheel","TAB"));if(next!=boundKey){clear();boundKey=next;}}
 
     boolean key(long window,int key,int scan,int action){
         synchronizeBinding();
         if(window!=client.getWindow().getHandle()||boundKey<0||key!=boundKey)return false;
         boolean down=action!=GLFW.GLFW_RELEASE;
-        var decision=lifecycle.update(client.world,client.getNetworkHandler(),client.isWindowFocused(),client.player!=null,client.currentScreen,down,action==GLFW.GLFW_PRESS);
+        var decision=lifecycle.update(client.world,client.getNetworkHandler(),client.isWindowFocused(),client.player!=null,client.currentScreen,down,action==GLFW.GLFW_PRESS,retained());
         apply(decision);
         if(decision.consume()||available())clearTab();
         return decision.consume()||available()&&client.currentScreen==null;
@@ -36,7 +37,7 @@ final class ModeWheelInput {
     void tick(){
         synchronizeBinding();
         boolean held=boundKey>=0&&InputUtil.isKeyPressed(client.getWindow().getHandle(),boundKey);
-        apply(lifecycle.update(client.world,client.getNetworkHandler(),client.isWindowFocused(),client.player!=null,client.currentScreen,held,false));
+        apply(lifecycle.update(client.world,client.getNetworkHandler(),client.isWindowFocused(),client.player!=null,client.currentScreen,held,false,retained()));
         if(available())clearTab();
         if(mouseRelease&&!mouseDown())mouseRelease=false;
         if(blocksWorldInput())clearMouseBindings();
@@ -82,6 +83,9 @@ final class ModeWheelInput {
         void bind(Object screen){owned=screen;}
         void reset(){world=null;connection=null;owned=null;initialized=false;down=false;blocked=true;claimed=false;}
         Decision update(Object nextWorld,Object nextConnection,boolean focused,boolean player,Object screen,boolean physicalDown,boolean pressEvent){
+            return update(nextWorld,nextConnection,focused,player,screen,physicalDown,pressEvent,false);
+        }
+        Decision update(Object nextWorld,Object nextConnection,boolean focused,boolean player,Object screen,boolean physicalDown,boolean pressEvent,boolean retained){
             boolean consume=claimed;Object close=null;
             if(!initialized||world!=nextWorld||connection!=nextConnection){
                 if(owned!=null&&owned==screen)close=owned;
@@ -95,11 +99,13 @@ final class ModeWheelInput {
             }
             if(owned!=null&&screen!=owned){owned=null;blocked=physicalDown;}
             if(!physicalDown){
+                if(retained&&owned!=null&&owned==screen){down=false;blocked=false;claimed=true;return new Decision(true,false,null);}
                 if(owned!=null&&owned==screen)close=owned;
                 owned=null;down=false;blocked=false;claimed=false;
                 return new Decision(consume,false,close);
             }
             boolean rising=!down;down=true;
+            if(retained&&owned!=null&&owned==screen&&rising&&pressEvent){close=owned;owned=null;blocked=true;claimed=true;return new Decision(true,false,close);}
             if(screen!=null&&screen!=owned){blocked=true;return new Decision(consume,false,null);}
             if(pressEvent&&rising&&!blocked&&screen==null){claimed=true;return new Decision(true,true,null);}
             return new Decision(consume,false,null);

@@ -6,18 +6,22 @@ import org.lwjgl.glfw.GLFW;
 import java.util.*;
 
 final class OptionsScreen extends MenuScreen {
-    private TextFieldWidget chord,search;private String selected="menu",query="";private boolean keys,recording;private OverlayList list;
+    private TextFieldWidget chord,search;private String selected="menu",query="";private int tab;private boolean recording;private OverlayList list;
     private final Map<String,String> drafts=new HashMap<>();private final LinkedHashSet<String> pressed=new LinkedHashSet<>();
     private net.minecraft.client.gui.widget.ButtonWidget cancelRecord;
+    private final net.minecraft.client.gui.widget.ButtonWidget[] tabs=new net.minecraft.client.gui.widget.ButtonWidget[3];
     OptionsScreen(Screen parent,ProjectionController controller){super("设置与快捷键","",parent,controller,true);}
     private String on(boolean v){return v?"开启":"关闭";}
     private void save(){controller.saveOptions();refresh();}
+    private void selectTab(int next){recording=false;pressed.clear();tab=next;refresh();}
     private void bind(String value){String normalized=InputBindings.normalize(value),conflict=InputBindings.conflict(controller.options().keys,selected,normalized);if(selected.equals("wheel"))ModeWheelInput.bindingCode(normalized);if(!conflict.isEmpty())throw new IllegalArgumentException("快捷键已用于："+InputBindings.label(conflict));controller.options().keys.put(selected,normalized);drafts.put(selected,normalized);controller.saveOptions();refresh();}
     private void rows(){if(list!=null)list.rows(controller.options().keys.keySet().stream().filter(k->(InputBindings.label(k)+k).toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT))).map(k->new OverlayList.Row(k,InputBindings.label(k),!controller.options().keys.get(k).isEmpty())).toList(),selected);}
     @Override protected void buildMenu(){
-        button("交互设置",0,3,0,()->{recording=false;keys=false;refresh();},true,!keys);button("显示",1,3,0,()->client.setScreen(new DisplayScreen(this,controller)));button("快捷键",2,3,0,()->{keys=true;refresh();},true,keys);var s=controller.options();
-        if(!keys){
-            button("选区工具："+on(s.tool),0,2,2,()->{s.tool=!s.tool;save();});button("模式："+(s.mode.equals("SELECTION")?"选区":"摆放"),1,2,2,()->{s.mode=s.mode.equals("SELECTION")?"PLACEMENT":"SELECTION";save();});
+        chord=null;search=null;cancelRecord=null;
+        tabs[0]=button("交互设置",0,3,0,()->selectTab(0),true,tab==0);tabs[1]=button("显示",1,3,0,()->selectTab(1),true,tab==1);tabs[2]=button("快捷键",2,3,0,()->selectTab(2),true,tab==2);var s=controller.options();
+        if(tab==1){DisplayScreen.buildControls(this,controller,2,()->client.setScreen(new LayerScreen(this,controller)),this::save);}
+        else if(tab==0){
+            button("选区工具："+on(s.tool),0,2,2,()->{s.tool=!s.tool;save();});button("工具设置",1,2,2,()->client.setScreen(new ToolScreen(this,controller)));
             button("简单放置："+on(s.easyPlace),0,2,3,()->{s.easyPlace=!s.easyPlace;save();});button("按住连续："+on(s.hold),1,2,3,()->{s.hold=!s.hold;save();});
             button("放置限制："+on(s.restriction),0,2,4,()->{s.restriction=!s.restriction;save();});button("投影拾取："+on(s.pick),1,2,4,()->{s.pick=!s.pick;save();});button("选区边框："+on(s.boxes),0,2,5,()->{s.boxes=!s.boxes;save();});
             button("精确放置："+s.accurate.label(),1,2,5,()->{s.accurate=AccuratePlacement.Mode.values()[(s.accurate.ordinal()+1)%AccuratePlacement.Mode.values().length];controller.printer().pause("设置已更改");save();});
@@ -38,6 +42,6 @@ final class OptionsScreen extends MenuScreen {
     @Override protected void updateMenu(){if(recording&&!client.isWindowFocused()){recording=false;pressed.clear();refresh();}}
     @Override public boolean keyPressed(int key,int scan,int modifiers){if(!recording)return super.keyPressed(key,scan,modifiers);if(key==GLFW.GLFW_KEY_ESCAPE){recording=false;refresh();return true;}controller.action(()->{pressed.add(InputBindings.name(key));if(pressed.size()>4)throw new IllegalArgumentException("最多四键组合");});return true;}
     @Override public boolean keyReleased(int key,int scan,int modifiers){if(!recording)return super.keyReleased(key,scan,modifiers);if(!pressed.isEmpty()){recording=false;controller.action(()->bind(String.join("+",pressed)));refresh();}return true;}
-    @Override public boolean mouseClicked(double x,double y,int button){if(!recording||hits(cancelRecord,x,y))return super.mouseClicked(x,y,button);if(footerHit(x,y)){recording=false;return super.mouseClicked(x,y,button);}if(button>=0&&button<8){pressed.add("MOUSE"+(button+1));recording=false;controller.action(()->bind(String.join("+",pressed)));refresh();}return true;}
+    @Override public boolean mouseClicked(double x,double y,int button){if(!recording||hits(cancelRecord,x,y))return super.mouseClicked(x,y,button);if(button==0)for(var tab:tabs)if(hits(tab,x,y)){recording=false;pressed.clear();return super.mouseClicked(x,y,button);}if(footerHit(x,y)){recording=false;return super.mouseClicked(x,y,button);}if(button>=0&&button<8){pressed.add("MOUSE"+(button+1));recording=false;controller.action(()->bind(String.join("+",pressed)));refresh();}return true;}
     @Override public boolean charTyped(char chr,int modifiers){return recording||super.charTyped(chr,modifiers);}
 }

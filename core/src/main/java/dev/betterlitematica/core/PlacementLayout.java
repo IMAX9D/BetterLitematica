@@ -21,6 +21,8 @@ public final class PlacementLayout {
     }
     public Placement placement(){return placement;}public Part part(int i){return parts[i];}public int size(){return parts.length;}
     public boolean enabled(int i){return placement.enabled()&&placement.region(parts[i].region()).enabled();}
+    public boolean intersects(PlacementBounds box){return intersectsAny(root,box);}
+    private static boolean intersectsAny(Node node,PlacementBounds box){return node!=null&&intersects(node.bounds(),box)&&(node.part()!=null||intersectsAny(node.a(),box)||intersectsAny(node.b(),box));}
     public List<Part> overlapping(PlacementBounds box){var result=new ArrayList<Part>();collect(root,box,result);result.sort(Comparator.comparingInt(Part::index));return List.copyOf(result);}
     public List<Part> at(Vec3i position){return overlapping(new PlacementBounds(position,position));}
     /** Null reports result/node-budget overflow, including broad overlapping bounds with few hits. */

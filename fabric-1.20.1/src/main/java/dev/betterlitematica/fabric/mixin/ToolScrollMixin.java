@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Mouse.class)
 abstract class ToolScrollMixin {
     @Inject(method="onMouseButton",at=@At("HEAD"),cancellable=true)
-    private void betterlitematica$button(long window,int button,int action,int modifiers,CallbackInfo callback){if(BetterLitematicaClient.wheelMouse(window,button,action)){callback.cancel();return;}BetterLitematicaClient.inputEvent(window,-button-1,action);}
+    private void betterlitematica$button(long window,int button,int action,int modifiers,CallbackInfo callback){if(BetterLitematicaClient.wheelMouse(window,button,action)){callback.cancel();return;}if(BetterLitematicaClient.toolInput(window,-button-1,action)){callback.cancel();return;}BetterLitematicaClient.inputEvent(window,-button-1,action);}
     @Inject(method="onMouseScroll",at=@At("HEAD"),cancellable=true)
     private void betterlitematica$scroll(long window,double horizontal,double vertical,CallbackInfo callback){if(BetterLitematicaClient.scrollTool(vertical))callback.cancel();}
 }

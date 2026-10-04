@@ -3,7 +3,7 @@
   "id": "betterlitematica",
   "version": "${version}",
   "name": "BetterLitematica",
-  "description": "Independent blueprint engine. Development preview; see VALIDATION.md.",
+  "description": "Independent blueprint engine. Development preview; see README.md.",
   "environment": "client",
   "entrypoints": {
     "client": [

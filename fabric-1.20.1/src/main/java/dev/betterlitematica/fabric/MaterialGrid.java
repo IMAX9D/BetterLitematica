@@ -29,6 +29,8 @@ final class MaterialGrid extends ButtonWidget {
         if(key==264)scroll+=36;else if(key==265)scroll-=36;else if(key==267)scroll+=height;else if(key==266)scroll-=height;else if(key==268)scroll=0;else if(key==269)scroll=maxScroll();else return false;
         clamp();return true;
     }
+    private final Map<Integer,UiMotion> motion=new LinkedHashMap<>();
+    private UiMotion motion(int index){if(motion.size()>128)motion.clear();return motion.computeIfAbsent(index,key->new UiMotion());}
     @Override public void renderButton(DrawContext ctx,int mouseX,int mouseY,float delta){
         var ui=IndependentUi.INSTANCE;int cardWidth=(width-10-(COLUMNS-1)*GAP)/COLUMNS,hover=-1;
         ui.clip(getX(),getY(),getX()+width,getY()+height);
@@ -39,7 +41,7 @@ final class MaterialGrid extends ButtonWidget {
                 int index=row*COLUMNS+col;if(index>=rows.size())break;var material=rows.get(index);
                 int x=getX()+col*(cardWidth+GAP);double y=getY()+row*ROW-scroll;boolean over=mouseX>=x&&mouseX<x+cardWidth&&mouseY>=Math.max(getY(),y)&&mouseY<Math.min(getY()+height,y+ROW-GAP);
                 if(over)hover=index;
-                ui.rect(x,y,x+cardWidth,y+ROW-GAP,over?UiTheme.HOVER:UiTheme.SURFACE);
+                ui.roundRect(x,y,x+cardWidth,y+ROW-GAP,7,UiMotion.mix(UiTheme.SURFACE,UiTheme.HOVER,motion(index).hover(over)));
                 ui.item(icons.get(index),x+4,y+4,22);
                 ui.text(material.item().getName().getString(),x+30,y+7,cardWidth-34,UiTheme.TEXT);
                 ui.text("总 "+material.total(),x+5,y+29,cardWidth-10,UiTheme.SECONDARY);
@@ -48,12 +50,13 @@ final class MaterialGrid extends ButtonWidget {
                 ui.text("有 "+material.available(),x+5,y+53,cardWidth-10,UiTheme.SECONDARY);
             }
         }finally{ui.unclip();}
-        if(maxScroll()>0){double thumb=Math.max(18,height*(double)height/content()),y=getY()+(height-thumb)*scroll/maxScroll();ui.rect(getX()+width-5,getY(),getX()+width-2,getY()+height,UiTheme.TRACK);ui.rect(getX()+width-5,y,getX()+width-2,y+thumb,UiTheme.ACCENT);}
+        if(maxScroll()>0){double thumb=Math.max(18,height*(double)height/content()),y=getY()+(height-thumb)*scroll/maxScroll();ui.roundRect(getX()+width-5,getY(),getX()+width-2,getY()+height,1.5,UiTheme.TRACK);ui.roundRect(getX()+width-5,y,getX()+width-2,y+thumb,1.5,UiTheme.ACCENT);}
         if(hover>=0){var m=rows.get(hover);int x=Math.min(getX()+width-244,Math.max(getX(),mouseX+10)),y=Math.min(getY()+height-44,Math.max(getY(),mouseY+12));
             ctx.getMatrices().push();ctx.getMatrices().translate(0,0,400);
-            try{ui.rect(x,y,x+240,y+42,UiTheme.TOOLTIP);ui.text(m.item().getName().getString(),x+6,y+4,228,UiTheme.TEXT);
+            try{ui.shadow(x,y,x+240,y+42,7);ui.roundRect(x,y,x+240,y+42,7,UiTheme.TOOLTIP);ui.text(m.item().getName().getString(),x+6,y+4,228,UiTheme.TEXT);
             int stack=Math.max(1,m.item().getMaxCount());ui.text(m.total()/stack+" 组 "+m.total()%stack+" 个 · "+(long)Math.ceil(m.total()/(stack*27.0))+" 盒",x+6,y+23,228,UiTheme.SECONDARY);
             }finally{ctx.getMatrices().pop();}
         }
+        if(isFocused())ui.roundFrame(getX(),getY(),getX()+width-9,getY()+height,7,UiTheme.FOCUS);
     }
 }

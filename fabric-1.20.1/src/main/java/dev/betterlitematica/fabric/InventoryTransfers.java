@@ -13,6 +13,7 @@ final class InventoryTransfers {
     private final MinecraftClient client;
     private final java.util.function.Supplier<InteractionOptions> options;
     private final CreativeEchoes creativeEchoes=new CreativeEchoes();
+    private final InventoryPolicy.ToolProtection toolProtection=new InventoryPolicy.ToolProtection();
     /** Vanilla applies old S2C slot values directly. Keep our latest ordered C2S intent per slot. */
     static final class CreativeEchoes {
         private final ItemStack[] latest=new ItemStack[9];
@@ -23,6 +24,7 @@ final class InventoryTransfers {
     private Predicate<ItemStack> pending;private int slot,startedTick;private long stamp,containerStamp;private boolean echo,watched;
     InventoryTransfers(MinecraftClient client,java.util.function.Supplier<InteractionOptions> options){this.client=client;this.options=options;}
     void reset(){watched=false;}
+    boolean inFlight(){return pending!=null;}
     private void clearPending(){pending=null;watched=false;}
     void clear(){clearPending();creativeEchoes.clear();}
     String settle(int tick){if(pending==null)return null;var p=client.player;if(p==null){clear();return null;}if(InventoryReceipts.containerStamp()>containerStamp){clearPending();return null;}if(confirmed(tick,startedTick,echo,stamp,InventoryReceipts.stamp(slot),pending.test(p.getInventory().getStack(slot)))){clearPending();return null;}if(tick-startedTick>100){boolean report=watched&&client.currentScreen==null;watched=false;return report?"换手未确认，请打开容器后重试":null;}return null;}
@@ -41,15 +43,22 @@ final class InventoryTransfers {
     Result equipForPrinter(ItemStack wanted,int tick){
         var exact=wanted.copy();return equip(stack->matchesStack(stack,exact),null,tick,true,exact);
     }
+    Result equipContainerForPrinter(ItemStack wanted,int tick){
+        var exact=wanted.copy();return equip(stack->matchesStack(stack,exact),null,tick,true,exact,true);
+    }
     static boolean matchesStack(ItemStack actual,ItemStack wanted){return wanted.isEmpty()?actual.isEmpty():!actual.isEmpty()&&ItemStack.canCombine(actual,wanted);}
     static boolean canCreate(boolean creative,boolean localCreative,Item item,ItemStack exact){
         return exact!=null?creative&&localCreative&&!exact.isEmpty():creative&&item!=null&&item!=Items.AIR;
+    }
+    static boolean canCreateMaterial(boolean creative,boolean localCreative,Item item,ItemStack exact,Predicate<ItemStack> protection){
+        return canCreate(creative,localCreative,item,exact)&&!protection.test(exact!=null?exact:new ItemStack(item));
     }
     static int find(net.minecraft.entity.player.PlayerInventory inventory,Predicate<ItemStack> matches){
         if(matches.test(inventory.getMainHandStack()))return inventory.selectedSlot;
         for(int i=0;i<36;i++)if(matches.test(inventory.getStack(i)))return i;
         return -1;
     }
+    static Predicate<ItemStack> materialMatch(Predicate<ItemStack> matches,Predicate<ItemStack> protection){return stack->!protection.test(stack)&&matches.test(stack);}
     static void creativePick(net.minecraft.entity.player.PlayerInventory inventory,Item item,int destination,java.util.function.Consumer<ItemStack> send,Runnable select){
         if(item==Items.AIR)throw new IllegalArgumentException("Invalid creative pick");
         creativePick(inventory,new ItemStack(item),destination,send,select);
@@ -72,20 +81,24 @@ final class InventoryTransfers {
         return equip(matches,creativeItem,tick,retainMaterials,null);
     }
     private Result equip(Predicate<ItemStack> matches,Item creativeItem,int tick,boolean retainMaterials,ItemStack exact){
+        return equip(matches,creativeItem,tick,retainMaterials,exact,false);
+    }
+    private Result equip(Predicate<ItemStack> matches,Item creativeItem,int tick,boolean retainMaterials,ItemStack exact,boolean container){
         var player=client.player;var inv=player.getInventory();
         if(pending!=null){
             if(InventoryReceipts.containerStamp()<=containerStamp&&!confirmed(tick,startedTick,echo,stamp,InventoryReceipts.stamp(slot),pending.test(inv.getStack(slot)))){if(tick-startedTick>100)throw new IllegalStateException("换手未确认，请打开容器后重试");return Result.WAIT;}
             clearPending();
         }
         if(player.currentScreenHandler!=player.playerScreenHandler)return Result.WAIT;
+        var settings=options.get();var protection=toolProtection.get(settings.tool,settings.toolItem);var material=materialMatch(matches,protection);
         boolean localCreative=client.getServer()!=null&&player.isCreative()&&client.interactionManager.getCurrentGameMode().isCreative();
-        if(matches.test(inv.getMainHandStack()))return reconcileCreative(inv,inv.selectedSlot,localCreative)?Result.READY:Result.MISSING;
-        int source=find(inv,matches);
-        if(source<0&&!canCreate(player.isCreative(),localCreative,creativeItem,exact))return Result.MISSING;
-        if(source>=0&&source<9){if(!reconcileCreative(inv,source,localCreative))return Result.MISSING;inv.selectedSlot=source;client.interactionManager.syncSelectedSlot();return Result.READY;}
-        var settings=options.get();Item tool=settings.tool?InventoryPolicy.tool(settings.toolItem):null;
-        int destination=retainMaterials?InventoryPolicy.printerDestination(inv,settings.protectedHotbar,tool):InventoryPolicy.destination(inv,settings.protectedHotbar,tool);
-        if(retainMaterials&&localCreative){
+        boolean creativePick=localCreative||container&&player.isCreative()&&client.interactionManager.getCurrentGameMode().isCreative();
+        if(material.test(inv.getMainHandStack()))return reconcileCreative(inv,inv.selectedSlot,creativePick)?Result.READY:Result.MISSING;
+        int source=find(inv,material);
+        if(source<0&&!canCreateMaterial(player.isCreative(),creativePick,creativeItem,exact,protection))return Result.MISSING;
+        if(source>=0&&source<9){if(!reconcileCreative(inv,source,creativePick))return Result.MISSING;inv.selectedSlot=source;client.interactionManager.syncSelectedSlot();return Result.READY;}
+        int destination=retainMaterials?InventoryPolicy.printerDestinationWithProtection(inv,settings.protectedHotbar,protection):InventoryPolicy.destinationWithProtection(inv,settings.protectedHotbar,protection);
+        if(retainMaterials&&creativePick){
             var picked=source>=9?inv.getStack(source):exact!=null?exact:new ItemStack(creativeItem);
             if(!client.getNetworkHandler().hasFeature(picked.getItem().getRequiredFeatures()))return Result.MISSING;
             // Same ordering as the vanilla creative pick operation. No inventory receipt is

@@ -73,24 +73,30 @@ final class ProjectionOverlays {
             }}finally{matrices.pop();buffers.draw(lines);buffers.draw(faces);}
     }
     static void selection(MinecraftClient client,WorldRenderContext context,dev.betterlitematica.core.AreaSelection selection,dev.betterlitematica.core.SelectionTarget target){
+        selection(client,context,selection,target,false);
+    }
+    static void selection(MinecraftClient client,WorldRenderContext context,dev.betterlitematica.core.AreaSelection selection,dev.betterlitematica.core.SelectionTarget target,boolean allNodes){
         if(selection.boxes().isEmpty()||context.matrixStack()==null)return;
         var matrices=context.matrixStack();var camera=context.camera().getPos();var buffers=client.getBufferBuilders().getEntityVertexConsumers();var vertices=buffers.getBuffer(RenderLayer.getLines());
         matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);
-        try{for(var box:selection.boxes()){var r=box.region();boolean selected=box.name().equals(selection.selected());WorldRenderer.drawBox(matrices,vertices,new Box(r.min().x(),r.min().y(),r.min().z(),(double)r.min().x()+r.size().x(),(double)r.min().y()+r.size().y(),(double)r.min().z()+r.size().z()),selected?0:1,1,selected?1:0,1);if(selected){var a=box.first();var b=box.second();WorldRenderer.drawBox(matrices,vertices,new Box(a.x()-0.1,a.y()-0.1,a.z()-0.1,a.x()+1.1,a.y()+1.1,a.z()+1.1),0.25f,0.6f,1f,1f);WorldRenderer.drawBox(matrices,vertices,new Box(b.x()-0.1,b.y()-0.1,b.z()-0.1,b.x()+1.1,b.y()+1.1,b.z()+1.1),1f,0.7f,0.2f,1f);}}
+        try{for(var box:selection.boxes()){var r=box.region();boolean selected=box.name().equals(selection.selected());WorldRenderer.drawBox(matrices,vertices,new Box(r.min().x(),r.min().y(),r.min().z(),(double)r.min().x()+r.size().x(),(double)r.min().y()+r.size().y(),(double)r.min().z()+r.size().z()),selected?0:1,1,selected?1:0,1);if(selected||allNodes){var a=box.first();var b=box.second();WorldRenderer.drawBox(matrices,vertices,new Box(a.x()-0.1,a.y()-0.1,a.z()-0.1,a.x()+1.1,a.y()+1.1,a.z()+1.1),0.25f,0.6f,1f,1f);WorldRenderer.drawBox(matrices,vertices,new Box(b.x()-0.1,b.y()-0.1,b.z()-0.1,b.x()+1.1,b.y()+1.1,b.z()+1.1),1f,0.7f,0.2f,1f);}}
             var o=selection.origin();boolean origin=target!=null&&target.part()==dev.betterlitematica.core.SelectionTarget.Part.ORIGIN;WorldRenderer.drawBox(matrices,vertices,new Box(o.x()-0.2,o.y()-0.2,o.z()-0.2,o.x()+0.2,o.y()+0.2,o.z()+0.2),1,origin?1:0.2f,origin?1:0.2f,1);
         }
         finally{matrices.pop();buffers.draw(RenderLayer.getLines());}
     }
     static void placements(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.PlacementLayout> layouts,java.util.UUID selected,DisplayOptions settings){
-        if(!settings.placementBounds&&!settings.regionBounds&&!settings.origins||context.matrixStack()==null)return;
+        placements(client,context,layouts,selected,settings,false,null,dev.betterlitematica.core.Vec3i.ZERO);
+    }
+    static void placements(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.PlacementLayout> layouts,java.util.UUID selected,DisplayOptions settings,boolean toolBounds,java.util.UUID previewId,dev.betterlitematica.core.Vec3i previewOffset){
+        if(!toolBounds&&!settings.placementBounds&&!settings.regionBounds&&!settings.origins||context.matrixStack()==null)return;
         var matrices=context.matrixStack();var camera=context.camera().getPos();var buffers=client.getBufferBuilders().getEntityVertexConsumers();var layer=OverlayLayers.lines(false);var vertices=buffers.getBuffer(layer);
-        matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);try{int drawn=0;for(var layout:layouts){boolean active=layout.placement().id().equals(selected);Box total=null;
-            for(int i=0;i<layout.size();i++){if(!layout.enabled(i))continue;var part=layout.part(i);var min=part.bounds().min();var max=part.bounds().max();var box=new Box(min.x(),min.y(),min.z(),(double)max.x()+1,(double)max.y()+1,(double)max.z()+1);total=total==null?box:total.union(box);
+        matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);try{int drawn=0;for(var layout:layouts){boolean active=layout.placement().id().equals(selected);Box total=null;var offset=layout.placement().id().equals(previewId)?previewOffset:dev.betterlitematica.core.Vec3i.ZERO;
+            for(int i=0;i<layout.size();i++){if(!layout.enabled(i))continue;var part=layout.part(i);var min=part.bounds().min();var max=part.bounds().max();var box=new Box(min.x(),min.y(),min.z(),(double)max.x()+1,(double)max.y()+1,(double)max.z()+1).offset(offset.x(),offset.y(),offset.z());total=total==null?box:total.union(box);
                 if(settings.regionBounds&&drawn<1024&&(context.frustum()==null||context.frustum().isVisible(box))){WorldRenderer.drawBox(matrices,vertices,box,active?.3f:.5f,.8f,1,.8f);drawn++;}
-                if(settings.origins&&settings.regionBounds&&drawn<1024){var pos=part.transform().apply(part.region().anchor());WorldRenderer.drawBox(matrices,vertices,new Box(pos.x()-.15,pos.y()-.15,pos.z()-.15,pos.x()+.15,pos.y()+.15,pos.z()+.15),1,.7f,.2f,1);drawn++;}
+                if(settings.origins&&settings.regionBounds&&drawn<1024){var pos=part.transform().apply(part.region().anchor()).add(offset);WorldRenderer.drawBox(matrices,vertices,new Box(pos.x()-.15,pos.y()-.15,pos.z()-.15,pos.x()+.15,pos.y()+.15,pos.z()+.15),1,.7f,.2f,1);drawn++;}
             }
-            if(settings.placementBounds&&total!=null&&(context.frustum()==null||context.frustum().isVisible(total)))WorldRenderer.drawBox(matrices,vertices,total,active?0:0.4f,active?1:.7f,1,1);
-            if(settings.origins){var pos=layout.placement().transform().origin();WorldRenderer.drawBox(matrices,vertices,new Box(pos.x()-.25,pos.y()-.25,pos.z()-.25,pos.x()+.25,pos.y()+.25,pos.z()+.25),1,.3f,.4f,1);}
+            if((settings.placementBounds||toolBounds)&&total!=null&&(context.frustum()==null||context.frustum().isVisible(total)))WorldRenderer.drawBox(matrices,vertices,total,active?0:0.4f,active?1:.7f,1,active?1:.55f);
+            if(settings.origins||toolBounds&&active){var pos=layout.placement().transform().origin().add(offset);WorldRenderer.drawBox(matrices,vertices,new Box(pos.x()-.25,pos.y()-.25,pos.z()-.25,pos.x()+.25,pos.y()+.25,pos.z()+.25),1,.3f,.4f,1);}
         }}finally{matrices.pop();buffers.draw(layer);}
     }
     static void marker(MinecraftClient client,WorldRenderContext context,dev.betterlitematica.core.Vec3i pos){

@@ -6,39 +6,42 @@ import net.minecraft.text.Text;
 import java.util.*;
 import java.util.function.Consumer;
 
-/** A clipped, virtual three-column directory viewport. */
+/** A clipped, virtual single-column directory viewport. */
 final class BrowserGrid extends ButtonWidget {
-    private static final int COLUMNS=3,ROW=30,GAP=5;
+    private static final int COLUMNS=1,ROW=30,GAP=5;
     private final Consumer<SessionIo.FileEntry> open;
     private List<SessionIo.FileEntry> entries=List.of();
-    private String empty="";
+    private String empty="",selected="";
     private double scroll;
     private boolean dragging;
     private int hovered=-1;
     private long hoverStart;
     BrowserGrid(int x,int width,int height,Consumer<SessionIo.FileEntry> open){super(x,0,width,height,Text.literal("投影文件"),b->{},DEFAULT_NARRATION_SUPPLIER);this.open=open;}
     void entries(List<SessionIo.FileEntry> next,String empty){boolean unchanged=entries.equals(next);entries=List.copyOf(next);this.empty=empty;if(!unchanged){scroll=0;hovered=-1;dragging=false;}}
+    void selected(String path){selected=path==null?"":path;}
+    String selectedPath(){return selected;}
     double scrollOffset(){return scroll;}
     private int cardWidth(){return (width-10-(COLUMNS-1)*GAP)/COLUMNS;}
     private int content(){return ((entries.size()+COLUMNS-1)/COLUMNS)*ROW;}
     private int maxScroll(){return Math.max(0,content()-height);}
     private void clamp(){scroll=Math.max(0,Math.min(scroll,maxScroll()));hovered=-1;}
     private int hit(double x,double y){
-        if(!isMouseOver(x,y))return -1;
+        if(!visible||!active||!isMouseOver(x,y))return -1;
         double dx=x-getX(),dy=y-getY()+scroll;int w=cardWidth(),col=(int)(dx/(w+GAP)),row=(int)(dy/ROW);
         if(col>=COLUMNS||dx-col*(w+GAP)>=w||dy-row*ROW>=ROW-GAP)return -1;
         int index=row*COLUMNS+col;return index<entries.size()?index:-1;
     }
-    @Override public boolean mouseScrolled(double x,double y,double amount){if(!isMouseOver(x,y))return false;scroll-=amount*ROW;clamp();return true;}
+    @Override public boolean mouseScrolled(double x,double y,double amount){if(!visible||!active||!isMouseOver(x,y))return false;scroll-=amount*ROW;clamp();return true;}
     @Override public boolean mouseClicked(double x,double y,int button){
-        if(button!=0||!isMouseOver(x,y))return false;setFocused(true);
+        if(!visible||!active||button!=0||!isMouseOver(x,y))return false;setFocused(true);
         dragging=maxScroll()>0&&x>=getX()+width-8;
-        if(dragging)dragTo(y);else{int index=hit(x,y);if(index>=0)open.accept(entries.get(index));}return true;
+        if(dragging)dragTo(y);else{int index=hit(x,y);if(index>=0){motion(index).press();open.accept(entries.get(index));}}return true;
     }
     private void dragTo(double y){double thumb=Math.max(18,height*(double)height/Math.max(1,content()));scroll=(y-getY()-thumb/2)/Math.max(1,height-thumb)*maxScroll();clamp();}
-    @Override public boolean mouseDragged(double x,double y,int button,double dx,double dy){if(!dragging||button!=0)return false;dragTo(y);return true;}
+    @Override public boolean mouseDragged(double x,double y,int button,double dx,double dy){if(!active||!dragging||button!=0)return false;dragTo(y);return true;}
     @Override public boolean mouseReleased(double x,double y,int button){boolean was=dragging;dragging=false;return was;}
     @Override public boolean keyPressed(int key,int scan,int modifiers){
+        if(!visible||!active)return false;
         if(key==264)scroll+=ROW;else if(key==265)scroll-=ROW;else if(key==267)scroll+=height;else if(key==266)scroll-=height;else if(key==268)scroll=0;else if(key==269)scroll=maxScroll();else return false;clamp();return true;
     }
     // Pause at both ends, move at a constant speed, then repeat without jumping.
@@ -47,6 +50,8 @@ final class BrowserGrid extends ButtonWidget {
         if(phase<0.8)return 0;if(phase<0.8+travel)return (phase-0.8)*28;
         if(phase<1.6+travel)return overflow;return Math.max(0,overflow-(phase-1.6-travel)*28);
     }
+    private final Map<Integer,UiMotion> motion=new LinkedHashMap<>();
+    private UiMotion motion(int index){if(motion.size()>128)motion.clear();return motion.computeIfAbsent(index,key->new UiMotion());}
     @Override public void renderButton(DrawContext ctx,int mouseX,int mouseY,float delta){
         var ui=IndependentUi.INSTANCE;int hover=hit(mouseX,mouseY),w=cardWidth();long now=System.nanoTime();
         if(hover!=hovered){hovered=hover;hoverStart=now;}
@@ -57,10 +62,11 @@ final class BrowserGrid extends ButtonWidget {
             for(int row=first;row<last;row++)for(int col=0;col<COLUMNS;col++){
                 int index=row*COLUMNS+col;if(index>=entries.size())break;var file=entries.get(index);
                 int x=getX()+col*(w+GAP);double y=getY()+row*ROW-scroll;
-                ui.rect(x,y,x+w,y+ROW-GAP,index==hover?UiTheme.HOVER:UiTheme.SURFACE);
+                ui.roundRect(x,y,x+w,y+ROW-GAP,6,UiMotion.mix(file.path().equals(selected)?UiTheme.SELECTED:UiTheme.SURFACE,UiTheme.HOVER,motion(index).hover(index==hover)));
+                if(file.path().equals(selected))ui.roundFrame(x,y,x+w,y+ROW-GAP,6,UiTheme.ACCENT);
                 // A small folder/document silhouette avoids repeated type labels.
                 int color=file.directory()?UiTheme.ACCENT:UiTheme.SECONDARY;
-                ui.rect(x+5,y+8,x+13,y+17,color);
+                ui.roundRect(x+5,y+8,x+13,y+17,1.5,color);
                 if(file.directory())ui.rect(x+5,y+6,x+9,y+9,color);
                 else ui.rect(x+7,y+10,x+11,y+11,UiTheme.SURFACE);
                 double tx=x+18,ty=y+(ROW-GAP-ui.lineHeight())/2.0,space=w-24;
@@ -70,6 +76,7 @@ final class BrowserGrid extends ButtonWidget {
                 }else ui.text(file.name(),tx,ty,space,UiTheme.TEXT);
             }
         }finally{ui.unclip();}
-        if(maxScroll()>0){double thumb=Math.max(18,height*(double)height/content()),y=getY()+(height-thumb)*scroll/maxScroll();ui.rect(getX()+width-5,getY(),getX()+width-2,getY()+height,UiTheme.TRACK);ui.rect(getX()+width-5,y,getX()+width-2,y+thumb,UiTheme.ACCENT);}
+        if(maxScroll()>0){double thumb=Math.max(18,height*(double)height/content()),y=getY()+(height-thumb)*scroll/maxScroll();ui.roundRect(getX()+width-5,getY(),getX()+width-2,getY()+height,1.5,UiTheme.TRACK);ui.roundRect(getX()+width-5,y,getX()+width-2,y+thumb,1.5,UiTheme.ACCENT);}
+        if(isFocused())ui.roundFrame(getX(),getY(),getX()+width-9,getY()+height,6,UiTheme.FOCUS);
     }
 }

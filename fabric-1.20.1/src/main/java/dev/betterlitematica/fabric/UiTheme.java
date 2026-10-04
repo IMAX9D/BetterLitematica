@@ -1,13 +1,16 @@
 package dev.betterlitematica.fabric;
 
-/** Shared neutral palette for the independent overlay, never world rendering. */
+/** Porcelain surfaces and ink text. These tokens never affect world highlights. */
 final class UiTheme {
     private UiTheme() {}
-    static final int BACKDROP=0xb809090b, PANEL=0xff18191b, INPUT=0xff121315;
-    static final int SURFACE=0xff242628, SELECTED=0xff34332f, HOVER=0xff323538;
-    static final int BORDER=0xff3c3f42, DIVIDER=0xff303235, TRACK=0xff292c2f;
-    static final int TEXT=0xffeeede9, SECONDARY=0xffb5b6b7, MUTED=0xff929698;
-    static final int ACCENT=0xffcebb98, FOCUS=0xffe5d8bd, DISABLED=0xff202224;
-    static final int DISABLED_TEXT=0xff85898d, SELECTION=0xff5b554a, TOOLTIP=0xff101113;
-    static final int WARNING=0xffd4b183, SUCCESS=0xffa5bba5, ERROR=0xffdfaaa4;
+    static final int BACKDROP=0x54232b3e, PANEL=0xfff7f8fa, INPUT=0xffffffff;
+    static final int OVERLAY_PANEL=0xdff7f8fa, OVERLAY_SURFACE=0xdcebefF5, OVERLAY_SELECTED=0xe5e3e8fa;
+    static final int SURFACE=0xffeceff4, SELECTED=0xffe2e7fb, HOVER=0xffe1e6f0;
+    static final int BORDER=0xffd4dae4, DIVIDER=0xffe1e5ec, TRACK=0xffe4e8ef;
+    static final int TEXT=0xff242b39, SECONDARY=0xff535f73, MUTED=0xff637087;
+    static final int ACCENT=0xff596cca, FOCUS=0xff4056b4, DISABLED=0xfff0f2f5;
+    static final int DISABLED_TEXT=0xff939cac, SELECTION=0xffced8f6, TOOLTIP=0xfffdfdff;
+    static final int WARNING=0xff865815, SUCCESS=0xff22694f, ERROR=0xffad424f;
+    static final int SHADOW=0x12232b3e;
+    static final double BUTTON_RADIUS=5, CARD_RADIUS=7, PANEL_RADIUS=11;
 }

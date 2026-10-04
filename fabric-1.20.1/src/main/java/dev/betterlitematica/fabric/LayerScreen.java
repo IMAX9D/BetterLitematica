@@ -9,7 +9,7 @@ final class LayerScreen extends MenuScreen {
     static int second(LayerRange value){return value.max()==Integer.MAX_VALUE?first(value):value.max();}
     private void sync(LayerRange value){axis=value.axis();mode=value.mode();first=Integer.toString(first(value));second=Integer.toString(second(value));}
     private static int coordinate(String text){int value=Integer.parseInt(text);if(value< -30_000_000||value>30_000_000)throw new IllegalArgumentException("层数超出坐标范围");return value;}
-    private void apply(){int a=mode==LayerRange.Mode.ALL?0:coordinate(first),b=mode==LayerRange.Mode.RANGE?coordinate(second):a;var value=LayerRange.of(axis,mode,a,b);controller.layer(value.axis(),value.min(),value.max());}
+    private void apply(){int a=mode==LayerRange.Mode.ALL?0:coordinate(first),b=mode==LayerRange.Mode.RANGE?coordinate(second):a;var value=LayerRange.of(axis,mode,a,b);controller.layer(value.axis(),value.min(),value.max());controller.explicitLayerMode(mode);}
     @Override protected void buildMenu(){
         var modes=LayerRange.Mode.values();String[] labels={"全部","单层","范围","以上","以下"};for(int i=0;i<modes.length;i++){var next=modes[i];buttonAt(labels[i],cellX(i,5),0,cellWidth(5),()->mode(next),true,mode==next);}
         for(int i=0;i<3;i++){var next=LayerRange.Axis.values()[i];button(next.name(),i,3,2,()->{var old=axis;axis=next;try{apply();refresh();}catch(RuntimeException e){axis=old;throw e;}},true,axis==next);}

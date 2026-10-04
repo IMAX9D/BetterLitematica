@@ -106,6 +106,17 @@ final class ProjectionEntities implements AutoCloseable {
         }finally{if(bound)shader.unbind();VertexBuffer.unbind();RenderSystem.setShaderTexture(0,previousTexture);RenderSystem.enableCull();RenderSystem.setShaderColor(color[0],color[1],color[2],color[3]);if(previous!=null)RenderSystem.setShader(()->previous);}
     }
     String error(){return error;}
+    void sceneChanged(SceneChanges changes,List<Candidate> candidates){
+        var affected=new HashSet<Key>();
+        meshes.forEach((key,mesh)->{if(changes.affects(sampleBounds(mesh.position())))affected.add(key);});
+        for(var candidate:candidates)if(changes.affects(sampleBounds(candidate.position())))affected.add(candidate.key());
+        for(var key:affected){meshes.remove(key);measuredBounds.remove(key);}
+        // Failed or resource-blocked candidates may no longer be in the current nearby list.
+        // Let them retry when visited, without dropping successful unrelated entity meshes.
+        failed.clear();deferred.clear();waitingRevision=-1;
+        if(!affected.isEmpty()){boundsRevision++;preparedBoundsRevision=-1;}
+    }
+    private static PlacementBounds sampleBounds(Vec3d p){return new PlacementBounds(new dev.betterlitematica.core.Vec3i(MathHelper.floor(p.x)-32,MathHelper.floor(p.y)-32,MathHelper.floor(p.z)-32),new dev.betterlitematica.core.Vec3i(MathHelper.floor(p.x)+32,MathHelper.floor(p.y)+32,MathHelper.floor(p.z)+32));}
     void suspend(){meshes.forEach((key,mesh)->mesh.resources().priority(RenderResources.COLD));preparedBoundsRevision=-1;preparedCandidates=null;visible.clear();scratchVisible.clear();nearbyKeys.clear();}
     void invalidate(){meshes.close();failed.clear();deferred.clear();measuredBounds.clear();visible.clear();scratchVisible.clear();nearbyKeys.clear();preparedBoundsRevision=-1;preparedCandidates=null;waitingRevision=-1;error="";}
     @Override public void close(){invalidate();if(buffer.isBuilding())buffer.end().release();buffer.clear();}

@@ -25,8 +25,19 @@ final class CreativeFillTask {
         var actor=world.getServer().getPlayerManager().getPlayer(player);if(actor==null||!actor.isCreative()||actor.getServerWorld()!=world){result.completeExceptionally(new IllegalStateException("需要在同一世界保持创造模式"));return;}
         long until=System.nanoTime()+2_000_000;int budget=512;
         try{while(!cursor.done()&&budget-->0&&System.nanoTime()<until){Vec3i p=cursor.local();BlockPos pos=new BlockPos(p.x(),p.y(),p.z());if(!world.isChunkLoaded(pos)){status="填充等待区块 "+(p.x()>>4)+","+(p.z()>>4);return;}if(!world.getWorldBorder().contains(pos))throw new IllegalStateException("选区超出世界边界");
-            var current=world.getBlockState(pos);if((!replace||current.equals(states.resolve(1)))&&!current.equals(states.resolve(0))){world.setBlockState(pos,states.resolve(0),Block.NOTIFY_LISTENERS|Block.FORCE_STATE|Block.SKIP_DROPS);changed++;}cursor.advance();}
+            var current=world.getBlockState(pos);if((!replace||current.equals(states.resolve(1)))&&!current.equals(states.resolve(0))){
+                var entity=world.getBlockEntity(pos);var saved=emptyInventory(entity);boolean placed;
+                try{placed=world.setBlockState(pos,states.resolve(0),Block.NOTIFY_LISTENERS|Block.FORCE_STATE|Block.SKIP_DROPS);}
+                catch(RuntimeException failure){if(world.getBlockState(pos).equals(current))restoreInventory(world.getBlockEntity(pos),saved);throw failure;}
+                if(!placed){if(world.getBlockState(pos).equals(current))restoreInventory(world.getBlockEntity(pos),saved);throw new IllegalStateException("填充方块被拒绝："+pos);}changed++;
+            }cursor.advance();}
             status="已检查 "+cursor.processed()+" 格，修改 "+changed;if(cursor.done())result.complete("填充完成："+status);
         }catch(RuntimeException e){result.completeExceptionally(e);}
     }
+    // Container onStateReplaced scatters inventory independently of the SKIP_DROPS flag.
+    static net.minecraft.nbt.NbtCompound emptyInventory(net.minecraft.block.entity.BlockEntity entity){
+        if(!(entity instanceof net.minecraft.inventory.Inventory inventory))return null;
+        var saved=entity.createNbtWithIdentifyingData();inventory.clear();return saved;
+    }
+    static void restoreInventory(net.minecraft.block.entity.BlockEntity entity,net.minecraft.nbt.NbtCompound saved){if(entity!=null&&saved!=null){entity.readNbt(saved);entity.markDirty();}}
 }

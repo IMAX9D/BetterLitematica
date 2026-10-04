@@ -28,7 +28,9 @@ public final class PlacementStore {
             if (axis >= LayerRange.Axis.values().length) throw new IOException("Invalid layer axis");
             LayerRange layer = new LayerRange(LayerRange.Axis.values()[axis], in.readInt(), in.readInt());
             float opacity = in.readFloat(); boolean rendering = in.readBoolean(); int count = in.readInt();
-            if (count < 0 || count > PlacementSession.MAX_PLACEMENTS) throw new IOException("Invalid placement count");
+            // Reject impossible declared counts before allocating or iterating, without a UI placement limit.
+            int minimumRecordBytes=version==1?37:version==2?41:48;
+            if (count < 0 || count > (in.available()-Long.BYTES)/minimumRecordBytes) throw new IOException("Invalid placement count");
             List<Placement> entries = new ArrayList<>();
             for (int i = 0; i < count; i++) {
                 UUID id = uuid(in); String name = in.readUTF(), source = in.readUTF();
@@ -56,7 +58,11 @@ public final class PlacementStore {
     }
     public static byte[] encode(PlacementSession session) throws IOException {
         var bytes = new ByteArrayOutputStream();
-        try (var out = new DataOutputStream(bytes)) {
+        try (var out = new DataOutputStream(new FilterOutputStream(bytes) {
+            private void reserve(int size)throws IOException{if(size<0||size>MAX_BYTES-bytes.size())throw new IOException("Placement settings exceed limit");}
+            @Override public void write(int value)throws IOException{reserve(1);out.write(value);}
+            @Override public void write(byte[] value,int offset,int length)throws IOException{reserve(length);out.write(value,offset,length);}
+        })) {
             out.writeInt(MAGIC); out.writeInt(VERSION); out.writeBoolean(session.selected() != null);
             if (session.selected() != null) uuid(out, session.selected());
             out.writeByte(session.layer().axis().ordinal()); out.writeInt(session.layer().min()); out.writeInt(session.layer().max());

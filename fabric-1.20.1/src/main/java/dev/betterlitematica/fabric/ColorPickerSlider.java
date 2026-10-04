@@ -9,6 +9,7 @@ import org.lwjgl.glfw.GLFW;
 /** Vanilla interaction/focus, independent overlay pixels and system-font labels. */
 final class ColorPickerSlider extends SliderWidget {
     private final String label;private final int steps;private final DoubleConsumer changed;private final DoubleToIntFunction color;
+    private final UiMotion motion=new UiMotion();
     ColorPickerSlider(int x,int width,String label,int steps,double value,DoubleConsumer changed,DoubleToIntFunction color){
         super(x,0,width,38,Text.empty(),ColorPickerColor.clamp(value));this.label=label;this.steps=steps;this.changed=changed;this.color=color;updateMessage();
     }
@@ -21,8 +22,8 @@ final class ColorPickerSlider extends SliderWidget {
     @Override public void renderButton(DrawContext context,int mouseX,int mouseY,float delta){
         var ui=IndependentUi.INSTANCE;ui.text(getMessage().getString(),getX(),getY(),width,UiTheme.TEXT);
         double left=getX()+4,right=getX()+width-4,y=getY()+23;
-        for(int i=0;i<32;i++){double a=left+(right-left)*i/32,b=left+(right-left)*(i+1)/32;ui.rect(a,y-4,b,y+4,(i&1)==0?UiTheme.SECONDARY:UiTheme.SURFACE);ui.rect(a,y-4,b,y+4,color.applyAsInt(i/31d));}
-        ui.frame(left,y-4,right,y+4,UiTheme.BORDER);double x=left+(right-left)*value;
-        ui.rect(x-3,y-7,x+3,y+7,UiTheme.INPUT);ui.frame(x-3,y-7,x+3,y+7,isFocused()||isHovered()?UiTheme.FOCUS:UiTheme.TEXT);
+        for(int i=0;i<32;i++){double a=left+(right-left)*i/32,b=left+(right-left)*(i+1)/32;ui.rect(a,y-4,b,y+4,(i&1)==0?UiTheme.INPUT:UiTheme.TRACK);ui.rect(a,y-4,b,y+4,color.applyAsInt(i/31d));}
+        ui.roundFrame(left,y-4,right,y+4,3,UiTheme.BORDER);double x=left+(right-left)*value,hover=motion.hover(isFocused()||isHovered());
+        ui.shadow(x-4,y-7,x+4,y+7,4);ui.roundRect(x-4,y-7,x+4,y+7,4,UiTheme.INPUT);ui.roundFrame(x-4,y-7,x+4,y+7,4,UiMotion.mix(UiTheme.BORDER,UiTheme.FOCUS,hover));
     }
 }

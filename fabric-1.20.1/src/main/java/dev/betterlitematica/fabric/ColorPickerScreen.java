@@ -63,14 +63,16 @@ final class ColorPickerScreen extends MenuScreen {
             var ui=IndependentUi.INSTANCE;Identifier id=texture();context.draw();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();try{ui.image(id,TEXTURE_SIZE,getX(),getY(),width,height);context.draw();}finally{RenderSystem.disableBlend();}
             double radius=(width-2)/2d,x=getX()+width/2d+Math.cos(hue*2*Math.PI)*saturation*radius,y=getY()+height/2d-Math.sin(hue*2*Math.PI)*saturation*radius;
             for(int row=-4;row<=4;row++){double extent=Math.sqrt(20-row*row);ui.rect(x-extent,y+row,x+extent,y+row+1,UiTheme.TEXT);if(Math.abs(row)<=2){double inner=Math.sqrt(8-row*row);ui.rect(x-inner,y+row,x+inner,y+row+1,UiTheme.INPUT);}}
-            if(isFocused())ui.frame(getX()-2,getY()-2,getX()+width+2,getY()+height+2,UiTheme.FOCUS);
+            if(isFocused())ui.roundFrame(getX()-2,getY()-2,getX()+width+2,getY()+height+2,(width+4)/2d,UiTheme.FOCUS);
         }
         @Override protected void appendClickableNarrations(NarrationMessageBuilder builder){appendDefaultNarrations(builder);}
     }
     private final class Preview extends ClickableWidget {
         Preview(int x,int width){super(x,0,width,66,Text.empty());active=false;}
         @Override public boolean mouseClicked(double x,double y,int button){return false;}
-        @Override public void renderButton(DrawContext context,int mouseX,int mouseY,float delta){var ui=IndependentUi.INSTANCE;for(int y=0;y<40;y+=8)for(int x=0;x<width;x+=8)ui.rect(getX()+x,getY()+y,getX()+Math.min(width,x+8),getY()+y+8,((x+y)/8&1)==0?UiTheme.SURFACE:UiTheme.SECONDARY);ui.rect(getX(),getY(),getX()+width,getY()+40,color());ui.frame(getX(),getY(),getX()+width,getY()+40,UiTheme.BORDER);ui.text(String.format("#%08X",color()),getX(),getY()+49,width,UiTheme.TEXT);}
+        @Override public void renderButton(DrawContext context,int mouseX,int mouseY,float delta){var ui=IndependentUi.INSTANCE;for(int y=0;y<40;y+=8)for(int x=0;x<width;x+=8)ui.rect(getX()+x,getY()+y,getX()+Math.min(width,x+8),getY()+y+8,((x+y)/8&1)==0?UiTheme.INPUT:UiTheme.TRACK);ui.rect(getX(),getY(),getX()+width,getY()+40,color());
+            // Mask only the preview's four corners; alpha and checkerboard retain their exact values.
+            for(int row=0;row<6;row++){double cut=6-Math.sqrt(36-(5.5-row)*(5.5-row));ui.rect(getX(),getY()+row,getX()+cut,getY()+row+1,UiTheme.PANEL);ui.rect(getX()+width-cut,getY()+row,getX()+width,getY()+row+1,UiTheme.PANEL);ui.rect(getX(),getY()+39-row,getX()+cut,getY()+40-row,UiTheme.PANEL);ui.rect(getX()+width-cut,getY()+39-row,getX()+width,getY()+40-row,UiTheme.PANEL);}ui.roundFrame(getX(),getY(),getX()+width,getY()+40,6,UiTheme.BORDER);ui.text(String.format("#%08X",color()),getX(),getY()+49,width,UiTheme.TEXT);}
         @Override protected void appendClickableNarrations(NarrationMessageBuilder builder){}
     }
 }

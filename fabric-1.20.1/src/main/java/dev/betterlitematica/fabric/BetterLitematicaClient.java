@@ -23,18 +23,24 @@ public final class BetterLitematicaClient implements ClientModInitializer {
     public static boolean wheelMouse(long window,int button,int action){return modeWheelInput!=null&&modeWheelInput.mouse(window,button,action);}
     public static boolean wheelBlocksWorldInput(){return modeWheelInput!=null&&modeWheelInput.blocksWorldInput();}
     private final DeferredMenuOpen menuOpen=new DeferredMenuOpen();
+    public static boolean toolInput(long window,int key,int action){return activeController!=null&&activeController.tool().event(window,key,action);}
+    public static boolean toolBlocksWorld(){return activeController!=null&&activeController.tool().blocksVanilla();}
     public static void inputEvent(long window,int key,int action){if(interactions!=null)interactions.inputEvent(window,key,action);}
     private void openFromCommand(MinecraftClient client,ProjectionController controller,java.util.function.Function<net.minecraft.client.gui.screen.Screen,net.minecraft.client.gui.screen.Screen> factory){
         var origin=client.currentScreen;
         var parent=origin instanceof net.minecraft.client.gui.screen.ChatScreen?null:origin;
         menuOpen.request(client.world,client.getNetworkHandler(),origin,()->controller.action(()->client.setScreen(factory.apply(parent))));
     }
-    public static boolean editUse(){return activeController!=null&&activeController.editor().use();}
-    public static boolean editAttack(){return activeController!=null&&activeController.editor().attack();}
+    public static boolean editUse(){return activeController!=null&&(activeController.tool().edit(true)||activeController.editor().use());}
+    public static boolean editAttack(){return activeController!=null&&(activeController.tool().edit(false)||activeController.editor().attack());}
     public static boolean editActive(){return activeController!=null&&activeController.editor().claimsInput();}
     public static boolean editEscape(){return activeController!=null&&activeController.editor().escape();}
     public static void supplyOpened(int sync,net.minecraft.screen.ScreenHandlerType<?> type){var c=activeController;if(c!=null)c.printer().supplyOpened(sync,type);}
+    public static void containerOpening(net.minecraft.screen.ScreenHandlerType<?> type){var c=activeController;if(c!=null&&MinecraftClient.getInstance().isOnThread())c.printer().containerOpening(type);}
     public static void supplyInventory(int sync){var c=activeController;if(c!=null)c.printer().supplyInventory(sync);}
+    public static void containerInventory(net.minecraft.network.packet.s2c.play.InventoryS2CPacket packet){var c=activeController;if(c!=null)c.printer().containerInventory(packet);}
+    public static void containerSlot(net.minecraft.network.packet.s2c.play.ScreenHandlerSlotUpdateS2CPacket packet){var c=activeController;if(c!=null)c.printer().containerSlot(packet);}
+    public static void manualContainerInteraction(){var c=activeController;if(c!=null)c.printer().manualContainerInteraction();}
     public static void manualInventory(){var c=activeController;if(c!=null)c.printer().manualInventory();}
     public static void confirmedProjectionBlock(net.minecraft.util.math.BlockPos pos,net.minecraft.block.BlockState state){var controller=activeController;if(controller!=null)controller.printer().confirmed(pos,state);}
     public static void projectionBlockChanged(net.minecraft.world.BlockView world,net.minecraft.util.math.BlockPos pos){var controller=activeController;if(controller!=null)controller.worldBlockChanged(world,pos);}
@@ -60,21 +66,24 @@ public final class BetterLitematicaClient implements ClientModInitializer {
             if(world==client.world&&interactions.blockClick(true,new net.minecraft.util.hit.BlockHitResult(net.minecraft.util.math.Vec3d.ofCenter(pos),direction,pos,false)))return net.minecraft.util.ActionResult.FAIL;return net.minecraft.util.ActionResult.PASS;
         });
         net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player,world,hand,hit)->world==client.world&&interactions.blockClick(false,hit)?net.minecraft.util.ActionResult.FAIL:net.minecraft.util.ActionResult.PASS);
-        ClientPlayConnectionEvents.DISCONNECT.register((handler,mc)->{modeWheelInput.clear();menuOpen.clear();controller.disconnect();});
-        IndependentUi ui=IndependentUi.INSTANCE;ProjectionInformation information=new ProjectionInformation();final int[] informationTick={0};ClientTickEvents.END_CLIENT_TICK.register(mc->{if(++informationTick[0]%4==0)information.update(mc,controller);});
-        ClientLifecycleEvents.CLIENT_STOPPING.register(mc->{modeWheelInput.clear();controller.close();ui.close();});
+        ClientPlayConnectionEvents.DISCONNECT.register((handler,mc)->{modeWheelInput.clear();menuOpen.clear();controller.disconnect();EntityOverlayMask.close();});
+        IndependentUi ui=IndependentUi.INSTANCE;ProjectionInformation information=new ProjectionInformation();ToolHud toolHud=new ToolHud();StatusHud statusHud=new StatusHud();final int[] informationTick={0};ClientTickEvents.END_CLIENT_TICK.register(mc->{if(++informationTick[0]%4==0)information.update(mc,controller);});
+        ClientLifecycleEvents.CLIENT_STOPPING.register(mc->{modeWheelInput.clear();controller.close();ui.close();EntityOverlayMask.close();});
+        WorldRenderEvents.START.register(context->EntityOverlayMask.reset());
+        WorldRenderEvents.BEFORE_ENTITIES.register(context->EntityOverlayMask.before(client,controller.entityOverlayMaskNeeded(context)));
+        WorldRenderEvents.AFTER_ENTITIES.register(context->EntityOverlayMask.after(client));
+        WorldRenderEvents.END.register(context->EntityOverlayMask.reset());
         WorldRenderEvents.LAST.register(context->{controller.render(context);controller.capturePreview();});
         HudRenderCallback.EVENT.register((context,delta)->{
-            if(client.world!=null&&!client.options.hudHidden){
-                information.render(client,context);
-                String text=client.textRenderer.trimToWidth(controller.hud(),Math.max(100,client.getWindow().getScaledWidth()-12));
-                if(!text.isEmpty())context.drawTextWithShadow(client.textRenderer,text,6,6,0xffffff);
-                int y=20;
-                for(String line:controller.printer().hud()){context.drawTextWithShadow(client.textRenderer,line,6,y,0x77d9eb);y+=11;}
-                for(var row:controller.materialHudRows()) {
-                    context.drawTextWithShadow(client.textRenderer,row.item().getName().getString()+": 缺 "+Math.max(0,row.missing()-row.available()),6,y,0xffcc77);y+=11;
-                }
-            }
+            if(client.world==null||client.player==null||client.options.hudHidden||HudLayout.menuHidesHud(client.currentScreen))return;
+            var layout=HudLayout.of(client,false);if(!ui.beginHud(context,layout.viewport()))return;
+            try{
+                layout=information.arrange(ui,layout);
+                double toolTop=toolHud.top(client,ui,controller,layout);
+                statusHud.draw(ui,controller,layout);
+                information.draw(client,ui,layout);
+                toolHud.draw(client,ui,controller,layout,toolTop);
+            }finally{ui.end();}
         });
         ResourceManagerHelper.get(ResourceType.CLIENT_RESOURCES).registerReloadListener(new SimpleSynchronousResourceReloadListener(){
             @Override public Identifier getFabricId(){return new Identifier("betterlitematica","projection_models");}

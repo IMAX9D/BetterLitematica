@@ -20,11 +20,13 @@ final class IndependentUi implements AutoCloseable {
     private final CompletableFuture<OutlineFont> loading;
     private final Map<Key,CompletableFuture<OutlineFont.Raster>> pending=new LinkedHashMap<>();
     private final WeightedLru<Key,Texture> textures=new WeightedLru<>(16L<<20,256,Texture::bytes,t->MinecraftClient.getInstance().getTextureManager().destroyTexture(t.id()));
+    private final StatusBadgeTextures statusBadges=new StatusBadgeTextures();
     private final LinkedHashMap<String,Float> widths=new LinkedHashMap<>(256,0.75f,true);
     private final LinkedHashMap<String,String> trims=new LinkedHashMap<>(256,0.75f,true);
     private final Deque<UiViewport.Clip> clips=new ArrayDeque<>();
     private OutlineFont font;private UiViewport view;private DrawContext context;private float[] previousColor;private boolean active;
     private int textPixels=20;
+    private double offsetX,offsetY,opacity=1;
     private IndependentUi(){loading=CompletableFuture.supplyAsync(()->{
         var selected=OutlineFont.system();BetterLitematicaClient.LOGGER.info("UI system font: {}",selected.family());
         if(!selected.supports("投影材料设置"))BetterLitematicaClient.LOGGER.warn("No Chinese-capable system font found; install a CJK font for menu text.");
@@ -33,11 +35,23 @@ final class IndependentUi implements AutoCloseable {
     boolean ready(){if(font==null&&loading.isDone())font=loading.join();return font!=null;}
     int pixels(){return textPixels;}
     boolean begin(DrawContext ctx,UiViewport viewport){
-        view=viewport;textPixels=Math.max(16,Math.min(64,(int)Math.round(view.scale()*9.5)));
+        offsetX=offsetY=0;opacity=1;
+        view=viewport;textPixels=UiTypography.bodyPixels(view.scale());
         if(!ready())return false;
         drain();context=ctx;ctx.draw();previousColor=RenderSystem.getShaderColor().clone();RenderSystem.setShaderColor(1,1,1,1);
         ctx.getMatrices().push();ctx.getMatrices().loadIdentity();ctx.getMatrices().scale((float)(1/view.guiScale()),(float)(1/view.guiScale()),1);
         active=true;return true;
+    }
+    /** HUD callbacks run after chat, but chat's depth still occludes z=0 textures and items. */
+    boolean beginHud(DrawContext ctx,UiViewport viewport){
+        if(!begin(ctx,viewport))return false;
+        ctx.getMatrices().translate(0,0,1000);
+        return true;
+    }
+    /** Translation only: glyphs keep their physical resolution throughout a transition. */
+    void effect(double x,double y,double alpha){
+        if(!clips.isEmpty())throw new IllegalStateException("UI effect changed inside a clip");
+        context.draw();offsetX=x;offsetY=y;opacity=UiMotion.clamp(alpha);
     }
     void end(){if(!active)return;try{while(!clips.isEmpty())unclip();context.draw();}finally{context.getMatrices().pop();RenderSystem.setShaderColor(previousColor[0],previousColor[1],previousColor[2],previousColor[3]);active=false;context=null;}}
     private void drain(){
@@ -64,14 +78,48 @@ final class IndependentUi implements AutoCloseable {
     private String trimAt(String text,int pixels,double width){text=bounded(text);int limit=Math.max(0,Math.min(rasterWidthLimit(pixels),(int)Math.floor(width*view.scale())));String key=pixels+":"+limit+":"+text;String result=trims.get(key);if(result==null){result=font.trim(text,pixels,limit,true);if(trims.size()>=1024)trims.remove(trims.keySet().iterator().next());trims.put(key,result);}return result;}
     void item(net.minecraft.item.ItemStack stack,double x,double y,double size){
         context.draw();var matrices=context.getMatrices();matrices.push();
-        try{matrices.translate(px(x),py(y),0);float scale=(float)(size*view.scale()/16);matrices.scale(scale,scale,1);context.drawItem(stack,0,0);context.draw();}
+        try{RenderSystem.setShaderColor(1,1,1,(float)opacity);matrices.translate(px(x),py(y),0);float scale=(float)(size*view.scale()/16);matrices.scale(scale,scale,1);context.drawItem(stack,0,0);context.draw();}
         finally{matrices.pop();RenderSystem.setShaderColor(1,1,1,1);RenderSystem.disableBlend();}
     }
     void itemCount(int count,double x,double y,double width){context.getMatrices().push();context.getMatrices().translate(0,0,300);try{text(Integer.toString(count),x,y,width,UiTheme.TEXT);}finally{context.getMatrices().pop();}}
-    void rect(double x,double y,double right,double bottom,int color){context.fill(px(x),py(y),px(right),py(bottom),color);}
+    void rect(double x,double y,double right,double bottom,int color){context.fill(px(x),py(y),px(right),py(bottom),UiMotion.alpha(color,opacity));}
+    void roundRect(double x,double y,double right,double bottom,double radius,int color){rounded(x,y,right,bottom,radius,color,false);}
+    void roundFrame(double x,double y,double right,double bottom,double radius,int color){rounded(x,y,right,bottom,radius,color,true);}
+    void shadow(double x,double y,double right,double bottom,double radius){
+        roundRect(x-3,y+1,right+3,bottom+5,radius+3,0x05232b3e);
+        roundRect(x-1.5,y+1,right+1.5,bottom+3,radius+1.5,0x08232b3e);
+        roundRect(x-.5,y+1,right+.5,bottom+2,radius+.5,UiTheme.SHADOW);
+    }
+    /** Rounded coverage is batched in the normal GUI layer; no extra shader/FBO per control. */
+    private void rounded(double x,double y,double right,double bottom,double radius,int color,boolean outline){
+        int l=px(x),t=py(y),r=px(right),b=py(bottom);if(r<=l||b<=t)return;
+        double rad=Math.max(0,Math.min(Math.min(r-l,b-t)/2d,radius*view.scale()));
+        int c=UiMotion.alpha(color,opacity),rows=(int)Math.ceil(rad);
+        if(rad<1){if(outline){context.fill(l,t,r,t+1,c);context.fill(l,b-1,r,b,c);context.fill(l,t,l+1,b,c);context.fill(r-1,t,r,b,c);}else context.fill(l,t,r,b,c);return;}
+        for(int i=0;i<rows;i++){
+            double dy=Math.max(0,rad-i-.5),cut=rad-Math.sqrt(Math.max(0,rad*rad-dy*dy));
+            double inRad=Math.max(0,rad-1),innerCut=1+inRad-Math.sqrt(Math.max(0,inRad*inRad-dy*dy));
+            roundedRow(l,r,t+i,cut,innerCut,c,outline&&i>0);
+            if(b-1-i!=t+i)roundedRow(l,r,b-1-i,cut,innerCut,c,outline&&i>0);
+        }
+        if(t+rows<b-rows){if(outline){context.fill(l,t+rows,l+1,b-rows,c);context.fill(r-1,t+rows,r,b-rows,c);}else context.fill(l,t+rows,r,b-rows,c);}
+    }
+    private void roundedRow(int l,int r,int y,double cut,double innerCut,int color,boolean hollow){
+        if(hollow){pixelSpan(l+cut,l+innerCut,y,color);pixelSpan(r-innerCut,r-cut,y,color);}
+        else pixelSpan(l+cut,r-cut,y,color);
+    }
+    private void pixelSpan(double left,double right,int y,int color){
+        if(right<=left)return;int first=(int)Math.floor(left),last=(int)Math.floor(right);
+        if(first==last){context.fill(first,y,first+1,y+1,UiMotion.alpha(color,right-left));return;}
+        int whole=(int)Math.ceil(left);
+        if(whole>first)context.fill(first,y,first+1,y+1,UiMotion.alpha(color,whole-left));
+        if(last>whole)context.fill(whole,y,last,y+1,color);
+        if(right>last)context.fill(last,y,last+1,y+1,UiMotion.alpha(color,right-last));
+    }
     /** Physical-pixel annular sector, also used for discs (inner=0). Angles are radians. */
     void sector(double cx,double cy,double inner,double outer,double start,double end,int color){
         if(outer<=inner||end<=start)return;
+        color=UiMotion.alpha(color,opacity);
         context.draw();boolean depth=org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_DEPTH_TEST),cull=org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_CULL_FACE);
         RenderSystem.disableDepthTest();RenderSystem.disableCull();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
         try{
@@ -81,30 +129,46 @@ final class IndependentUi implements AutoCloseable {
             int steps=Math.max(1,Math.min(256,(int)Math.ceil((end-start)*outer*view.scale()/5)));
             for(int i=0;i<steps;i++){
                 double a=start+(end-start)*i/steps,b=start+(end-start)*(i+1)/steps;
-                for(int v=0;v<4;v++){double r=v==1||v==2?outer:inner,t=v<2?a:b;buffer.vertex(matrix,(float)view.pixelX(cx+Math.cos(t)*r),(float)view.pixelY(cy+Math.sin(t)*r),0).color((color>>>16)&255,(color>>>8)&255,color&255,(color>>>24)&255).next();}
+                for(int v=0;v<4;v++){double r=v==1||v==2?outer:inner,t=v<2?a:b;buffer.vertex(matrix,(float)view.pixelX(cx+offsetX+Math.cos(t)*r),(float)view.pixelY(cy+offsetY+Math.sin(t)*r),0).color((color>>>16)&255,(color>>>8)&255,color&255,(color>>>24)&255).next();}
             }
             net.minecraft.client.render.BufferRenderer.drawWithGlobalProgram(buffer.end());
         }finally{RenderSystem.disableBlend();if(depth)RenderSystem.enableDepthTest();if(cull)RenderSystem.enableCull();}
     }
     void frame(double x,double y,double right,double bottom,int color){double line=1/view.scale();rect(x,y,right,y+line,color);rect(x,bottom-line,right,bottom,color);rect(x,y,x+line,bottom,color);rect(right-line,y,right,bottom,color);}
-    void image(Identifier id,int pixels,double x,double y,double width,double height){context.draw();RenderSystem.setShaderColor(1,1,1,1);context.drawTexture(id,px(x),py(y),px(x+width)-px(x),py(y+height)-py(y),0,0,pixels,pixels,pixels,pixels);}
-    private int px(double x){return (int)Math.round(view.pixelX(x));}private int py(double y){return (int)Math.round(view.pixelY(y));}
+    void image(Identifier id,int pixels,double x,double y,double width,double height){
+        imageRegion(id,pixels,0,0,pixels,pixels,x,y,width,height);
+    }
+    void imageRegion(Identifier id,int pixels,int sourceX,int sourceY,int sourceWidth,int sourceHeight,double x,double y,double width,double height){
+        context.draw();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
+        try{RenderSystem.setShaderColor(1,1,1,(float)opacity);context.drawTexture(id,px(x),py(y),px(x+width)-px(x),py(y+height)-py(y),sourceX,sourceY,sourceWidth,sourceHeight,pixels,pixels);context.draw();}
+        finally{RenderSystem.setShaderColor(1,1,1,1);RenderSystem.disableBlend();}
+    }
+    void prepareStatusBadges(double diameter){statusBadges.prepare(statusBadgePixels(diameter));}
+    private int statusBadgePixels(double diameter){return Math.max(12,Math.min(192,(int)Math.round(diameter*view.scale())));}
+    void statusBadge(dev.betterlitematica.runtime.StatusBadgeArt.Kind kind,double x,double y,double diameter){
+        var texture=statusBadges.get(kind,statusBadgePixels(diameter));if(texture==null)return;
+        context.draw();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
+        // Exact physical-pixel blit: supersampled curves must not be rescaled with the game GUI.
+        try{RenderSystem.setShaderColor(1,1,1,(float)opacity);context.drawTexture(texture.id(),px(x)-texture.padding(),py(y)-texture.padding(),0,0,texture.size(),texture.size(),texture.size(),texture.size());context.draw();}
+        finally{RenderSystem.setShaderColor(1,1,1,1);RenderSystem.disableBlend();}
+    }
+    private int px(double x){return (int)Math.round(view.pixelX(x+offsetX));}private int py(double y){return (int)Math.round(view.pixelY(y+offsetY));}
     void text(String text,double x,double y,double maxWidth,int color){draw(trimAt(text,textPixels,maxWidth),px(x),py(y),textPixels,color);}
-    void title(String text,double x,double y,double maxWidth,int color){int size=Math.min(64,textPixels+4);draw(trimAt(text,size,maxWidth),px(x),py(y),size,color);}
+    void title(String text,double x,double y,double maxWidth,int color){int size=UiTypography.titlePixels(view.scale());draw(trimAt(text,size,maxWidth),px(x),py(y),size,color);}
     void centered(String text,double x,double y,double width,double height,int color){String shown=trim(text,width-12);int left=px(x)+(int)Math.round((width*view.scale()-measurePixels(shown,textPixels))/2);int top=py(y)+(int)Math.round((height*view.scale()-font.lineHeight(textPixels))/2);draw(shown,left,top,textPixels,color);}
     private void draw(String text,int x,int y,int pixels,int color){
         if(text.isEmpty())return;Texture run=texture(text,pixels,color);if(run==null)return;
         context.draw();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
-        try{context.drawTexture(run.id(),x-2,y-2,0,0,run.width(),run.height(),run.width(),run.height());}
-        finally{RenderSystem.disableBlend();}
+        try{RenderSystem.setShaderColor(1,1,1,(float)opacity);context.drawTexture(run.id(),x-2,y-2,0,0,run.width(),run.height(),run.width(),run.height());context.draw();}
+        finally{RenderSystem.setShaderColor(1,1,1,1);RenderSystem.disableBlend();}
     }
-    void clip(double left,double top,double right,double bottom){context.draw();var clip=view.clip(left,top,right,bottom);if(clips.isEmpty())context.enableScissor(0,0,view.inputWidth(),view.inputHeight());else{var parent=clips.peek();int x=Math.max(parent.x(),clip.x()),y=Math.max(parent.y(),clip.y());clip=new UiViewport.Clip(x,y,Math.max(0,Math.min(parent.x()+parent.width(),clip.x()+clip.width())-x),Math.max(0,Math.min(parent.y()+parent.height(),clip.y()+clip.height())-y));}clips.push(clip);RenderSystem.enableScissor(clip.x(),clip.y(),clip.width(),clip.height());}
+    void clip(double left,double top,double right,double bottom){context.draw();var clip=view.clip(left+offsetX,top+offsetY,right+offsetX,bottom+offsetY);if(clips.isEmpty())context.enableScissor(0,0,view.inputWidth(),view.inputHeight());else{var parent=clips.peek();int x=Math.max(parent.x(),clip.x()),y=Math.max(parent.y(),clip.y());clip=new UiViewport.Clip(x,y,Math.max(0,Math.min(parent.x()+parent.width(),clip.x()+clip.width())-x),Math.max(0,Math.min(parent.y()+parent.height(),clip.y()+clip.height())-y));}clips.push(clip);RenderSystem.enableScissor(clip.x(),clip.y(),clip.width(),clip.height());}
     void unclip(){context.draw();clips.pop();if(clips.isEmpty())context.disableScissor();else{var clip=clips.peek();RenderSystem.enableScissor(clip.x(),clip.y(),clip.width(),clip.height());}}
     int hit(String text,double localX){return ready()?font.hit(text,textPixels,(float)(localX*view.scale())):0;}
     int startForCursor(String text,int cursor,double width){return font.startForCursor(text,cursor,textPixels,(float)(width*view.scale()));}
     String fittingText(String text,double width){return font.trim(text,textPixels,(float)Math.min(rasterWidthLimit(textPixels),width*view.scale()),false);}
     void rawText(String text,double x,double y,int color){draw(text,px(x),py(y),textPixels,color);}
     double lineHeight(){return font.lineHeight(textPixels)/view.scale();}
-    void clearTextures(){for(var future:pending.values())future.cancel(false);pending.clear();worker.getQueue().clear();textures.close();widths.clear();trims.clear();}
-    @Override public void close(){worker.shutdownNow();pending.clear();clearTextures();}
+    void clearTextures(){for(var future:pending.values())future.cancel(false);pending.clear();worker.getQueue().clear();textures.close();widths.clear();trims.clear();statusBadges.clear();}
+    @Override public void close(){worker.shutdownNow();pending.clear();clearTextures();statusBadges.close();}
 }

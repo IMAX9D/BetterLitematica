@@ -80,6 +80,7 @@ final class PrinterScreen extends MenuScreen {
     @SuppressWarnings({"rawtypes","unchecked"}) private static String propertyName(net.minecraft.state.property.Property property,Comparable value){return property.name(value);}
     private void strategyPage(){
         toggle("破冰放水",0,56,()->draft.iceWater,v->draft.iceWater=v);toggle("珊瑚替代",1,56,()->draft.coralSubstitute,v->draft.coralSubstitute=v);toggle("侦测器顺序检查",0,82,()->draft.safeObserver,v->draft.safeObserver=v);
+        toggle("容器填充",1,82,()->draft.containerFill,v->draft.containerFill=v);
         buttonAt("补给："+draft.supply.label(),cellX(0,2),118,cellWidth(2),()->{read();draft.supply=PrinterSupply.Source.values()[(draft.supply.ordinal()+1)%PrinterSupply.Source.values().length];refresh();},true,false);
         toggle("破基岩",1,118,()->draft.bedrock,v->draft.bedrock=v);
     }

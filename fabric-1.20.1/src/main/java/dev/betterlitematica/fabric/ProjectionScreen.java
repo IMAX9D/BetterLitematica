@@ -1,28 +1,30 @@
 package dev.betterlitematica.fabric;
 
 final class ProjectionScreen extends MenuScreen {
-    private int page,ticks;
+    private int ticks;
     private String snapshot="";
 
     ProjectionScreen(ProjectionController c){super("BetterLitematica","",null,c,true);}
-    @Override protected int preferredHeight(){return Math.max(246,114+26*Math.max(controller.placements().size(),controller.hasDraftRecovery()?6:5));}
+    @Override protected int preferredHeight(){return Math.max(246,114+26*Math.max(Math.min(controller.placements().size(),8),controller.hasDraftRecovery()?6:5));}
+
+    @Override protected int scrollRight(){return left+304;}
+    @Override protected int scrollTop(){return bodyTop+26;}
+    @Override protected boolean scrolls(int x,int y){return x<scrollRight()&&y>=26;}
 
     @Override protected void buildMenu(){
         int listWidth=304,right=left+listWidth+20,rightWidth=innerWidth-listWidth-20;
         var entries=controller.placements();
-        int count=Math.max(1,(bodyBottom-bodyTop-26)/26),pages=Math.max(1,(entries.size()+count-1)/count);
-        page=Math.min(page,pages-1);
         caption("当前投影 · "+entries.size(),left,0,listWidth);
         caption("功能与工具",right,0,rightWidth);
         if(entries.isEmpty()){
             caption("尚未加载投影",left,40,listWidth);
 
         }
-        for(int i=page*count;i<Math.min(entries.size(),(page+1)*count);i++){
+        for(int i=0;i<entries.size();i++){
             var entry=entries.get(i);
             boolean selected=entry.id().equals(controller.selectedId());
-            int y=26+(i-page*count)*26;
-            buttonAt((selected?"已选 · ":"")+entry.name(),left,y,listWidth-146,()->{
+            int y=26+i*26;
+            buttonAt(entry.name(),left,y,listWidth-146,()->{
                 controller.select(selected?null:entry.id());refresh();
             },true,selected);
             buttonAt("配置",left+listWidth-142,y,40,()->{controller.select(entry.id());client.setScreen(new PlacementConfigScreen(this,controller));},true,false);
@@ -38,7 +40,6 @@ final class ProjectionScreen extends MenuScreen {
         option("设置与快捷键",right,rightWidth,0,3,()->client.setScreen(new OptionsScreen(this,controller)),false);
 
         if(controller.hasDraftRecovery())option("恢复编辑",right,rightWidth,1,3,()->client.setScreen(new DraftRecoveryScreen(this,controller)),true);
-        pager(page,pages,()->{page--;refresh();},()->{page++;refresh();});
         snapshot=snapshot();
     }
 

@@ -56,7 +56,7 @@ final class PrinterColdWarmup {
         for(int y=0;y<=3&&pos==null;y++)for(int x=-3;x<=3&&pos==null;x++)for(int z=-3;z<=3;z++){
             if(Math.abs(x)+Math.abs(z)<2)continue;
             var candidate=center.add(x,y,z);
-            if(client.world.isChunkLoaded(candidate)&&client.world.getBlockState(candidate).isAir()){pos=candidate;break;}
+            if(WorldChunks.loaded(client.world,candidate)&&client.world.getBlockState(candidate).isAir()){pos=candidate;break;}
         }
         if(pos==null)return;
         long started=System.nanoTime();int count=0;
