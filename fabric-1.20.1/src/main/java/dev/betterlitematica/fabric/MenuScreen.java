@@ -180,7 +180,7 @@ abstract class MenuScreen extends Screen {
         String status=displayedStatus();
         if(!status.isEmpty()){int color=statusColor();double sy=panelBottom-15;ui.roundRect(left,sy+ui.lineHeight()/2-1.5,left+3,sy+ui.lineHeight()/2+1.5,1.5,color==UiTheme.MUTED?UiTheme.ACCENT:color);ui.text(status,left+8,sy,innerWidth-8,color);}
         for(var entry:hints.entrySet())if(entry.getKey().visible&&entry.getKey().isMouseOver(mouseX,mouseY)){
-            String[] lines=entry.getValue().split("\n");double w=Arrays.stream(lines).mapToDouble(ui::measure).max().orElse(0)+18,h=lines.length*(ui.lineHeight()+2)+10;
+            String[] lines=entry.getValue().split("\n");double w=Arrays.stream(lines).mapToDouble(ui::measure).max().orElse(0)+20,h=lines.length*(ui.lineHeight()+2)+10;
             double x=Math.max(8,Math.min(width-w-8,entry.getKey().getX()+entry.getKey().getWidth()/2d-w/2)),y=entry.getKey().getY()-h-6;if(y<8)y=entry.getKey().getY()+entry.getKey().getHeight()+6;
             tooltip(ui,x,y,w,h);for(int i=0;i<lines.length;i++)ui.text(lines[i],x+9,y+5+i*(ui.lineHeight()+2),w-18,UiTheme.TEXT);return;
         }
