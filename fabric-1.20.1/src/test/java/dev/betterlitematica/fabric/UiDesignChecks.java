@@ -64,7 +64,11 @@ public final class UiDesignChecks {
         check(UiMotion.mix(0x10406080,0xf0a0c0e0,0)==0x10406080&&UiMotion.mix(0x10406080,0xf0a0c0e0,1)==0xf0a0c0e0,"Hover interpolation keeps exact endpoint colors");
         check(UiMotion.mix(0x10406080,0xf0a0c0e0,.5)==0x807090b0,"Hover interpolation includes alpha without channel carry");
 
-        // These are actual painted combinations, including hover and text selection.
+        var originalPalette=UiTheme.current();
+        try{for(var palette:UiTheme.Palette.values()){
+        UiTheme.apply(palette);
+        check(UiTheme.Palette.parse(palette.name().toLowerCase(java.util.Locale.ROOT))==palette,"Saved palette parses independent of case");
+        // These are actual painted combinations, including hover and text selection, in both palettes.
         for(int background:new int[]{UiTheme.PANEL,UiTheme.INPUT,UiTheme.TOOLTIP,UiTheme.SURFACE,UiTheme.SELECTED,UiTheme.HOVER,UiTheme.SELECTION}){
             contrast(UiTheme.TEXT,background,"Primary text");
             contrast(UiTheme.SECONDARY,background,"Secondary text");
@@ -77,6 +81,7 @@ public final class UiDesignChecks {
             contrast(UiTheme.SUCCESS,background,"Completed material text");
             contrast(UiTheme.ERROR,background,"Error text");
         }
+        }}finally{UiTheme.apply(originalPalette);}
         return checks;
     }
     private static void contrast(int foreground,int background,String name){

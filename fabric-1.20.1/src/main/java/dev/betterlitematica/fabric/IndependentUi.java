@@ -14,7 +14,7 @@ import java.util.concurrent.*;
 /** Physical-pixel overlay. Font textures are copied 1:1, never enlarged game glyphs. */
 final class IndependentUi implements AutoCloseable {
     static final IndependentUi INSTANCE=new IndependentUi();
-    private record Key(String text,int pixels,int color){}
+    private record Key(String text,int pixels){}
     private record Texture(Identifier id,int width,int height){long bytes(){return (long)width*height*4;}}
     private final ThreadPoolExecutor worker=new ThreadPoolExecutor(1,1,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(32),r->{Thread t=new Thread(r,"betterlitematica-ui-font");t.setDaemon(true);return t;});
     private final CompletableFuture<OutlineFont> loading;
@@ -91,9 +91,10 @@ final class IndependentUi implements AutoCloseable {
         try{RenderSystem.setShaderColor((color>>>16&255)/255f,(color>>>8&255)/255f,(color&255)/255f,(float)((color>>>24)/255d*opacity));context.drawTexture(ready.id(),left,top,0,0,pixels,pixels,pixels,pixels);context.draw();}
         finally{RenderSystem.setShaderColor(1,1,1,1);RenderSystem.disableBlend();}
     }
-    private Texture texture(String text,int size,int color){
-        Key key=new Key(text,size,color);Texture ready=textures.get(key);if(ready!=null)return ready;
-        if(pending.size()<24&&!pending.containsKey(key))pending.put(key,CompletableFuture.supplyAsync(()->font.raster(text,size,color),worker));
+    private Texture texture(String text,int size){
+        Key key=new Key(text,size);Texture ready=textures.get(key);if(ready!=null)return ready;
+        // Glyphs share this bounded worker. Backpressure defers a cold run to a later frame.
+        if(pending.size()<24&&!pending.containsKey(key))try{pending.put(key,CompletableFuture.supplyAsync(()->font.raster(text,size,0xffffffff),worker));}catch(RejectedExecutionException busy){}
         return null;
     }
     private static String bounded(String text){if(text.length()<=OutlineFont.MAX_TEXT)return text;int end=OutlineFont.MAX_TEXT-1;if(Character.isHighSurrogate(text.charAt(end-1)))end--;return text.substring(0,end)+"…";}
@@ -202,9 +203,10 @@ final class IndependentUi implements AutoCloseable {
     void title(String text,double x,double y,double maxWidth,int color){int size=UiTypography.titlePixels(view.scale(),font);draw(trimAt(text,size,maxWidth),px(x),py(y),size,color);}
     void centered(String text,double x,double y,double width,double height,int color){String shown=trim(text,width-12);int left=px(x)+(int)Math.round((width*view.scale()-measurePixels(shown,textPixels))/2);int top=py(y)+(int)Math.round((height*view.scale()-font.lineHeight(textPixels))/2);draw(shown,left,top,textPixels,color);}
     private void draw(String text,int x,int y,int pixels,int color){
-        if(text.isEmpty())return;Texture run=texture(text,pixels,color);if(run==null)return;
+        if(text.isEmpty())return;Texture run=texture(text,pixels);if(run==null)return;
         context.draw();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
-        try{RenderSystem.setShaderColor(1,1,1,(float)opacity);context.drawTexture(run.id(),x-2,y-2,0,0,run.width(),run.height(),run.width(),run.height());context.draw();}
+        // Tint the coverage mask so animated colours and palette changes reuse the same run.
+        try{RenderSystem.setShaderColor((color>>>16&255)/255f,(color>>>8&255)/255f,(color&255)/255f,(float)((color>>>24)/255d*opacity));context.drawTexture(run.id(),x-2,y-2,0,0,run.width(),run.height(),run.width(),run.height());context.draw();}
         finally{RenderSystem.setShaderColor(1,1,1,1);RenderSystem.disableBlend();}
     }
     void clip(double left,double top,double right,double bottom){context.draw();var clip=view.clip(left+offsetX,top+offsetY,right+offsetX,bottom+offsetY);if(clips.isEmpty())context.enableScissor(0,0,view.inputWidth(),view.inputHeight());else{var parent=clips.peek();int x=Math.max(parent.x(),clip.x()),y=Math.max(parent.y(),clip.y());clip=new UiViewport.Clip(x,y,Math.max(0,Math.min(parent.x()+parent.width(),clip.x()+clip.width())-x),Math.max(0,Math.min(parent.y()+parent.height(),clip.y()+clip.height())-y));}clips.push(clip);RenderSystem.enableScissor(clip.x(),clip.y(),clip.width(),clip.height());}

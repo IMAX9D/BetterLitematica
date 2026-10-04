@@ -53,4 +53,4 @@ Linux/macOS 使用 `bash scripts/test-core.sh` 和 `bash scripts/build.sh`。中
 
 仓库只保存源码、测试、构建配置和这份说明及 [开发约束](AGENTS.md)。个人投影、存档、日志、缓存、工具二进制及本地验收资料不入库。
 
-格式与行为参考：[Litematica](https://github.com/maruohon/litematica)、[litematica-printer](https://github.com/water2004/litematica-printer)、[Sponge Schematic Specification](https://github.com/SpongePowered/Schematic-Specification)。第三方依赖遵循各自许可证；本私有项目尚未指定公开发布许可证。
+格式与行为参考：[Litematica](https://github.com/maruohon/litematica)、[litematica-printer](https://github.com/water2004/litematica-printer)、[Sponge Schematic Specification](https://github.com/SpongePowered/Schematic-Specification)。第三方依赖遵循各自许可证；本项目尚未指定公开发布许可证。

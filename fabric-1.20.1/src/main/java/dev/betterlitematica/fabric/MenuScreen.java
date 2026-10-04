@@ -32,7 +32,7 @@ abstract class MenuScreen extends Screen {
         int cursor=previousFocus==null?0:((OverlayTextField)previousFocus.widget).getCursor(),anchor=previousFocus==null?0:((OverlayTextField)previousFocus.widget).selectionAnchor();
         setFocused(null);
         width=UiViewport.WIDTH;height=UiViewport.HEIGHT;
-        building=true;clearChildren();body.clear();footer.clear();navigation.clear();captions.clear();hints.clear();contentHeight=0;
+        building=true;clearChildren();body.clear();footer.clear();navigation.clear();captions.clear();hints.clear();fieldMotion.clear();contentHeight=0;
         innerWidth=Math.max(160,Math.min(width-48,wide?680:440));left=(width-innerWidth)/2;
         int panelHeight=Math.min(height-20,preferredHeight());panelTop=(height-panelHeight)/2;panelBottom=panelTop+panelHeight;
         bodyTop=panelTop+(description.isEmpty()?40:58);bodyBottom=panelBottom-56;

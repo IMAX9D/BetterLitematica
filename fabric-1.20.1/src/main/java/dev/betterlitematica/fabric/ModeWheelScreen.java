@@ -93,7 +93,7 @@ final class ModeWheelScreen extends MenuScreen {
     }
     private void drawCard(IndependentUi ui,DrawContext ctx,int x,int y,float delta){
         int bottom=controller.wheelRenderMode()==WheelRenderMode.RANGE?242:200;HudLayout.card(ui,CARD_X,CARD_TOP,CARD_RIGHT-CARD_X,bottom-CARD_TOP);
-        ui.text(controller.wheelRenderMode().label(),CARD_X+10,CARD_TOP+9,CARD_RIGHT-CARD_X-20,UiTheme.TEXT);ui.rect(CARD_X+10,CARD_TOP+26,CARD_RIGHT-10,CARD_TOP+26+ui.pixel(),UiTheme.DIVIDER);
+        ui.text(controller.wheelRenderMode().label(),CARD_X+10,CARD_TOP+9,CARD_RIGHT-CARD_X-20,UiTheme.TEXT);
         for(var field:new OverlayTextField[]{firstField,secondField})if(field!=null){ui.text(field.getMessage().getString(),CARD_X+10,field.getY()-14,CARD_RIGHT-CARD_X-20,UiTheme.MUTED);MenuScreen.paintFieldStatic(ui,field);field.render(ctx,x,y,delta);}
         for(var control:new ButtonWidget[]{firstPlayer,secondPlayer})if(control!=null)control.render(ctx,x,y,delta);
     }

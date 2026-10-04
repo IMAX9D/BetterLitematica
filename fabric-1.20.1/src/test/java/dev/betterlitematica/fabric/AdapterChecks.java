@@ -15,7 +15,7 @@ public final class AdapterChecks {
     public static void main(String[] args)throws Exception{
         SharedConstants.createGameVersion();Bootstrap.initialize();
         checks+=PreviewAdapterChecks.run();
-        checks+=UiDesignChecks.run();checks+=HudNumberChecks.run();checks+=ToolHudChecks.run();
+        checks+=UiDesignChecks.run();checks+=UiTextureQueueChecks.run();checks+=HudNumberChecks.run();checks+=ToolHudChecks.run();
         checks+=ToolEditorChecks.run();checks+=ToolInventoryChecks.run();checks+=ToolInteractionChecks.run();checks+=ToolSelectionResizeChecks.run();
         checks+=ToolWorldOperationChecks.run();
         checks+=PasteSchedulingChecks.run();
