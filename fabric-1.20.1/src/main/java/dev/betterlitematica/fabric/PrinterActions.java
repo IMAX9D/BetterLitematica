@@ -26,8 +26,10 @@ final class PrinterActions {
     private final Map<BlockState,PlacementHint> placementHints=new LinkedHashMap<>();
     private final java.util.function.Supplier<AccuratePlacement.Mode> protocol;
     private final PrinterContainers containers;
+    private final PrinterSigns signs;private final ProjectionController controller;
     PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed){this(client,transfers,protocol,allowed,null);}
-    PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed,PrinterContainers containers){this.client=client;this.protocol=protocol;this.transfers=transfers;this.supply=new PrinterSupply(client);this.miner=new ExternalMiner(client,allowed);this.containers=containers;}
+    PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed,PrinterContainers containers){this(client,transfers,protocol,allowed,containers,null,null);}
+    PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed,PrinterContainers containers,PrinterSigns signs,ProjectionController controller){this.client=client;this.protocol=protocol;this.transfers=transfers;this.supply=new PrinterSupply(client);this.miner=new ExternalMiner(client,allowed);this.containers=containers;this.signs=signs;this.controller=controller;}
     void checkMiner(){miner.check();}
     String cleanupError(){return miner.problem();}
     boolean supplyTick(int tick){boolean work=supply.tick(tick);if(work)reason=supply.reason();return work;}
@@ -72,13 +74,26 @@ final class PrinterActions {
             ?LightBlock.addNbtForLevel(new ItemStack(item),place.get(LightBlock.LEVEL_15))
             :stack(item);
         ContainerPrintTarget container=null;
+        SignPrintTarget sign=null;boolean dataSign=false,inlineSign=false;
+        if(signs!=null&&SignPrintTarget.supported(place)){
+            try{sign=job.kind()==PrinterQueue.Kind.FILL?SignPrintTarget.from(place,null):SignPrintTarget.read(controller,pos,place);}
+            catch(IllegalArgumentException invalid){return fail(Outcome.UNSUPPORTED,invalid.getMessage());}
+            catch(IllegalStateException pending){return fail(Outcome.RETRY,pending.getMessage());}
+            dataSign=client.player.isCreativeLevelTwoOp();inlineSign=dataSign&&sign.nonDefault();
+            // Even an empty sign must replace a previously held sign's nonempty NBT.
+            if(dataSign)requested=sign.placementStack();
+        }
         if(settings.containerFill&&containers!=null&&ContainerPrintTarget.supported(place)){
             try{container=containers.placement(pos);}catch(RuntimeException pending){return fail(Outcome.RETRY,pending.getMessage());}
             if(client.player.isCreative())requested=container.placementStack();
             else{int slot=InventoryTransfers.find(client.player.getInventory(),container::safeSurvivalItem);if(slot>=0)requested=client.player.getInventory().getStack(slot);else{missing=item;return fail(Outcome.MISSING,"缺少可用容器");}}
         }
         var plan=placement(pos,place,settings,requested);if(plan==null)return fail(Outcome.RETRY,"等待可用放置面");
-        if(container!=null){
+        if(dataSign){
+            var selected=transfers.equipContainerForPrinter(requested,tick);
+            if(selected==InventoryTransfers.Result.WAIT)return fail(Outcome.WAIT,"等待换手");
+            if(selected==InventoryTransfers.Result.MISSING)return fail(Outcome.MISSING,"缺少可用告示牌");
+        }else if(container!=null){
             var selected=client.player.isCreative()?transfers.equipContainerForPrinter(requested,tick):transfers.equipForPrinter(container::safeSurvivalItem,tick);
             if(selected==InventoryTransfers.Result.WAIT)return fail(Outcome.WAIT,"等待换手");
             if(selected==InventoryTransfers.Result.MISSING){missing=item;return fail(Outcome.MISSING,"缺少可用容器");}
@@ -87,7 +102,15 @@ final class PrinterActions {
             if(selected==InventoryTransfers.Result.WAIT)return fail(Outcome.WAIT,"等待换手");
             if(selected==InventoryTransfers.Result.MISSING)return fail(Outcome.MISSING,"缺少匹配光源方块");
         }else{var selected=equip(item,tick);if(selected!=null)return selected;}
-        var outcome=use(plan.hit(),plan.yaw(),plan.pitch(),plan.sneak(),pos,place);if(coral&&outcome==Outcome.SENT){if(corals.size()>=128)corals.remove(corals.keySet().iterator().next());corals.put(pos.toImmutable(),tick+200);}return outcome;
+        var intent=sign==null?null:signs.arm(pos,sign,inlineSign);
+        if(sign!=null&&intent==null)return fail(Outcome.WAIT,"等待告示牌确认");
+        Outcome outcome;
+        try{outcome=use(plan.hit(),plan.yaw(),plan.pitch(),plan.sneak(),pos,place);}
+        catch(RuntimeException failure){if(intent!=null&&!dispatched)signs.abandon(pos,intent);throw failure;}
+        // A local prediction can return PASS even though its sequenced packet was sent.
+        // Keep that transaction until the server opens its editor or the ticket expires.
+        if(intent!=null&&!dispatched)signs.abandon(pos,intent);
+        if(coral&&outcome==Outcome.SENT){if(corals.size()>=128)corals.remove(corals.keySet().iterator().next());corals.put(pos.toImmutable(),tick+200);}return outcome;
     }
     private ItemStack stack(Item item){var inv=client.player.getInventory();if(inv.getMainHandStack().isOf(item))return inv.getMainHandStack();for(int i=0;i<36;i++)if(inv.getStack(i).isOf(item))return inv.getStack(i);return new ItemStack(item);}
     int material(PrinterQueue.Job job,PrinterSettings settings){

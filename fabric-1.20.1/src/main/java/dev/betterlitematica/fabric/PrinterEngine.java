@@ -16,6 +16,7 @@ final class PrinterEngine implements AutoCloseable {
     private record Context(ClientWorld world,List<ProjectionController.PrinterSource> sources,LayerRange layer,AreaSelection selection,long revision) {}
     private final MinecraftClient client;private final ProjectionController controller;private final PrinterActions actions;
     private final PrinterContainers containers;
+    private final PrinterSigns signs;
     private final PrinterQueue queue=new PrinterQueue(4096);
     private final ArrayDeque<CompletableFuture<PrinterDiscovery.Result>> searches=new ArrayDeque<>();
     private final PrinterPacing pacing=new PrinterPacing();
@@ -28,7 +29,7 @@ final class PrinterEngine implements AutoCloseable {
     private int ticks,roundCompared,roundMatched,roundUnknown,lastCompared,lastMatched,lastUnknown;
     private BlockState fillState;
     private long operations;private String status="已停止";
-    PrinterEngine(MinecraftClient client,ProjectionController controller){this.client=client;this.controller=controller;containers=new PrinterContainers(client,controller);actions=new PrinterActions(client,controller.inventoryTransfers(),()->controller.options().accurate,this::externalAllowed,containers);}
+    PrinterEngine(MinecraftClient client,ProjectionController controller){this.client=client;this.controller=controller;containers=new PrinterContainers(client,controller);signs=new PrinterSigns(client,controller);actions=new PrinterActions(client,controller.inventoryTransfers(),()->controller.options().accurate,this::externalAllowed,containers,signs,controller);}
     private boolean externalAllowed(){return running()&&client.world!=null&&client.player!=null&&client.currentScreen==null&&client.isWindowFocused()&&!client.player.isDead()&&!controller.worldWriteBusy()&&Objects.equals(context,current());}
     State state(){return state;}boolean acting(){return actions.acting()||containers.acting();}boolean running(){return state==State.RUNNING;}
     boolean ownsBreaking(){return running()&&actions.breaking()&&client.currentScreen==null&&client.isWindowFocused();}
@@ -74,12 +75,14 @@ final class PrinterEngine implements AutoCloseable {
     void containerInventory(net.minecraft.network.packet.s2c.play.InventoryS2CPacket packet){containers.inventory(packet);}
     void containerSlot(net.minecraft.network.packet.s2c.play.ScreenHandlerSlotUpdateS2CPacket packet){containers.slot(packet);}
     void manualContainerInteraction(){if(containers.active()&&!acting()){containers.manualRequest();pause("已暂停");}}
+    boolean signOpened(net.minecraft.block.entity.SignBlockEntity sign,boolean front){return signs.opened(sign,front);}
+    void manualSignInteraction(BlockPos pos){if(!acting())signs.manual(pos);}
     Collection<ActionHighlights.Mark> actionMarks(long now){return highlights.live(now);}
     void render(net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext context){if(settings().highlights)ProjectionOverlays.actions(client,context,highlights.live(System.nanoTime()),settings());}
     private void clearWork(){containers.clear();generation++;for(var future:searches)future.cancel(true);searches.clear();if(workers!=null)workers.getQueue().clear();queue.clear();pacing.reset();completedRounds=0;sampler=null;missing.clear();scan=null;center=null;waiting=null;actions.diagnostics.reset();roundCompared=roundMatched=roundUnknown=lastCompared=lastMatched=lastUnknown=0;actions.reset();}
     private void pool(){int count=settings().threads;if(workers!=null&&count==workerCount)return;if(workers!=null)workers.shutdownNow();workerCount=count;workers=new ThreadPoolExecutor(count,count,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(count),r->{Thread t=new Thread(r,"betterlitematica-printer-search");t.setDaemon(true);return t;});}
     void tick(){
-        ticks++;
+        ticks++;signs.tick();
         if(client.world==null||client.player==null||client.interactionManager==null){if(state!=State.STOPPED)stop();containers.tick(ticks,false);return;}
         if(state==State.STOPPED){containers.tick(ticks,false);return;}
         if(context!=null&&context.world()!=client.world){stop();containers.tick(ticks,false);return;}
@@ -219,5 +222,5 @@ final class PrinterEngine implements AutoCloseable {
         }
         return true;
     }
-    @Override public void close(){stop();if(workers!=null){workers.shutdownNow();workers=null;}}
+    @Override public void close(){stop();signs.clear();if(workers!=null){workers.shutdownNow();workers=null;}}
 }

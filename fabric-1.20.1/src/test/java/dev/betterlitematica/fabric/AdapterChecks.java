@@ -23,6 +23,7 @@ public final class AdapterChecks {
         checks+=PrinterContainerSettingsChecks.run();
         checks+=ContainerFillPlanChecks.run();
         checks+=ContainerPrintTargetChecks.run();
+        checks+=SignPrintTargetChecks.run();
         checks+=SceneChangesChecks.run();
         checks+=WheelRenderModeChecks.run();
         checks+=WheelRenderUiChecks.run();

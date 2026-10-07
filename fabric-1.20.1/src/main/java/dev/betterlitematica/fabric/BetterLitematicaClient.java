@@ -41,6 +41,8 @@ public final class BetterLitematicaClient implements ClientModInitializer {
     public static void containerInventory(net.minecraft.network.packet.s2c.play.InventoryS2CPacket packet){var c=activeController;if(c!=null)c.printer().containerInventory(packet);}
     public static void containerSlot(net.minecraft.network.packet.s2c.play.ScreenHandlerSlotUpdateS2CPacket packet){var c=activeController;if(c!=null)c.printer().containerSlot(packet);}
     public static void manualContainerInteraction(){var c=activeController;if(c!=null)c.printer().manualContainerInteraction();}
+    public static boolean printerSignOpened(net.minecraft.block.entity.SignBlockEntity sign,boolean front){var c=activeController;return c!=null&&MinecraftClient.getInstance().isOnThread()&&c.printer().signOpened(sign,front);}
+    public static void manualSignInteraction(net.minecraft.util.math.BlockPos pos){var c=activeController;if(c!=null&&MinecraftClient.getInstance().isOnThread())c.printer().manualSignInteraction(pos);}
     public static void manualInventory(){var c=activeController;if(c!=null)c.printer().manualInventory();}
     public static void confirmedProjectionBlock(net.minecraft.util.math.BlockPos pos,net.minecraft.block.BlockState state){var controller=activeController;if(controller!=null)controller.printer().confirmed(pos,state);}
     public static void projectionBlockChanged(net.minecraft.world.BlockView world,net.minecraft.util.math.BlockPos pos){var controller=activeController;if(controller!=null)controller.worldBlockChanged(world,pos);}
