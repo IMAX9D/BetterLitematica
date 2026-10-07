@@ -54,7 +54,7 @@ final class BlueprintBrowserScreen extends MenuScreen {
         manage=fixed("文件管理",0,80,()->client.setScreen(new SchematicFileScreen(this,controller,selectedPath)));
         fixed("新建目录",88,80,()->client.setScreen(new NewDirectoryScreen(this,controller,directory,()->{read(true);rows();})));
         fixed("已加载",176,80,()->client.setScreen(new ResourceScreen(this,controller)));
-        load=fixed("加载",innerWidth-164,80,this::loadSelected);updateActions();
+        load=fixedAction("加载",innerWidth-164,80,this::loadSelected);updateActions();
     }
     private void updateActions(){boolean chosen=!selectedPath.isEmpty();if(load!=null)load.active=chosen;if(manage!=null)manage.active=chosen;}
     private void rows(){if(grid!=null){grid.entries(files,pending!=null||queryDue!=0?"读取中…":"无匹配文件");grid.selected(selectedPath);}}

@@ -113,10 +113,11 @@ final class ModeWheelScreen extends MenuScreen {
                 ui.sector(cx,CY,OUTER-.6,OUTER,start,end,UiMotion.alpha(UiTheme.BORDER,.9));ui.sector(cx,CY,INNER,INNER+.6,start,end,UiMotion.alpha(UiTheme.BORDER,.9));
                 if(over>.01)ui.sector(cx,CY,OUTER-2.2,OUTER,start+.04,end-.04,UiMotion.alpha(UiTheme.ACCENT,over));
                 if(on)ui.sector(cx,CY,INNER+3,INNER+5,center-.18,center+.18,UiTheme.ACCENT);
-                double lx=cx+Math.cos(center)*94,ly=CY+Math.sin(center)*94;String label=page==Page.MODES?MODES[i].label():page==Page.RENDER?(i<RENDER_MODES.length?RENDER_MODES[i].label():i==RENDER_MODES.length?"下一层":"上一层"):i==0?"模式选择":i==1?"总渲染":i==2?"渲染":"执行操作";
+                double lx=cx+Math.cos(center)*94,ly=CY+Math.sin(center)*94;String label=page==Page.MODES?MODES[i].label():page==Page.RENDER?(i<RENDER_MODES.length?RENDER_MODES[i].label():i==RENDER_MODES.length?"下一层":"上一层"):i==0?"施工模式":i==1?"总渲染":i==2?"分层":"执行操作";
                 int labelColor=!enabled?UiTheme.DISABLED_TEXT:hover==i||on?UiTheme.TEXT:UiTheme.SECONDARY;
                 if(page==Page.MAIN){
-                    var glyph=i==0?dev.betterlitematica.runtime.UiGlyphArt.Kind.TUNE:i==1?(on?dev.betterlitematica.runtime.UiGlyphArt.Kind.EYE:dev.betterlitematica.runtime.UiGlyphArt.Kind.EYE_OFF):i==2?dev.betterlitematica.runtime.UiGlyphArt.Kind.VERSIONS:dev.betterlitematica.runtime.UiGlyphArt.Kind.SELECTION;
+                    // Each wheel glyph is unique to its action; none is borrowed from a main-menu destination.
+                    var glyph=i==0?dev.betterlitematica.runtime.UiGlyphArt.Kind.MODES:i==1?(on?dev.betterlitematica.runtime.UiGlyphArt.Kind.EYE:dev.betterlitematica.runtime.UiGlyphArt.Kind.EYE_OFF):i==2?dev.betterlitematica.runtime.UiGlyphArt.Kind.LAYERS:dev.betterlitematica.runtime.UiGlyphArt.Kind.PLAY;
                     ui.glyph(glyph,lx-8,ly-(i==1?24:20),16,hover==i||on?UiTheme.ACCENT:UiTheme.MUTED);
                     ui.centered(label,lx-42,ly-(i==1?7:3),84,22,labelColor);
                     if(i==1)ui.centered(on?"开":"关",lx-24,ly+12,48,14,on?UiTheme.ACCENT:UiTheme.MUTED);

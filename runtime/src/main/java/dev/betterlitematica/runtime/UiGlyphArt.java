@@ -20,7 +20,8 @@ import java.util.Objects;
 public final class UiGlyphArt {
     public enum Kind {
         BRAND, LOAD, PRINTER, SELECTION, PASTE, TASKS, VERSIONS, SETTINGS, RESTORE,
-        EYE, EYE_OFF, TUNE, TRASH, BACK, FOLDER, FILE, SEARCH, CHECK, PLUS, REFRESH, UP, NEXT, COPY
+        EYE, EYE_OFF, TUNE, TRASH, BACK, FOLDER, FILE, SEARCH, CHECK, PLUS, REFRESH, UP, NEXT, COPY,
+        LAYERS, MODES, PLAY, LOCK
     }
     public static final int MIN_PIXELS=8,MAX_PIXELS=128,SUPERSAMPLING=4;
     public record Raster(int size,int[] argb){
@@ -146,6 +147,22 @@ public final class UiGlyphArt {
             case SEARCH -> {g.draw(new Ellipse2D.Double(4,4,12.5,12.5));g.draw(new Line2D.Double(14.6,14.6,20,20));}
             case CHECK -> {var p=new Path2D.Double();p.moveTo(5,12.5);p.lineTo(10,17.5);p.lineTo(19.5,7);g.draw(p);}
             case PLUS -> {g.draw(new Line2D.Double(12,5,12,19));g.draw(new Line2D.Double(5,12,19,12));}
+            case LAYERS -> {
+                // Flat slabs with the current one solid: reads as "one layer of many", unlike the isometric VERSIONS stack.
+                g.draw(new RoundRectangle2D.Double(4,4.2,16,3.8,1.6,1.6));
+                g.fill(new RoundRectangle2D.Double(4,10.1,16,3.8,1.6,1.6));
+                g.draw(new RoundRectangle2D.Double(4,16,16,3.8,1.6,1.6));
+            }
+            case MODES -> {
+                g.draw(new RoundRectangle2D.Double(4,4,6.8,6.8,1.8,1.8));g.draw(new RoundRectangle2D.Double(13.2,4,6.8,6.8,1.8,1.8));
+                g.draw(new RoundRectangle2D.Double(4,13.2,6.8,6.8,1.8,1.8));g.fill(new RoundRectangle2D.Double(13.2,13.2,6.8,6.8,1.8,1.8));
+            }
+            case PLAY -> {var p=new Path2D.Double();p.moveTo(7.6,5);p.lineTo(19,12);p.lineTo(7.6,19);p.closePath();g.draw(p);}
+            case LOCK -> {
+                g.draw(new RoundRectangle2D.Double(5,10.5,14,10,2.6,2.6));
+                var shackle=new Path2D.Double();shackle.moveTo(8.2,10.5);shackle.lineTo(8.2,7.6);shackle.curveTo(8.2,2.6,15.8,2.6,15.8,7.6);shackle.lineTo(15.8,10.5);g.draw(shackle);
+                g.fill(new Ellipse2D.Double(11,14.2,2,2));
+            }
         }
     }
     private static void folder(Graphics2D g){

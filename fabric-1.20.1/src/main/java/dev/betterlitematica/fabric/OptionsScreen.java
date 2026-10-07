@@ -23,9 +23,10 @@ final class OptionsScreen extends MenuScreen {
         else if(tab==0){
             button("选区工具："+on(s.tool),0,2,2,()->{s.tool=!s.tool;save();});button("工具设置",1,2,2,()->client.setScreen(new ToolScreen(this,controller)));
             button("简单放置："+on(s.easyPlace),0,2,3,()->{s.easyPlace=!s.easyPlace;save();});button("按住连续："+on(s.hold),1,2,3,()->{s.hold=!s.hold;save();});
-            button("放置限制："+on(s.restriction),0,2,4,()->{s.restriction=!s.restriction;save();});button("投影拾取："+on(s.pick),1,2,4,()->{s.pick=!s.pick;save();});button("选区边框："+on(s.boxes),0,2,5,()->{s.boxes=!s.boxes;save();});
-            button("精确放置："+s.accurate.label(),1,2,5,()->{s.accurate=AccuratePlacement.Mode.values()[(s.accurate.ordinal()+1)%AccuratePlacement.Mode.values().length];controller.printer().pause("设置已更改");save();});
-            button("取料与工具",0,2,7,()->client.setScreen(new InventoryScreen(this,controller)));
+            button("放置限制："+on(s.restriction),0,2,4,()->{s.restriction=!s.restriction;save();});button("投影拾取："+on(s.pick),1,2,4,()->{s.pick=!s.pick;save();});
+            // Selection boxes live only under 显示; one switch per setting.
+            button("精确放置："+s.accurate.label(),0,2,5,()->{s.accurate=AccuratePlacement.Mode.values()[(s.accurate.ordinal()+1)%AccuratePlacement.Mode.values().length];controller.printer().pause("设置已更改");save();});
+            button("取料与工具",1,2,5,()->client.setScreen(new InventoryScreen(this,controller)));
         }else{
             int w=180,right=left+w+18,rw=innerWidth-w-18;
             search=fieldAt("搜索",query,left,40,w,100);search.setChangedListener(v->{query=v;rows();});

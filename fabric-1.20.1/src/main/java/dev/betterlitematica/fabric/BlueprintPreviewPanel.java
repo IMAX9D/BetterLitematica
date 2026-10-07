@@ -29,7 +29,7 @@ final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseab
     private String status="";
     private boolean moved,appliedDetailed;private int dragButton=-1,orbitSide;
     private long lastInput,lastClick,requestedFrame,appliedFrame;
-    private double clickX,clickY;
+    private double clickX,clickY,pointerX=-1,pointerY=-1;
     BlueprintPreviewPanel(ProjectionController controller,int x,int width,int height){this(controller,x,width,height,true);}
     BlueprintPreviewPanel(ProjectionController controller,int x,int width,int height,boolean gallery){super(x,0,width,height,Text.empty());this.controller=controller;this.gallery=gallery;active=false;name=new OverlayLabel(x,width,"");}
     void selected(String value){close();camera=PreviewCamera.DEFAULT;lastInput=lastClick=0;name.setMessage(Text.literal(value));status=value.isEmpty()?"":"生成中…";}
@@ -69,8 +69,14 @@ final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseab
     private int imageLeft(){return getX()+(width-imageSize()-(gallery?GAP+thumbnailSize():0))/2;}
     private int imageTop(){return getY()+(gallery?24:Math.max(0,(height-imageSize())/2));}
     private boolean orbitHit(double x,double y){int left=imageLeft(),top=imageTop(),size=imageSize();return visible&&active&&orbit!=null&&x>=left&&x<left+size&&y>=top&&y<top+size;}
+    /** A reset chip appears in the corner once the view leaves its default framing; double-click remains a shortcut. */
+    private static final int RESET=18;
+    private boolean resetShown(){return orbit!=null&&!camera.equals(PreviewCamera.DEFAULT);}
+    private boolean resetHit(double x,double y){int rx=imageLeft()+imageSize()-INSET-RESET-4,ry=imageTop()+INSET+4;return resetShown()&&orbitHit(x,y)&&x>=rx&&x<rx+RESET&&y>=ry&&y<ry+RESET;}
+    boolean recentlyUsed(){return lastInput!=0&&System.nanoTime()-lastInput<1_500_000_000L;}
     @Override public boolean mouseClicked(double x,double y,int button){
         if((button!=0&&button!=2)||!orbitHit(x,y))return false;
+        if(button==0&&resetHit(x,y)){camera=PreviewCamera.DEFAULT;lastClick=0;changed();return true;}
         long now=System.nanoTime();
         if(button==0&&lastClick!=0&&now-lastClick<DOUBLE_CLICK_NANOS&&Math.hypot(x-clickX,y-clickY)<=5){camera=PreviewCamera.DEFAULT;changed();lastClick=0;}
         else lastClick=0;
@@ -103,6 +109,7 @@ final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseab
     }
     @Override public void renderButton(DrawContext context,int mouseX,int mouseY,float delta){
         if(name.getMessage().getString().isEmpty())return;
+        pointerX=mouseX;pointerY=mouseY;
         var ui=IndependentUi.INSTANCE;if(gallery){name.setY(getY());name.render(context,mouseX,mouseY,delta);}
         pollCapture();request(interacting(System.nanoTime()));
         if(orbit!=null){
@@ -133,6 +140,12 @@ final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseab
         }
         else if(image!=null)image.drawRegion(256,256,256,x+INSET,y+INSET,size-INSET*2,size-INSET*2);
         ui.roundFrame(x,y,x+size,y+size,UiTheme.CARD_RADIUS,UiTheme.BORDER);
+        if(resetShown()){
+            double rx=x+size-INSET-RESET-4,ry=y+INSET+4;boolean over=resetHit(pointerX,pointerY);
+            ui.roundRect(rx,ry,rx+RESET,ry+RESET,RESET/2d,UiMotion.alpha(over?UiTheme.HOVER:UiTheme.OVERLAY_PANEL,.92));
+            ui.roundFrame(rx,ry,rx+RESET,ry+RESET,RESET/2d,over?UiTheme.ACCENT:UiTheme.BORDER);
+            ui.glyph(dev.betterlitematica.runtime.UiGlyphArt.Kind.REFRESH,rx+3,ry+3,RESET-6,over?UiTheme.ACCENT:UiTheme.SECONDARY);
+        }
     }
     private void drawView(int view,int x,int y,int size){
         var ui=IndependentUi.INSTANCE;ui.roundRect(x,y,x+size,y+size,UiTheme.CARD_RADIUS,UiTheme.SUNKEN);

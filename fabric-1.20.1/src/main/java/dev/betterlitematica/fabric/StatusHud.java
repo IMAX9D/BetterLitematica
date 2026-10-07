@@ -47,7 +47,7 @@ final class StatusHud {
         if(projectionBadge||printerBadge){
             double diameter=24,tx=x;ui.prepareStatusBadges(diameter);
             if(projectionBadge){ui.statusBadge(controller.projectionRenderingEnabled()?StatusBadgeArt.Kind.EYE_OPEN:StatusBadgeArt.Kind.EYE_CLOSED,tx,y,diameter);tx+=diameter+HudLayout.GAP;}
-            if(printerBadge)drawPrinterBadge(ui,tx,y,diameter,expansion);
+            if(printerBadge)drawPrinterBadge(ui,tx,y,diameter,expansion,currentState==PrinterEngine.State.PAUSED);
             y+=diameter+HudLayout.GAP;
         }
         double shortageWidth=shortages.isEmpty()?0:10+shortages.size()*18+4;
@@ -65,14 +65,17 @@ final class StatusHud {
     }
 
     /** One continuous surface; only the right edge moves, with no rescaled icons or text rasters. */
-    static void drawPrinterBadge(IndependentUi ui,double x,double y,double diameter,double expansion){
+    static void drawPrinterBadge(IndependentUi ui,double x,double y,double diameter,double expansion){drawPrinterBadge(ui,x,y,diameter,expansion,false);}
+    /** Paused keeps the collapsed circle but tints the printer amber, so it never reads as switched off. */
+    static void drawPrinterBadge(IndependentUi ui,double x,double y,double diameter,double expansion,boolean paused){
         double progress=UiMotion.clamp(expansion),radius=diameter/2;
         String label="打印中";
         ui.prepareText(label);
         double width=diameter+(ui.measure(label)+10)*progress;
         int surface=UiTheme.DARK?0xee1f2027:0xe3f6f9fc;
         int border=UiTheme.DARK?0x1effffff:0x3a8191a7;
-        int icon=UiMotion.mix(UiTheme.DARK?0xff82868f:0xff8993a1,UiTheme.DARK?0xff6ed69c:0xff0ab463,progress);
+        int idle=paused?UiTheme.WARNING:UiTheme.DARK?0xff82868f:0xff8993a1;
+        int icon=UiMotion.mix(idle,UiTheme.DARK?0xff6ed69c:0xff0ab463,progress);
         ui.shadow(x,y,x+width,y+diameter,radius);
         ui.roundRect(x,y,x+width,y+diameter,radius,surface);
         ui.roundFrame(x,y,x+width,y+diameter,radius,border);

@@ -7,6 +7,7 @@ final class ProjectionScreen extends MenuScreen {
     private static final int LIST=300,GUTTER=24,ROW=26,TILE=34,TILE_STEP=40;
     private int ticks;
     private String snapshot="";
+    private java.util.UUID removing;private long removingSince;
 
     ProjectionScreen(ProjectionController c){super("BetterLitematica","",null,c,true);}
     @Override protected int preferredHeight(){return Math.max(306,130+ROW*Math.max(Math.min(controller.placements().size(),8),6));}
@@ -28,8 +29,13 @@ final class ProjectionScreen extends MenuScreen {
             int y=ROW+i*ROW,ax=left+nameWidth+6;
             rowAt(entry.name(),left,y,nameWidth,selected,live,()->{controller.select(selected?null:entry.id());refresh();});
             iconAt(Kind.TUNE,"配置",ax,y,icon,()->{controller.select(entry.id());client.setScreen(new PlacementConfigScreen(this,controller));},true,Look.GHOST,0);
-            iconAt(live?Kind.EYE:Kind.EYE_OFF,!entry.enabled()?"已停用":live?"隐藏":"显示",ax+icon+2,y,icon,()->{controller.toggleDisplay(entry.id());refresh();},true,Look.GHOST,live?0:UiTheme.MUTED);
-            iconAt(Kind.TRASH,"删除",ax+2*(icon+2),y,icon,()->{controller.unload(entry.id());refresh();},true,Look.GHOST,0);
+            iconAt(live?Kind.EYE:Kind.EYE_OFF,!entry.enabled()?"启用并显示":live?"隐藏方块":"显示方块",ax+icon+2,y,icon,()->{controller.toggleDisplay(entry.id());refresh();},true,Look.GHOST,live?0:UiTheme.MUTED);
+            // Removing loses position, rotation and filters, so it takes a second click on the same, now red, control.
+            boolean confirming=entry.id().equals(removing);
+            iconAt(Kind.TRASH,confirming?"再次点击移除":"移除投影",ax+2*(icon+2),y,icon,()->{
+                if(confirming){removing=null;controller.unload(entry.id());}else{removing=entry.id();removingSince=System.nanoTime();}
+                refresh();
+            },true,confirming?Look.STANDARD:Look.GHOST,confirming?UiTheme.ERROR:0);
         }
         int tw=(rightWidth-8)/2;
         tile(Kind.LOAD,"加载投影",right,tw,0,0,()->client.setScreen(new BlueprintBrowserScreen(this,controller)),true);
@@ -53,5 +59,8 @@ final class ProjectionScreen extends MenuScreen {
         return state.toString();
     }
 
-    @Override protected void updateMenu(){if(++ticks%10==0&&!snapshot.equals(snapshot()))refresh();}
+    @Override protected void updateMenu(){
+        if(removing!=null&&System.nanoTime()-removingSince>3_000_000_000L){removing=null;refresh();return;}
+        if(++ticks%10==0&&!snapshot.equals(snapshot()))refresh();
+    }
 }

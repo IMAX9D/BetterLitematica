@@ -21,7 +21,8 @@ final class PlacementConfigScreen extends MenuScreen {
     private String previewSource="";
     private Map<String,RegionPlacement> previewRegions=Map.of();
     private long lastOpacityUpdate=System.nanoTime();
-    PlacementConfigScreen(Screen p,ProjectionController c){super("摆放设置","",p,c,true);id=c.selectedId();}
+    private final long epoch;
+    PlacementConfigScreen(Screen p,ProjectionController c){super("摆放设置","",p,c,true);id=c.selectedId();epoch=c.sessionEpoch();}
     @Override protected int preferredHeight(){return 380;}
     private TextFieldWidget coordinate(String axis,String value,int x,int y,int width){
         var field=new OverlayTextField(x+40,0,width-46,axis);field.setMaxLength(12);field.setText(value);addBody(field,y);return field;
@@ -44,25 +45,27 @@ final class PlacementConfigScreen extends MenuScreen {
         px=coordinate("X",px==null?""+p.transform().origin().x():px.getText(),controlsLeft,84,columnWidth);
         py=coordinate("Y",py==null?""+p.transform().origin().y():py.getText(),controlsLeft,110,columnWidth);
         pz=coordinate("Z",pz==null?""+p.transform().origin().z():pz.getText(),controlsLeft,136,columnWidth);
-        for(int axis=0;axis<3;axis++){final int a=axis;boolean locked=(p.lockedAxes()&(1<<axis))!=0;buttonAt(new String[]{"X","Y","Z"}[axis]+(locked?" ×":""),controlsLeft,84+axis*26,30,()->act(()->{controller.axisLock(a);switch(a){case 0->px=null;case 1->py=null;case 2->pz=null;}refresh();}),!p.locked(),locked);}
+        for(int axis=0;axis<3;axis++){final int a=axis;boolean locked=(p.lockedAxes()&(1<<axis))!=0;String axisName=new String[]{"X","Y","Z"}[axis];
+            var lock=buttonAt(axisName,controlsLeft,84+axis*26,30,()->act(()->{controller.axisLock(a);switch(a){case 0->px=null;case 1->py=null;case 2->pz=null;}refresh();}),!p.locked(),locked);
+            hint(lock,(locked?"解锁 ":"锁定 ")+axisName+" 轴");}
         px.setEditable(!p.locked()&&(p.lockedAxes()&1)==0);py.setEditable(!p.locked()&&(p.lockedAxes()&2)==0);pz.setEditable(!p.locked()&&(p.lockedAxes()&4)==0);
-        buttonAt("应用坐标",controlsLeft,172,columnWidth,()->act(()->controller.move(Integer.parseInt(px.getText()),Integer.parseInt(py.getText()),Integer.parseInt(pz.getText()))),!p.locked(),true);
+        buttonAt("应用坐标",controlsLeft,172,columnWidth,this::applyCoordinates,!p.locked(),true);
 
         caption("方向与显示",right,42,columnWidth-48);
         addBody(new ClipboardIconButton(right+columnWidth-44,false,()->controller.action(()->{applyOpacity();client.keyboard.setClipboard(PlacementClipboard.encode(placement(),controller.regions(id)));})),36);
         var paste=new ClipboardIconButton(right+columnWidth-20,true,()->controller.action(()->act(()->{
             controller.pastePlacement(client.keyboard.getClipboard());opacityDirty=false;resetCoordinates();
         })));paste.active=!p.locked();addBody(paste,36);
-        buttonAt("旋转 "+p.transform().quarterTurns()*90+"° → +90°",right,58,columnWidth,()->act(()->{controller.rotateNext();refresh();}),!p.locked(),false);
+        buttonAt("旋转："+p.transform().quarterTurns()*90+"°",right,58,columnWidth,()->act(()->{controller.rotateNext();refresh();}),!p.locked(),false);
         String mirror=p.transform().mirrorX()?(p.transform().mirrorZ()?"xz":"x"):(p.transform().mirrorZ()?"z":"none");
         buttonAt("镜像："+(mirror.equals("none")?"无":mirror.toUpperCase()),right,84,columnWidth,()->act(()->{controller.mirror(switch(mirror){case "none"->"x";case "x"->"z";case "z"->"xz";default->"none";});refresh();}),!p.locked(),false);
-        buttonAt(p.enabled()?"启用：是":"启用：否",right,110,columnWidth,()->act(()->{controller.toggle();refresh();}),true,false);
-        buttonAt(p.locked()?"变换：已锁定":"变换：未锁定",right,136,columnWidth,()->act(()->{controller.toggleLock();refresh();}),true,false);
+        hint(buttonAt("启用："+(p.enabled()?"开":"关"),right,110,columnWidth,()->act(()->{controller.toggle();refresh();}),true,false),"停用后不显示，也不参与打印");
+        hint(buttonAt("锁定变换："+(p.locked()?"开":"关"),right,136,columnWidth,()->act(()->{controller.toggleLock();refresh();}),true,false),"锁定后位置、旋转和镜像不可修改");
         if(!opacityDirty)pendingOpacity=p.opacity();
         opacitySlider=new OverlayOpacitySlider(right,columnWidth,pendingOpacity,value->{pendingOpacity=(float)value;opacityDirty=true;});
         opacitySlider.previewCallbacks(this::beginPreview,this::endPreview);
         addBody(opacitySlider,168);
-        buttonAt(p.renderBlocks()?"渲染：是":"渲染：否",controlsLeft,206,columnWidth,()->act(()->{controller.toggleBlocks();refresh();}),true,false);
+        hint(buttonAt("显示方块："+(p.renderBlocks()?"开":"关"),controlsLeft,206,columnWidth,()->act(()->{controller.toggleBlocks();refresh();}),true,false),"只隐藏方块，打印照常");
         buttonAt("重叠："+switch(p.overlapRule()){case ALL->"替换全部";case NON_AIR->"忽略空气";case NONE->"仅填空白";},right,206,columnWidth,()->act(()->{controller.overlapNext();refresh();}),true,false);
         buttonAt("材料清单",cellX(0,5),246,cellWidth(5),()->act(()->client.setScreen(new AnalysisScreen(this,controller,true))),true,false);
         buttonAt("投影校验",cellX(1,5),246,cellWidth(5),()->act(()->client.setScreen(new AnalysisScreen(this,controller,false))),true,false);
@@ -100,8 +103,31 @@ final class PlacementConfigScreen extends MenuScreen {
             if(key==org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE){endPreview();return true;}
             return true;
         }
+        // Enter commits the field being edited, the same as its button.
+        if((key==org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER||key==org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER)&&getFocused()!=null){
+            var focus=getFocused();
+            if(focus==name){controller.action(()->act(()->controller.rename(name.getText())));return true;}
+            if(focus==px||focus==py||focus==pz){controller.action(this::applyCoordinates);return true;}
+        }
         return super.keyPressed(key,scan,modifiers);
     }
+    /** Typed name and coordinates are kept when leaving, like the opacity slider; unparsable drafts are left untouched. */
+    private void commitDrafts(){
+        Placement p=placement();if(p==null||epochChanged())return;
+        if(name!=null){String value=name.getText().strip();if(!value.isEmpty()&&!value.equals(p.name()))controller.action(()->act(()->controller.rename(value)));}
+        if(px!=null&&py!=null&&pz!=null&&!p.locked()){
+            try{
+                int x=Integer.parseInt(px.getText().strip()),y=Integer.parseInt(py.getText().strip()),z=Integer.parseInt(pz.getText().strip());
+                var origin=p.transform().origin();
+                if(x!=origin.x()||y!=origin.y()||z!=origin.z())controller.action(()->act(()->controller.move(x,y,z)));
+            }catch(NumberFormatException ignored){}
+        }
+    }
+    private boolean epochChanged(){return epoch!=controller.sessionEpoch();}
+    private static int coordinate(TextFieldWidget field){
+        try{return Integer.parseInt(field.getText().strip());}catch(NumberFormatException e){throw new IllegalArgumentException(field.getMessage().getString()+" 坐标须为整数");}
+    }
+    private void applyCoordinates(){int x=coordinate(px),y=coordinate(py),z=coordinate(pz);act(()->controller.move(x,y,z));}
     private void applyOpacity(){
         if(!opacityDirty)return;
         opacityDirty=false;
@@ -122,5 +148,5 @@ final class PlacementConfigScreen extends MenuScreen {
         if(now-lastOpacityUpdate>=200_000_000L){lastOpacityUpdate=now;applyOpacity();}
     }
     // Preserve the last drag value when closing before the next 200 ms update.
-    @Override public void removed(){cancelPreview();schematicPreview=null;endPreview();applyOpacity();super.removed();}
+    @Override public void removed(){cancelPreview();schematicPreview=null;endPreview();applyOpacity();commitDrafts();super.removed();}
 }

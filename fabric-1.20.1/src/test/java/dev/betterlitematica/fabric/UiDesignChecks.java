@@ -100,6 +100,7 @@ public final class UiDesignChecks {
         contrast(UiTheme.MUTED,UiTheme.PANEL,"Footer status");
         contrast(UiTheme.FOCUS,UiTheme.SELECTED,"Primary button label");
         contrast(UiTheme.FOCUS,UiTheme.HOVER,"Hovered primary button label");
+        for(int background:new int[]{UiTheme.ACCENT,UiTheme.ACCENT_HOVER,UiTheme.FOCUS})contrast(UiTheme.ON_ACCENT,background,"Solid footer action label");
         for(int background:new int[]{UiTheme.PANEL,UiTheme.SURFACE,UiTheme.HOVER}){
             contrast(UiTheme.WARNING,background,"Material shortage text");
             contrast(UiTheme.SUCCESS,background,"Completed material text");
