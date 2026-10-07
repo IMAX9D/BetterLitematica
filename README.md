@@ -1,10 +1,12 @@
 # BetterLitematica
 
-Minecraft **1.20.1 / Fabric** 的独立投影与建造辅助模组，当前版本 **0.3.89-dev**。不依赖 Litematica 或 MaLiLib，仍在开发中，尚未实现原模组的全部功能。
+Minecraft **1.20.1 / Fabric** 的独立投影与建造辅助模组，当前版本 **0.3.90-dev**。不依赖 Litematica 或 MaLiLib，仍在开发中，尚未实现原模组的全部功能。
 
 ## 安装与使用
 
 需要 Java 17、Fabric Loader 0.15.11 或更高版本，以及适用于 Minecraft 1.20.1 的 Fabric API。将构建出的 JAR 放入游戏实例的 `mods/`，投影文件放入同实例的 `schematics/`。
+
+内置可选模组兼容：检测到旧 Litematica／Litematica Printer 时接管投影显示、工具输入、快捷键和旧打印执行；检测到定制 Tom’s Storage 时停用旧打印补货、导航及其快捷键，保留仓储、终端和独立投影备货。Tweakeroo 的精准／灵活放置、连续点击、放置限制及自动换手等竞争功能在 BetterLitematica 加载期间停用，其他功能保留。无需替换这些模组的 JAR，也不要求安装它们；这不等于将旧打印机的自动补货和导航移植到 BetterLitematica。
 
 - 多投影加载、独立摆放、旋转镜像、分层显示及可旋转的缓存预览。
 - 完整源文件材料统计、动态校验、方块信息与容器内容展示。
