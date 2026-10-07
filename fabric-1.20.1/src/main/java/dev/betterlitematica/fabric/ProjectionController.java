@@ -249,7 +249,8 @@ final class ProjectionController implements AutoCloseable {
     private void closeLoaded(LoadCoordinator.Loaded loaded) { try { loaded.close(); } catch (IOException e) { report(e.toString()); } }
     private void apply(Entry entry) {
         if(entry.renderer==null)return;
-        if(!entry.renderer.layout().placement().sameGeometry(entry.placement))entry.renderer.place(entry.placement);
+        var drawn=entry.renderer.layout().placement();
+        if(!drawn.sameGeometry(entry.placement)||!drawn.displayFilter().equals(entry.placement.displayFilter()))entry.renderer.place(entry.placement);
         entry.renderer.visible(entry.placement.enabled()&&entry.placement.renderBlocks());entry.renderer.opacity(entry.placement.opacity());
         if(!entry.renderer.layer().equals(layer))entry.renderer.layer(layer);
     }
@@ -303,8 +304,8 @@ final class ProjectionController implements AutoCloseable {
     boolean worldWriteBusy(){return toolWorld.busy()||pasteStarting!=null||paste!=null||fillStarting!=null||fill!=null||commands!=null||commandsLoading!=null;}
     record PrinterSample(boolean inside,net.minecraft.block.BlockState state){}
     record PrinterSource(Placement placement,ProjectionRenderer1201 renderer,BlueprintMetadata metadata){
-        @Override public boolean equals(Object value){return value instanceof PrinterSource other&&placement.equals(other.placement)&&renderer==other.renderer&&metadata==other.metadata;}
-        @Override public int hashCode(){return Objects.hash(placement,System.identityHashCode(renderer),System.identityHashCode(metadata));}
+        @Override public boolean equals(Object value){return value instanceof PrinterSource other&&placement.id().equals(other.placement.id())&&placement.sameGeometry(other.placement)&&placement.name().equals(other.placement.name())&&placement.locked()==other.placement.locked()&&placement.opacity()==other.placement.opacity()&&placement.renderBlocks()==other.placement.renderBlocks()&&placement.lockedAxes()==other.placement.lockedAxes()&&renderer==other.renderer&&metadata==other.metadata;}
+        @Override public int hashCode(){return Objects.hash(placement.id(),placement.name(),placement.source(),placement.transform(),placement.enabled(),placement.locked(),placement.opacity(),placement.regions(),placement.renderBlocks(),placement.lockedAxes(),placement.overlapRule(),System.identityHashCode(renderer),System.identityHashCode(metadata));}
     }
     List<Placement> printerPlacements(){return entries.values().stream().map(e->e.placement).filter(Placement::enabled).toList();}
     List<PrinterSource> printerSources(){return entries.values().stream().filter(e->e.placement.enabled()).map(e->new PrinterSource(e.placement,e.renderer,e.renderer==null?e.metadata:e.renderer.metadata())).toList();}
@@ -758,6 +759,10 @@ final class ProjectionController implements AutoCloseable {
     void toggle(UUID id) { requireWorld(); Entry entry=entries.get(id); if(entry==null)throw new IllegalArgumentException("投影已移除"); entry.placement=entry.placement.enabled(!entry.placement.enabled());cancelAnalysis();apply(entry);rebuildScene();dirty=true; }
     void toggleDisplay(UUID id){requireWorld();var e=entries.get(id);if(e==null)throw new IllegalStateException("投影已移除");boolean enabling=!e.placement.enabled();e.placement=enabling?e.placement.enabled(true).renderBlocks(true):e.placement.renderBlocks(!e.placement.renderBlocks());apply(e);if(enabling){cancelAnalysis();rebuildScene();}dirty=true;}
     void placementOpacity(UUID id,float value) { requireWorld(); Entry entry=entries.get(id);if(entry==null)throw new IllegalArgumentException("投影已移除");entry.placement=entry.placement.opacity(value);apply(entry);dirty=true; }
+    void placementDisplayFilter(UUID id,BlockDisplayFilter filter){
+        requireWorld();Entry entry=require(id);if(entry.placement.displayFilter().equals(filter))return;
+        entry.placement=entry.placement.displayFilter(filter);apply(entry);rebuildScene();dirty=true;
+    }
     void toggleRendering() { requireWorld(); rendering = !rendering; dirty = true; }
     void reload(){reloadResource(require().placement.source());}
     void unload() { unload(require().placement.id()); }

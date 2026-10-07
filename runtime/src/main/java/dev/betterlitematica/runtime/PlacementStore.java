@@ -8,7 +8,7 @@ import java.util.zip.CRC32;
 
 /** Small versioned settings file. Never stores or edits source blueprint data. Call from an IO worker. */
 public final class PlacementStore {
-    private static final int MAGIC = 0x424c5053, VERSION = 3, MAX_BYTES = 8 * 1024 * 1024;
+    private static final int MAGIC = 0x424c5053, VERSION = 4, MAX_BYTES = 8 * 1024 * 1024;
     private PlacementStore() {}
     public static PlacementSession read(Path file) throws IOException {
         if (!Files.exists(file)) return PlacementSession.EMPTY;
@@ -29,7 +29,7 @@ public final class PlacementStore {
             LayerRange layer = new LayerRange(LayerRange.Axis.values()[axis], in.readInt(), in.readInt());
             float opacity = in.readFloat(); boolean rendering = in.readBoolean(); int count = in.readInt();
             // Reject impossible declared counts before allocating or iterating, without a UI placement limit.
-            int minimumRecordBytes=version==1?37:version==2?41:48;
+            int minimumRecordBytes=version==1?37:version==2?41:version==3?48:53;
             if (count < 0 || count > (in.available()-Long.BYTES)/minimumRecordBytes) throw new IOException("Invalid placement count");
             List<Placement> entries = new ArrayList<>();
             for (int i = 0; i < count; i++) {
@@ -41,7 +41,20 @@ public final class PlacementStore {
                 boolean enabled=in.readBoolean(),locked=in.readBoolean();float alpha=version>=2?in.readFloat():opacity;
                 boolean render=true;int axes=0;ReplaceRule overlap=ReplaceRule.ALL;Map<String,RegionPlacement> regions=new LinkedHashMap<>();
                 if(version>=3){render=in.readBoolean();axes=in.readUnsignedByte();int mode=in.readUnsignedByte();if(mode>=ReplaceRule.values().length)throw new IOException("Invalid overlap rule");overlap=ReplaceRule.values()[mode];int n=in.readInt();if(n<0||n>1024)throw new IOException("Invalid region override count");for(int j=0;j<n;j++){String key=in.readUTF();var pos=new Vec3i(in.readInt(),in.readInt(),in.readInt());int rotation=in.readUnsignedByte();if(rotation>3)throw new IOException("Invalid region rotation");var value=new RegionPlacement(pos,rotation,in.readBoolean(),in.readBoolean(),in.readBoolean(),in.readBoolean());if(regions.put(key,value)!=null)throw new IOException("Duplicate region override");}}
-                entries.add(new Placement(id,name,source,transform,enabled,locked,alpha,regions,render,axes,overlap));
+                BlockDisplayFilter filter=BlockDisplayFilter.OFF;
+                if(version>=4){
+                    int filterMode=in.readUnsignedByte(),n=in.readInt();
+                    if(filterMode>=BlockDisplayFilter.Mode.values().length)throw new IOException("Invalid display filter mode");
+                    if(n<0||n>BlockDisplayFilter.MAX_IDS||n>(in.available()-Long.BYTES)/5)throw new IOException("Invalid display filter count");
+                    Set<String> ids=new LinkedHashSet<>();int characters=0;
+                    for(int j=0;j<n;j++){
+                        String raw=in.readUTF(),key=BlockDisplayFilter.canonicalId(raw);
+                        if(!raw.equals(key)||!ids.add(key))throw new IOException("Invalid or duplicate display filter ID");
+                        characters+=key.length();if(characters>BlockDisplayFilter.MAX_ID_CHARACTERS)throw new IOException("Display filter exceeds budget");
+                    }
+                    filter=new BlockDisplayFilter(BlockDisplayFilter.Mode.values()[filterMode],ids);
+                }
+                entries.add(new Placement(id,name,source,transform,enabled,locked,alpha,regions,render,axes,overlap,filter));
             }
             if (in.readLong() != crc.getValue() || in.read() != -1) throw new IOException("Placement settings checksum mismatch");
             return new PlacementSession(entries, selected, layer, opacity, rendering);
@@ -74,6 +87,8 @@ public final class PlacementStore {
                 out.writeBoolean(entry.enabled()); out.writeBoolean(entry.locked()); out.writeFloat(entry.opacity());
                 out.writeBoolean(entry.renderBlocks());out.writeByte(entry.lockedAxes());out.writeByte(entry.overlapRule().ordinal());out.writeInt(entry.regions().size());
                 for(var override:entry.regions().entrySet()){out.writeUTF(override.getKey());var r=override.getValue();out.writeInt(r.position().x());out.writeInt(r.position().y());out.writeInt(r.position().z());out.writeByte(r.quarterTurns());out.writeBoolean(r.mirrorX());out.writeBoolean(r.mirrorZ());out.writeBoolean(r.enabled());out.writeBoolean(r.locked());}
+                out.writeByte(entry.displayFilter().mode().ordinal());out.writeInt(entry.displayFilter().blockIds().size());
+                for(String id:entry.displayFilter().blockIds())out.writeUTF(id);
             }
             CRC32 crc = new CRC32(); crc.update(bytes.toByteArray()); out.writeLong(crc.getValue());
         }

@@ -22,7 +22,7 @@ final class SceneChanges {
             if(source.owner()!=observer&&(reordered||previousSource==null||!same(source,previousSource)))changed.add(source.layout());}
         return new SceneChanges(changed);
     }
-    private static boolean same(Source a,Source b){return a.layout().placement().sameGeometry(b.layout().placement());}
+    private static boolean same(Source a,Source b){var first=a.layout().placement();var second=b.layout().placement();return first.sameGeometry(second)&&first.displayFilter().equals(second.displayFilter());}
     boolean empty(){return domains.isEmpty();}
     boolean affects(PlacementBounds bounds){for(var domain:domains)if(domain.intersects(bounds))return true;return false;}
 }

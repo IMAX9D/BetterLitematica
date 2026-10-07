@@ -33,7 +33,7 @@ record PlacementClipboard(PlacementTransform transform,boolean enabled,float opa
     Placement apply(Placement p){
         var merged=new LinkedHashMap<>(p.regions());for(String name:regionNames)merged.remove(name);merged.putAll(regions);
         var moved=p.placed(transform).enabled(enabled).opacity(opacity);if(p.locked()&&!p.regions().equals(merged))throw new IllegalStateException("投影已锁定");for(var e:p.regions().entrySet())if(e.getValue().locked()&&!Objects.equals(merged.get(e.getKey()),e.getValue()))throw new IllegalStateException("子区域已锁定");
-        return new Placement(moved.id(),moved.name(),moved.source(),moved.transform(),moved.enabled(),moved.locked(),moved.opacity(),merged,renderBlocks,lockedAxes,overlapRule);
+        return new Placement(moved.id(),moved.name(),moved.source(),moved.transform(),moved.enabled(),moved.locked(),moved.opacity(),merged,renderBlocks,lockedAxes,overlapRule,moved.displayFilter());
     }
     PlacementClipboard matching(List<Region> available){var names=new HashSet<String>();for(var r:available)names.add(r.name());var filtered=new LinkedHashMap<String,RegionPlacement>();for(var e:regions.entrySet())if(names.contains(e.getKey()))filtered.put(e.getKey(),e.getValue());return new PlacementClipboard(transform,enabled,opacity,filtered,renderBlocks,lockedAxes,overlapRule,regionNames.stream().filter(names::contains).toList());}
 }

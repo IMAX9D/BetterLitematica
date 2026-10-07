@@ -1,6 +1,7 @@
 package dev.betterlitematica.fabric;
 
 import dev.betterlitematica.core.Placement;
+import dev.betterlitematica.core.BlockDisplayFilter;
 import dev.betterlitematica.core.RegionPlacement;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
@@ -62,10 +63,11 @@ final class PlacementConfigScreen extends MenuScreen {
         addBody(opacitySlider,168);
         buttonAt(p.renderBlocks()?"渲染：是":"渲染：否",controlsLeft,206,columnWidth,()->act(()->{controller.toggleBlocks();refresh();}),true,false);
         buttonAt("重叠："+switch(p.overlapRule()){case ALL->"替换全部";case NON_AIR->"忽略空气";case NONE->"仅填空白";},right,206,columnWidth,()->act(()->{controller.overlapNext();refresh();}),true,false);
-        buttonAt("材料清单",cellX(0,4),246,cellWidth(4),()->act(()->client.setScreen(new AnalysisScreen(this,controller,true))),true,false);
-        buttonAt("投影校验",cellX(1,4),246,cellWidth(4),()->act(()->client.setScreen(new AnalysisScreen(this,controller,false))),true,false);
-        buttonAt("投影编辑",cellX(2,4),246,cellWidth(4),()->act(()->client.setScreen(new EditingScreen(this,controller))),true,false);
-        buttonAt("子区域",cellX(3,4),246,cellWidth(4),()->client.setScreen(new SubregionScreen(this,controller,id)),true,false);
+        buttonAt("材料清单",cellX(0,5),246,cellWidth(5),()->act(()->client.setScreen(new AnalysisScreen(this,controller,true))),true,false);
+        buttonAt("投影校验",cellX(1,5),246,cellWidth(5),()->act(()->client.setScreen(new AnalysisScreen(this,controller,false))),true,false);
+        buttonAt("投影编辑",cellX(2,5),246,cellWidth(5),()->act(()->client.setScreen(new EditingScreen(this,controller))),true,false);
+        buttonAt("子区域",cellX(3,5),246,cellWidth(5),()->client.setScreen(new SubregionScreen(this,controller,id)),true,false);
+        buttonAt("显示过滤",cellX(4,5),246,cellWidth(5),()->client.setScreen(new BlockDisplayFilterScreen(this,controller,id)),true,p.displayFilter().mode()!=BlockDisplayFilter.Mode.OFF);
         fixed("另存投影",0,80,()->client.setScreen(controller.editor().owns(p.id())?new EditingScreen(this,controller,p.id()):new SchematicFileScreen(this,controller,p.source())));
 
     }

@@ -1,6 +1,6 @@
 # BetterLitematica
 
-Minecraft **1.20.1 / Fabric** 的独立投影与建造辅助模组，当前版本 **0.3.81-dev**。不依赖 Litematica 或 MaLiLib，仍在开发中，尚未实现原模组的全部功能。
+Minecraft **1.20.1 / Fabric** 的独立投影与建造辅助模组，当前版本 **0.3.82-dev**。不依赖 Litematica 或 MaLiLib，仍在开发中，尚未实现原模组的全部功能。
 
 ## 安装与使用
 
@@ -22,6 +22,8 @@ Minecraft **1.20.1 / Fabric** 的独立投影与建造辅助模组，当前版�
 
 快捷键可在设置中修改。轮盘“执行操作”使用当前木棍模式，执行快捷键默认未绑定。材料清单和校验位于各投影的配置页。
 
+每个投影的“配置 → 显示过滤”支持方块白名单／黑名单，可按名称或 ID 搜索全部已注册方块（含模组方块），按“保存”应用。白名单为空时不显示方块；关闭过滤会保留勾选。只影响世界中的投影方块显示，不改变材料统计、校验、打印、粘贴和导出的数据。
+
 投影预览采用简化几何，不等同完整游戏材质。未加载世界状态按未知处理；取消写入只停止后续步骤，不回滚已经修改的方块。跨版本、全部特殊方块和任意模组组合尚未全面验证。
 
 ## 从源码构建
@@ -35,7 +37,7 @@ Minecraft **1.20.1 / Fabric** 的独立投影与建造辅助模组，当前版�
 
 Linux/macOS 使用 `bash scripts/test-core.sh` 和 `bash scripts/build.sh`。中文界面及字体检查需要系统中文字体，例如 Noto Sans CJK；模组不附带字体。
 
-产物位于 `fabric-1.20.1/build/libs/`，完整构建成功后只保留最新可安装 JAR。Windows 开发客户端可通过 `Start-Test.cmd` 启动，游戏目录为 `fabric-1.20.1/run/`；该脚本使用 JAVA_HOME 或 PATH 中的 JDK。
+产物位于 `fabric-1.20.1/build/libs/`，完整构建成功后只保留最新可安装 JAR。Windows 开发客户端可通过 `Start-Test.cmd` 启动，游戏目录为 `fabric-1.20.1/run/`；该脚本使用 JAVA_HOME 或 PATH 中的 JDK。也可在 `.tools/java-home.txt` 第一行填写本机 JDK 目录，无需修改系统环境；该文件不会提交到 Git。`Start-Test.cmd --dry-run` 可检查启动任务而不打开游戏。
 
 构建默认执行核心回归和 Fabric 适配检查。已有隔离游戏专项验证不代表所有服务器、投影或整合包均已通过。
 

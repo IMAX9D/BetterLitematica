@@ -91,6 +91,18 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     }
     PlacementTransform transform(){return layout.placement().transform();}
     PlacementLayout layout(){return layout;}
+    private List<BlockStateSpec> displayPalette;
+    private BitSet hiddenStates;
+    /** Compile once per immutable palette/filter revision, never once per source cell. */
+    boolean displays(int id){
+        var palette=metadata().palette();
+        if(displayPalette!=palette||hiddenStates==null){
+            var hidden=new BitSet(palette.size());var filter=layout.placement().displayFilter();
+            for(int i=0;i<palette.size();i++)if(!filter.allows(palette.get(i)))hidden.set(i);
+            hiddenStates=hidden;displayPalette=palette;
+        }
+        return id>=0&&id<palette.size()&&!hiddenStates.get(id);
+    }
     void scene(ProjectionScene value){
         var changes=value.changesFrom(scene,this);scene=value;if(changes.empty())return;
         // The moved renderer already invalidated its own layout. Other renderers keep unrelated
@@ -209,7 +221,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         var patch=edits==null?null:edits.snapshot().patch(key,position);return patch==null?baseState(key,position):patch.state();
     }
     void place(Placement next){
-        layout=new PlacementLayout(next,metadata().regions());invalidate();
+        layout=new PlacementLayout(next,metadata().regions());displayPalette=null;invalidate();
     }
     void layer(LayerRange next){layer=next;invalidate();}
     LayerRange layer(){return layer;}
@@ -341,12 +353,12 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             if(i==PackedSection.VOLUME)break;
             int x=i&15,z=(i>>>4)&15,y=i>>>8,id=current.section.globalId(i);
             BlockStateSpec spec=metadata().palette().get(id);
-            if(spec.isAir()||spec.name().equals("minecraft:structure_void")){current.cursor++;processed++;continue;}
+            if(spec.isAir()||spec.name().equals("minecraft:structure_void")||!displays(id)){current.cursor++;processed++;continue;}
             Vec3i local=current.localBase.add(new Vec3i(x,y,z)),world=transform.apply(local);
             if(!layer.contains(world)){current.cursor++;processed++;continue;}
-            if(current.overlaps.size()>1){var owner=scene.sample(current.overlaps,world);if(owner!=null&&owner.unknown())return;
+            if(current.overlaps.size()>1){var owner=scene.sampleDisplayed(current.overlaps,world);if(owner!=null&&owner.unknown())return;
                 if(owner==null||owner.renderer()!=this||owner.region().index()!=current.key.region()){current.cursor++;processed++;continue;}
-                boolean pending=false;for(var direction:DIRECTIONS){var other=scene.sample(current.overlaps,world.add(new Vec3i(direction.getOffsetX(),direction.getOffsetY(),direction.getOffsetZ())));if(other!=null&&other.unknown())pending=true;}if(pending)return;
+                boolean pending=false;for(var direction:DIRECTIONS){var other=scene.sampleDisplayed(current.overlaps,world.add(new Vec3i(direction.getOffsetX(),direction.getOffsetY(),direction.getOffsetZ())));if(other!=null&&other.unknown())pending=true;}if(pending)return;
             }
             BlockState state=states.resolve(id);var worldPos=new BlockPos(world.x(),world.y(),world.z());boolean loaded=WorldChunks.loaded(client.world,worldPos);
             BlockState actual=loaded?client.world.getBlockState(worldPos):null;
@@ -425,7 +437,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         }
     }
     private net.minecraft.block.entity.BlockEntity blockEntity(Job current,BlockPos pos){
-        var cached=blockEntities.get(pos);if(cached!=null)return cached;var at=new Vec3i(pos.getX(),pos.getY(),pos.getZ());var cell=scene.sample(current.overlaps,at);if(cell==null)return null;if(cell.unknown())throw new ProjectionBlockView.Pending();var owner=cell.renderer();var state=owner.resolve(cell.region().index(),cell.id());if(!state.hasBlockEntity())return null;
+        var cached=blockEntities.get(pos);if(cached!=null)return cached;var at=new Vec3i(pos.getX(),pos.getY(),pos.getZ());var cell=scene.sampleDisplayed(current.overlaps,at);if(cell==null)return null;if(cell.unknown())throw new ProjectionBlockView.Pending();var owner=cell.renderer();var state=owner.resolve(cell.region().index(),cell.id());if(!state.hasBlockEntity())return null;
         net.minecraft.block.entity.BlockEntity entity=null;
         if(owner.details!=null&&(owner.edits==null||owner.edits.snapshot().patch(cell.region().section(cell.local()),cell.region().cell(cell.local()))==null||owner.edits.snapshot().patch(cell.region().section(cell.local()),cell.region().cell(cell.local())).blockData())){var data=owner.details.parts().get(cell.region().index()).blocks().get(cell.local());if(data!=null){var tag=(net.minecraft.nbt.NbtCompound)NbtBridge.game(data);BlockEntityNbtTransform.placed(tag,cell.region().transform());tag.putInt("x",pos.getX());tag.putInt("y",pos.getY());tag.putInt("z",pos.getZ());entity=net.minecraft.block.entity.BlockEntity.createFromNbt(pos,state,tag);}}
         if(entity==null&&state.getBlock() instanceof BlockEntityProvider provider)entity=provider.createBlockEntity(pos,state);
@@ -454,8 +466,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private boolean cull(Job current,int x,int y,int z,Vec3i world,BlockState state,Direction side){
         var neighborPosition=world.add(new Vec3i(side.getOffsetX(),side.getOffsetY(),side.getOffsetZ()));if(!layer.contains(neighborPosition))return false;
         BlockState neighbor;
-        if(current.overlaps.size()>1){var cell=scene.sample(current.overlaps,neighborPosition);if(cell==null||cell.unknown())return false;neighbor=cell.renderer().resolve(cell.region().index(),cell.id());}
-        else {Vec3i delta=current.offsets[side.ordinal()];int id=current.neighborhood.globalId(x+delta.x(),y+delta.y(),z+delta.z());neighbor=current.states.resolve(id);}
+        if(current.overlaps.size()>1){var cell=scene.sampleDisplayed(current.overlaps,neighborPosition);if(cell==null||cell.unknown())return false;neighbor=cell.renderer().resolve(cell.region().index(),cell.id());}
+        else {Vec3i delta=current.offsets[side.ordinal()];int id=current.neighborhood.globalId(x+delta.x(),y+delta.y(),z+delta.z());if(!displays(id))return false;neighbor=current.states.resolve(id);}
         if(neighbor.isAir()||neighbor.isOf(Blocks.STRUCTURE_VOID))return false;
         return state.isSideInvisible(neighbor,side)||opaqueStates.computeIfAbsent(neighbor,v->v.isOpaqueFullCube(EmptyBlockView.INSTANCE,BlockPos.ORIGIN));
     }

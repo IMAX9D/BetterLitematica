@@ -22,7 +22,7 @@ public final class PrinterCompositionChecks {
         private static int[] repeated(int state,int count){int[] ids=new int[count];Arrays.fill(ids,state);return ids;}
         Source(Path directory,int[] states,Placement placement,boolean cached)throws Exception{
             this.placement=placement;this.state=states[0];file=directory.resolve(UUID.randomUUID()+".bpc");var list=new ArrayList<Region>();for(int i=0;i<states.length;i++)list.add(new Region("r"+i,Vec3i.ZERO,new Vec3i(1,1,1)));
-            metadata=new BlueprintMetadata("test",3465,"0".repeat(64),List.of(BlockStateSpec.AIR,BlockStateSpec.parse("minecraft:stone"),BlockStateSpec.parse("minecraft:glass"),BlockStateSpec.parse("minecraft:structure_void"),BlockStateSpec.parse("minecraft:oak_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]")),list,List.of());
+            metadata=new BlueprintMetadata("test",3465,"0".repeat(64),List.of(BlockStateSpec.AIR,BlockStateSpec.parse("minecraft:stone"),BlockStateSpec.parse("minecraft:glass"),BlockStateSpec.parse("minecraft:structure_void"),BlockStateSpec.parse("minecraft:oak_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]"),BlockStateSpec.parse("minecraft:light[level=10,waterlogged=false]"),BlockStateSpec.parse("minecraft:water[level=0]"),BlockStateSpec.parse("minecraft:lava[level=0]")),list,List.of());
             try(var writer=new BlueprintCache.Writer(file,metadata)){for(int r=0;r<states.length;r++){writer.count(r,states[r]);int[] cells=new int[4096];cells[0]=states[r];writer.add(new SectionKey(r,0,0,0),PackedSection.fromGlobalIds(cells));}writer.commit(Cancellation.THREAD);}
             stream=new SectionStreamer(BlueprintCache.open(file),1<<20);renderer=(ProjectionRenderer1201)allocate(ProjectionRenderer1201.class);
             set(renderer,"stream",stream);set(renderer,"layout",new PlacementLayout(placement,metadata.regions()));set(renderer,"resolvers",new HashMap<>());
@@ -34,8 +34,51 @@ public final class PrinterCompositionChecks {
     }
     private static Placement placement(Vec3i at,ReplaceRule rule){return new Placement(UUID.randomUUID(),"test","test.litematic",new PlacementTransform(at,0,false,false),true,false).overlap(rule);}
     private static PrinterProjectionView view(Source... sources){return new PrinterProjectionView(Arrays.stream(sources).map(Source::descriptor).toList());}
+    private static ProjectionScene.Cell displayed(Source... sources){var scene=new ProjectionScene(Arrays.stream(sources).map(s->s.renderer).toList());return scene.sampleDisplayed(scene.overlapping(new PlacementBounds(Vec3i.ZERO,Vec3i.ZERO)),Vec3i.ZERO);}
+    private static void filters(Path directory)throws Exception{
+        var hideGlass=new BlockDisplayFilter(BlockDisplayFilter.Mode.BLACKLIST,Set.of("minecraft:glass"));
+        var stoneOnly=new BlockDisplayFilter(BlockDisplayFilter.Mode.WHITELIST,Set.of("minecraft:stone"));
+        var emptyWhite=new BlockDisplayFilter(BlockDisplayFilter.Mode.WHITELIST,Set.of());
+        try(var lower=new Source(directory,1,placement(Vec3i.ZERO,ReplaceRule.ALL),1,true);
+            var filtered=new Source(directory,2,placement(Vec3i.ZERO,ReplaceRule.ALL).displayFilter(hideGlass),1,true);
+            var internal=new Source(directory,new int[]{1,2},placement(Vec3i.ZERO,ReplaceRule.ALL).displayFilter(stoneOnly),true);
+            var internalAir=new Source(directory,new int[]{1,0},placement(Vec3i.ZERO,ReplaceRule.ALL).displayFilter(stoneOnly),true);
+            var none=new Source(directory,1,placement(Vec3i.ZERO,ReplaceRule.NONE).displayFilter(emptyWhite),1,true);
+            var unknown=new Source(directory,2,placement(Vec3i.ZERO,ReplaceRule.ALL).displayFilter(hideGlass),1,false);
+            var water=new Source(directory,6,placement(Vec3i.ZERO,ReplaceRule.ALL).displayFilter(new BlockDisplayFilter(BlockDisplayFilter.Mode.WHITELIST,Set.of("minecraft:water"))),1,true);
+            var hiddenWater=new Source(directory,6,placement(Vec3i.ZERO,ReplaceRule.ALL).displayFilter(emptyWhite),1,true);
+            var light=new Source(directory,5,placement(Vec3i.ZERO,ReplaceRule.ALL).displayFilter(new BlockDisplayFilter(BlockDisplayFilter.Mode.WHITELIST,Set.of("minecraft:light"))),1,true)){
+            check(displayed(lower,filtered).renderer()==lower.renderer&&displayed(filtered,lower).renderer()==lower.renderer,"A filtered independent overlay reveals the lower projection in either order");
+            check(view(lower,filtered).apply(Vec3i.ZERO).state()==Blocks.GLASS.getDefaultState(),"Printer still builds the filtered upper source rather than the revealed visual source");
+            check(displayed(internal)==null,"Filtering a winning region never revives an earlier region in the same placement");
+            check(view(internal).apply(Vec3i.ZERO).state()==Blocks.GLASS.getDefaultState(),"Internal region composition stays complete for construction");
+            check(displayed(internalAir)==null&&view(internalAir).apply(Vec3i.ZERO).state().isAir(),"Internal ALL air erasure remains effective when air itself is filtered");
+            check(displayed(lower,internal).renderer()==lower.renderer,"Hidden internal winning region reveals only an independent source");
+            check(displayed(none)==null&&view(none).apply(Vec3i.ZERO).state()==Blocks.STONE.getDefaultState(),"Empty whitelist affects display only, including NONE placements");
+            check(displayed(lower,unknown).unknown()&&view(lower,unknown).apply(Vec3i.ZERO).state()==null,"A blacklist cannot reinterpret UNKNOWN source cells as display air or known construction data");
+            check(!filtered.renderer.displays(2)&&filtered.renderer.displays(1),"Renderer palette mask hides exact block type only");
+            check(!filtered.renderer.displays(-1)&&!filtered.renderer.displays(999),"Unknown or out-of-palette state IDs are never displayed");
+            check(light.renderer.displays(5)&&!light.renderer.displays(1),"Light marker uses the same whitelist mask as ordinary block surfaces");
+            check(displayed(light).renderer()==light.renderer&&light.renderer.resolve(0,5).get(net.minecraft.block.LightBlock.LEVEL_15)==10,"Filtering retains the actual light state and level");
+            check(Blocks.WATER.asItem()==net.minecraft.item.Items.AIR&&water.renderer.displays(6)&&!water.renderer.displays(7),"Item-less water is selectable independently of lava through registry IDs");
+            var waterScene=new ProjectionScene(List.of(water.renderer));var waterParts=waterScene.overlapping(new PlacementBounds(Vec3i.ZERO,Vec3i.ZERO));
+            var waterView=new ProjectionBlockView(null,waterScene,waterParts,LayerRange.ALL);
+            check(waterView.getFluidState(net.minecraft.util.math.BlockPos.ORIGIN).isStill(),"Model neighbor view exposes displayed source fluid without requiring a live world");
+            var hiddenScene=new ProjectionScene(List.of(hiddenWater.renderer));var hiddenView=new ProjectionBlockView(null,hiddenScene,hiddenScene.overlapping(new PlacementBounds(Vec3i.ZERO,Vec3i.ZERO)),LayerRange.ALL);
+            check(hiddenView.getBlockState(net.minecraft.util.math.BlockPos.ORIGIN).isAir()&&hiddenView.getFluidState(net.minecraft.util.math.BlockPos.ORIGIN).isEmpty(),"Hidden fluid cannot incorrectly cull adjacent model or fluid faces");
+            check(view(hiddenWater).apply(Vec3i.ZERO).state().isOf(Blocks.WATER),"Item-less hidden fluid remains present in the raw construction source");
+            var descriptor=lower.descriptor();var changed=new ProjectionController.PrinterSource(lower.placement.displayFilter(emptyWhite),lower.renderer,lower.metadata);
+            check(descriptor.equals(changed)&&changed.equals(descriptor)&&descriptor.hashCode()==changed.hashCode(),"Filter-only changes preserve printer context equality and hash");
+            check(new HashSet<>(List.of(descriptor)).contains(changed),"Existing printer context remains findable after display-only changes");
+            var moved=new ProjectionController.PrinterSource(lower.placement.placed(new PlacementTransform(new Vec3i(1,0,0),0,false,false)),lower.renderer,lower.metadata);
+            check(!descriptor.equals(moved),"Real construction transform changes still invalidate printer context");
+            var pasted=PlacementClipboard.decode(PlacementClipboard.encode(lower.placement)).apply(filtered.placement);
+            check(pasted.displayFilter().equals(hideGlass),"Transform clipboard preserves the destination's independent display selection");
+        }
+    }
     public static int run()throws Exception{
         checks=0;Path directory=Files.createTempDirectory("printer-composition-");
+        filters(directory);
         try(var stone=new Source(directory,1,placement(Vec3i.ZERO,ReplaceRule.ALL),1,true);
             var glass=new Source(directory,2,placement(Vec3i.ZERO,ReplaceRule.ALL),1,true);
             var air=new Source(directory,0,placement(Vec3i.ZERO,ReplaceRule.ALL),1,true);

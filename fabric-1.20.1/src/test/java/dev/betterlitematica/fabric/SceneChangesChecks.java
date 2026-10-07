@@ -35,6 +35,16 @@ final class SceneChangesChecks {
         var nearby=new PlacementBounds(new Vec3i(16,0,0),new Vec3i(31,15,15));
         var removed=SceneChanges.between(before,List.of(stable),b);
         check(!removed.affects(nearby)&&removed.affects(MeshRefresh.padded(nearby)),"One-cell dependency pad catches adjacent faces");
+        var filtered=p.displayFilter(new BlockDisplayFilter(BlockDisplayFilter.Mode.BLACKLIST,Set.of("minecraft:stone")));
+        var after=List.of(new SceneChanges.Source(a,layout(filtered)),stable);
+        var filterChanges=SceneChanges.between(before,after,b);
+        check(p.sameGeometry(filtered)&&!filterChanges.empty(),"Display-only filtering invalidates render dependencies without changing construction geometry");
+        check(filterChanges.affects(at(1,1,1)),"Overlapping renderer rebuilds the filtered source domain");
+        check(!filterChanges.affects(at(101,1,1)),"Distant resident meshes survive filter changes on another placement");
+        check(!filterChanges.affects(nearby)&&filterChanges.affects(MeshRefresh.padded(nearby)),"Filtered border blocks invalidate precisely the neighboring face dependency");
+        check(SceneChanges.between(before,after,a).empty(),"Edited renderer resets itself instead of double-counting scene invalidation");
+        check(SceneChanges.between(after,after,b).empty(),"Unchanged filter snapshots do not repeatedly invalidate render geometry");
+        check(SceneChanges.between(after,before,b).affects(at(1,1,1)),"Restoring the previous filter restores overlapping visible ownership");
         return checks;
     }
 }

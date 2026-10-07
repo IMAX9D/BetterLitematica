@@ -27,6 +27,7 @@ public final class CoreTests {
             test("complete source previews, embedded digests and bounded cache",()->{checks+=SchematicPreviewChecks.run(temp.resolve("previews"));});
             test("axis handle geometry and stable signed grid dragging",()->{checks+=AxisGizmoChecks.run();});
             test("placement quantity uses byte budgets not fixed counts",()->{checks+=UnlimitedPlacementChecks.run();});
+            test("per-placement display filters and legacy settings migration",()->{checks+=BlockDisplayFilterChecks.run();});
             test("complete bounded directory search and cancellation",()->{checks+=DirectorySearchChecks.run(temp);});
             test("draft persistence ordering and failure recovery",()->{checks+=DraftRecoveryChecks.run(temp.resolve("recovery"));});
             test("finite material batches avoid needless switches without starvation",()->{checks+=PrinterBatchChecks.run();});
