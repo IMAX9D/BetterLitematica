@@ -56,6 +56,12 @@ public final class UiDesignChecks {
         }
 
         int translucent=0x80406ab5;
+        for(double direction:new double[]{-11,11})for(long elapsed:new long[]{-1,0,1,UiWindowMotion.DURATION_NANOS/2,UiWindowMotion.DURATION_NANOS,Long.MAX_VALUE}){
+            var navigation=UiWindowMotion.sample(elapsed,direction,0,true);
+            near(navigation.alpha(),1,"Internal navigation never exposes the world by fading the whole panel or backdrop");
+            var opening=UiWindowMotion.sample(elapsed,direction,0,false);
+            near(navigation.x(),opening.x(),"Opaque navigation retains the same nonlinear slide and hit-test displacement");
+        }
         check(UiMotion.alpha(translucent,1)==translucent,"Opacity one preserves source alpha and RGB");
         check(UiMotion.alpha(translucent,0)==0x00406ab5,"Opacity zero clears only alpha");
         check(UiMotion.alpha(translucent,.5)==0x40406ab5,"Transition alpha multiplies existing transparency");

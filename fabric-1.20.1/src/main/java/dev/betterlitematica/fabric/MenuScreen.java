@@ -27,7 +27,7 @@ abstract class MenuScreen extends Screen {
     private double animatedX,animatedY;
     MenuScreen(String title,String description,Screen parent,ProjectionController controller,boolean wide){super(Text.literal(title));this.description=description;this.parent=parent;this.controller=controller;this.wide=wide;sessionEpoch=controller.sessionEpoch();}
     @Override protected final void init(){
-        if(!presented){var previous=departed.get();motion.enter(previous!=null&&System.nanoTime()-departureTime<500_000_000L,previous!=null&&previous.parent==this);presented=true;}
+        if(!presented){var previous=departed.get();motion.enter(previous!=null&&previous.previewControl()==null&&System.nanoTime()-departureTime<500_000_000L,previous!=null&&previous.parent==this);presented=true;}
         Item previousFocus=body.stream().filter(i->i.widget==getFocused()&&i.widget instanceof OverlayTextField).findFirst().orElse(null);
         int cursor=previousFocus==null?0:((OverlayTextField)previousFocus.widget).getCursor(),anchor=previousFocus==null?0:((OverlayTextField)previousFocus.widget).selectionAnchor();
         setFocused(null);

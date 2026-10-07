@@ -110,8 +110,14 @@ final class IndependentUi implements AutoCloseable {
     }
     void itemCount(int count,double x,double y,double width){context.getMatrices().push();context.getMatrices().translate(0,0,300);try{text(Integer.toString(count),x,y,width,UiTheme.TEXT);}finally{context.getMatrices().pop();}}
     void rect(double x,double y,double right,double bottom,int color){context.fill(px(x),py(y),px(right),py(bottom),UiMotion.alpha(color,opacity));}
-    void roundRect(double x,double y,double right,double bottom,double radius,int color){rounded(x,y,right,bottom,radius,color,false);}
-    void roundFrame(double x,double y,double right,double bottom,double radius,int color){rounded(x,y,right,bottom,radius,color,true);}
+    void roundRect(double x,double y,double right,double bottom,double radius,int color){roundedBatch(x,y,right,bottom,radius,color,false);}
+    void roundFrame(double x,double y,double right,double bottom,double radius,int color){roundedBatch(x,y,right,bottom,radius,color,true);}
+    private void roundedBatch(double x,double y,double right,double bottom,double radius,int color,boolean outline){
+        if((UiMotion.alpha(color,opacity)>>>24)==0)return;
+        // DrawContext.fill otherwise flushes every antialiased span. Keep one geometry-only
+        // batch per shape; texture tint, scissor and matrix changes still flush at their boundaries.
+        context.draw(()->rounded(x,y,right,bottom,radius,color,outline));
+    }
     /** Small controls: a tight contact shadow. */
     void shadow(double x,double y,double right,double bottom,double radius){
         roundRect(x-2,y+1,right+2,bottom+4,radius+2,UiTheme.SHADOW_AMBIENT);
