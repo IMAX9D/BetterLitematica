@@ -18,6 +18,7 @@ final class InteractionOptions {
     WheelRenderMode wheelRenderMode=WheelRenderMode.ALL;
     AccuratePlacement.Mode accurate=AccuratePlacement.Mode.AUTO;
     PrinterSettings printer=new PrinterSettings();
+    BedrockSettings bedrock=new BedrockSettings();
     DisplayOptions display=new DisplayOptions();
     CommandSettings commands=new CommandSettings();
     private JsonObject preserved=new JsonObject();
@@ -34,7 +35,7 @@ final class InteractionOptions {
             if(root.has("keys")){var keys=root.getAsJsonObject("keys");for(String key:settings.keys.keySet())if(keys.has(key))settings.keys.put(key,keys.get(key).getAsString());}
             if(root.has("accuratePlacement"))settings.accurate=AccuratePlacement.Mode.valueOf(root.get("accuratePlacement").getAsString());
             if(root.has("tools")){settings.tools=new Gson().fromJson(root.get("tools"),ToolSettings.class);if(settings.tools==null)throw new IOException("Invalid tool settings");settings.tools.validate();}
-            settings.printer=PrinterSettings.read(root.get("printer"));if(root.has("display")){settings.display=new Gson().fromJson(root.get("display"),DisplayOptions.class);if(settings.display==null||settings.display.errorStyle==null)throw new IOException("Invalid display settings");}
+            settings.printer=PrinterSettings.read(root.get("printer"));settings.bedrock=BedrockSettings.read(root.get("bedrock"));if(root.has("display")){settings.display=new Gson().fromJson(root.get("display"),DisplayOptions.class);if(settings.display==null||settings.display.errorStyle==null)throw new IOException("Invalid display settings");}
             if(root.has("commands")){settings.commands=new Gson().fromJson(root.get("commands"),CommandSettings.class);if(settings.commands==null)throw new IOException("Invalid command settings");settings.commands.validate();}
             if(root.has("keys")){var old=root.getAsJsonObject("keys");if(settings.keys.get("information").isBlank()&&old.has("informationDetails"))settings.keys.put("information",old.get("informationDetails").getAsString());}
             settings.keys.replaceAll((key,chord)->InputBindings.normalize(chord));
@@ -42,7 +43,7 @@ final class InteractionOptions {
             return settings;
         }catch(RuntimeException e){throw new IOException("Malformed interaction settings",e);}
     }
-    JsonObject snapshot(){var root=preserved.deepCopy();root.addProperty("version",1);root.addProperty("toolItem",toolItem);root.addProperty("protectedHotbar",protectedHotbar);root.addProperty("followLayer",followLayer);root.addProperty("capturePreviews",capturePreviews);root.addProperty("wheelRenderMode",wheelRenderMode.name());root.addProperty("accuratePlacement",accurate.name());root.addProperty("mode",mode);root.add("tools",new Gson().toJsonTree(tools));root.addProperty("tool",tool);root.addProperty("easyPlace",easyPlace);root.addProperty("hold",hold);root.addProperty("restriction",restriction);root.addProperty("pick",pick);root.addProperty("boxes",boxes);JsonObject keyValues=new JsonObject();keys.forEach(keyValues::addProperty);root.add("keys",keyValues);root.add("printer",printer.snapshot());root.add("display",new Gson().toJsonTree(display));root.add("commands",new Gson().toJsonTree(commands));return root;}
+    JsonObject snapshot(){var root=preserved.deepCopy();root.addProperty("version",1);root.addProperty("toolItem",toolItem);root.addProperty("protectedHotbar",protectedHotbar);root.addProperty("followLayer",followLayer);root.addProperty("capturePreviews",capturePreviews);root.addProperty("wheelRenderMode",wheelRenderMode.name());root.addProperty("accuratePlacement",accurate.name());root.addProperty("mode",mode);root.add("tools",new Gson().toJsonTree(tools));root.addProperty("tool",tool);root.addProperty("easyPlace",easyPlace);root.addProperty("hold",hold);root.addProperty("restriction",restriction);root.addProperty("pick",pick);root.addProperty("boxes",boxes);JsonObject keyValues=new JsonObject();keys.forEach(keyValues::addProperty);root.add("keys",keyValues);root.add("printer",printer.snapshot());root.add("bedrock",bedrock.snapshot());root.add("display",new Gson().toJsonTree(display));root.add("commands",new Gson().toJsonTree(commands));return root;}
     static void write(Path file,JsonObject data)throws IOException{Files.createDirectories(file.toAbsolutePath().getParent());Path temp=Files.createTempFile(file.toAbsolutePath().getParent(),"settings-",".part");try{Files.writeString(temp,new GsonBuilder().setPrettyPrinting().create().toJson(data),StandardCharsets.UTF_8);Files.move(temp,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}finally{Files.deleteIfExists(temp);}}
     private static boolean bool(JsonObject root,String key,boolean fallback){return root.has(key)?root.get(key).getAsBoolean():fallback;}
 }

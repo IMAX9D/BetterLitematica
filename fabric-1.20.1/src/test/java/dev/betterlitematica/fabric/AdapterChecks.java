@@ -24,6 +24,7 @@ public final class AdapterChecks {
         checks+=ContainerFillPlanChecks.run();
         checks+=ContainerPrintTargetChecks.run();
         checks+=SignPrintTargetChecks.run();
+        checks+=BedrockChecks.run();
         checks+=SceneChangesChecks.run();
         checks+=WheelRenderModeChecks.run();
         checks+=WheelRenderUiChecks.run();

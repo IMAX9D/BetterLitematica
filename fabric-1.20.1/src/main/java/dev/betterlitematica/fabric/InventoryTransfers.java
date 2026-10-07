@@ -46,6 +46,7 @@ final class InventoryTransfers {
     Result equipContainerForPrinter(ItemStack wanted,int tick){
         var exact=wanted.copy();return equip(stack->matchesStack(stack,exact),null,tick,true,exact,true);
     }
+    boolean usableForPrinter(ItemStack stack){var s=options.get();return !toolProtection.get(s.tool,s.toolItem).test(stack);}
     static boolean matchesStack(ItemStack actual,ItemStack wanted){return wanted.isEmpty()?actual.isEmpty():!actual.isEmpty()&&ItemStack.canCombine(actual,wanted);}
     static boolean canCreate(boolean creative,boolean localCreative,Item item,ItemStack exact){
         return exact!=null?creative&&localCreative&&!exact.isEmpty():creative&&item!=null&&item!=Items.AIR;

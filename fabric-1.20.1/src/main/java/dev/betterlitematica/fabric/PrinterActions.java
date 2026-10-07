@@ -16,7 +16,7 @@ import java.util.*;
 final class PrinterActions {
     enum Outcome { SENT,WAIT,MISSING,UNSUPPORTED,RETRY,STALE }
     private final MinecraftClient client;final PrinterDiagnostics diagnostics=new PrinterDiagnostics();
-    private final InventoryTransfers transfers;private final PrinterSupply supply;private final ExternalMiner miner;private PrinterSettings currentSettings;private BlockPos breaking;
+    private final InventoryTransfers transfers;private final PrinterSupply supply;private final NativeMiner miner;private PrinterSettings currentSettings;private BlockPos breaking;
     private String reason="";private Item missing;
     private boolean acting,dispatched,breakDispatched;private int materialTick=Integer.MIN_VALUE;private final Set<Item> inventoryItems=new HashSet<>();
     private dev.betterlitematica.core.IceWaterPlan ice;private BlockPos icePosition;
@@ -29,16 +29,16 @@ final class PrinterActions {
     private final PrinterSigns signs;private final ProjectionController controller;
     PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed){this(client,transfers,protocol,allowed,null);}
     PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed,PrinterContainers containers){this(client,transfers,protocol,allowed,containers,null,null);}
-    PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed,PrinterContainers containers,PrinterSigns signs,ProjectionController controller){this.client=client;this.protocol=protocol;this.transfers=transfers;this.supply=new PrinterSupply(client);this.miner=new ExternalMiner(client,allowed);this.containers=containers;this.signs=signs;this.controller=controller;}
+    PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed,PrinterContainers containers,PrinterSigns signs,ProjectionController controller){this.client=client;this.protocol=protocol;this.transfers=transfers;this.supply=new PrinterSupply(client);this.miner=new NativeMiner(client,transfers,()->controller==null?new BedrockSettings():controller.options().bedrock);this.containers=containers;this.signs=signs;this.controller=controller;}
     void checkMiner(){miner.check();}
     String cleanupError(){return miner.problem();}
-    boolean supplyTick(int tick){boolean work=supply.tick(tick);if(work)reason=supply.reason();return work;}
+    boolean supplyTick(int tick){if(NativeMiner.recoverSuspended(tick)){reason="回收上次施工材料";return true;}boolean work=supply.tick(tick);if(work)reason=supply.reason();return work;}
     void supplyOpened(int sync,net.minecraft.screen.ScreenHandlerType<?> type){supply.opened(sync,type);}
     void supplyInventory(int sync){supply.inventory(sync);}
     void manualInventory(){if(supply.active()){supply.reset(false);throw new IllegalStateException("补给已由玩家接管");}}
     boolean dispatched(){return dispatched;}boolean breakDispatched(){return breakDispatched;}
     void prepare(int tick){if(materialTick==tick)return;materialTick=tick;inventoryItems.clear();if(client.player!=null)for(int i=0;i<36;i++)inventoryItems.add(client.player.getInventory().getStack(i).getItem());}
-    boolean acting(){return acting||ExternalMiner.acting();}
+    boolean acting(){return acting||NativeMiner.acting();}
     boolean breaking(){return breaking!=null||miner.active();}
     String reason(){return reason;}
     Item missing(){return missing;}
@@ -60,7 +60,7 @@ final class PrinterActions {
         prepare(tick);dispatched=breakDispatched=false;currentSettings=settings;reason="";missing=null;var pos=BlockPos.fromLong(job.position());var expected=Block.getStateFromRawId(job.expected());var actual=client.world.getBlockState(pos);
         if(Block.getRawIdFromState(actual)!=job.observed()&&!owns(job))return Outcome.STALE;
         double reach=client.interactionManager.getReachDistance();if(PrinterReach.distanceSquared(client.player.getEyePos(),pos)>reach*reach)return fail(Outcome.UNSUPPORTED,"目标超出交互距离");
-        if(job.kind()==PrinterQueue.Kind.BEDROCK){dispatched=breakDispatched=!miner.owns(job.generation(),job.position());return miner.step(job.generation(),pos,tick)?Outcome.SENT:fail(Outcome.WAIT,"正在破基岩");}
+        if(job.kind()==PrinterQueue.Kind.BEDROCK){dispatched=breakDispatched=!miner.owns(job.generation(),job.position());return miner.step(job.generation(),pos,tick)?Outcome.SENT:fail(Outcome.WAIT,miner.reason());}
         if(ice!=null&&ice.owns(job.generation(),job.position()))return iceWater(job,pos,actual,settings,tick);
         if(job.kind()==PrinterQueue.Kind.BREAK)return breakBlock(pos,actual,settings);
         if(job.kind()==PrinterQueue.Kind.ADJUST){var adjusted=adjust(pos,actual,expected,settings,tick);if(adjusted!=null)return adjusted;}

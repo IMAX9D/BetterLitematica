@@ -15,7 +15,7 @@ import net.minecraft.block.enums.SlabType;
 final class BuildingInteractions {
     void editingEntered(){pendingPick=null;dragSelection=null;dragTarget=null;transfers.reset();wasUse=false;cooldown=0;}
     boolean preservePrinterBreaking(){return controller.printer().ownsBreaking();}
-    void manualPrinterInteraction(){if(!controller.printer().acting()){pendingPick=null;controller.printer().manualContainerInteraction();controller.printer().pause("已暂停");}}
+    void manualPrinterInteraction(){if(!controller.printer().acting()){pendingPick=null;controller.bedrock().manualInput();controller.printer().manualContainerInteraction();controller.printer().pause("已暂停");}}
     private final MinecraftClient client;private final ProjectionController controller;
     private final InventoryTransfers transfers;private int ticks;private net.minecraft.client.world.ClientWorld transferWorld;
     private final InputBindings bindings=new InputBindings();

@@ -57,6 +57,7 @@ public final class CoreTests {
             test("tintable vector glyphs at exact physical sizes",()->{checks+=UiGlyphChecks.run();});
             test("complete source previews, embedded digests and bounded cache",()->{checks+=SchematicPreviewChecks.run(temp.resolve("previews"));});
             test("axis handle geometry and stable signed grid dragging",()->{checks+=AxisGizmoChecks.run();});
+            test("bounded bedrock construction geometry and power directions",()->{checks+=BedrockPlanChecks.run();});
             test("placement quantity uses byte budgets not fixed counts",()->{checks+=UnlimitedPlacementChecks.run();});
             test("per-placement display filters and legacy settings migration",()->{checks+=BlockDisplayFilterChecks.run();});
             test("complete bounded directory search and cancellation",()->{checks+=DirectorySearchChecks.run(temp);});

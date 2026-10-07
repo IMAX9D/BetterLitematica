@@ -32,7 +32,7 @@ final class ProjectionController implements AutoCloseable {
     }
     private final MinecraftClient client;
     private final ToolInteractions tool;private final ToolWorldOperations toolWorld;
-    private final PrinterEngine printer;private final InventoryTransfers inventoryTransfers;
+    private final PrinterEngine printer;private final InventoryTransfers inventoryTransfers;private final BedrockController bedrock;
     private final NearbyProjectionHighlights nearbyHighlights=new NearbyProjectionHighlights();
     private final DraftWriter draftWriter=new DraftWriter();private Path draftFile;private CompletableFuture<DraftStore.Draft> draftReading;private DraftStore.Draft recoveringDraft;private CompletableFuture<SchematicEdits> draftRecovering;private CompletableFuture<Path> draftArchiving;private boolean draftRetrySource;private String draftError="";private long checkpointRevision=-1;private Placement checkpointPlacement;private String checkpointFailure="";
     static final class EditorBaseline {
@@ -110,7 +110,7 @@ final class ProjectionController implements AutoCloseable {
     private CompletableFuture<int[]> previewCapture;
 
     ProjectionController(MinecraftClient client) {
-        this.client = client;editor=new SchematicEditor(client,this);inventoryTransfers=new InventoryTransfers(client,()->options);printer=new PrinterEngine(client,this);toolWorld=new ToolWorldOperations(client,this);tool=new ToolInteractions(client,this);
+        this.client = client;editor=new SchematicEditor(client,this);inventoryTransfers=new InventoryTransfers(client,()->options);bedrock=new BedrockController(client,this);printer=new PrinterEngine(client,this);toolWorld=new ToolWorldOperations(client,this);tool=new ToolInteractions(client,this);
         Path game = FabricLoader.getInstance().getGameDir().toAbsolutePath();
         schematicDirectory = game.resolve("schematics"); cacheDirectory = game.resolve(".betterlitematica-cache");
         temporarySources=new TemporarySources(cacheDirectory);
@@ -200,7 +200,7 @@ final class ProjectionController implements AutoCloseable {
         String error = io.takeError(); if (error != null) { dirty = true; report(error); }
         if (ticks % 5 == 0) cachedHud = hudStatus();
     }
-    private String worldKey() {
+    String worldKey() {
         String identity;
         if (client.getServer() != null) identity = "local:" + client.getServer().getSavePath(WorldSavePath.ROOT).toAbsolutePath().normalize();
         else if (client.getCurrentServerEntry() != null) identity = "server:" + client.getCurrentServerEntry().address.toLowerCase(Locale.ROOT);
@@ -299,6 +299,7 @@ final class ProjectionController implements AutoCloseable {
     boolean toolRenderingEnabled(){return rendering&&!temporarilyHidden;}
     InventoryTransfers inventoryTransfers(){return inventoryTransfers;}
     PrinterEngine printer(){return printer;}
+    BedrockController bedrock(){return bedrock;}
     NearbyProjectionHighlights nearbyHighlights(){return nearbyHighlights;}
     Placement placement(UUID id){Entry e=entries.get(id);return e==null?null:e.placement;}
     boolean worldWriteBusy(){return toolWorld.busy()||pasteStarting!=null||paste!=null||fillStarting!=null||fill!=null||commands!=null||commandsLoading!=null;}
@@ -842,6 +843,8 @@ final class ProjectionController implements AutoCloseable {
         temporarySources.clear();if(temporarySources.cleanupPending())cleanupTemporary();
     }
     void disconnect() {
+        bedrock.disconnect();
+        NativeMiner.disconnectAll();
         filePreviews.cancelAll();
         tool.clear();toolWorld.cancel();
         for(var id:List.copyOf(draftAdoptions.keySet()))draftLoadFailed(id);

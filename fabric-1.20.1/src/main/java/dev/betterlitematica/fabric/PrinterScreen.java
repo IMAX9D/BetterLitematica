@@ -82,7 +82,9 @@ final class PrinterScreen extends MenuScreen {
         toggle("破冰放水",0,56,()->draft.iceWater,v->draft.iceWater=v);toggle("珊瑚替代",1,56,()->draft.coralSubstitute,v->draft.coralSubstitute=v);toggle("侦测器顺序检查",0,82,()->draft.safeObserver,v->draft.safeObserver=v);
         toggle("容器填充",1,82,()->draft.containerFill,v->draft.containerFill=v);
         buttonAt("补给："+draft.supply.label(),cellX(0,2),118,cellWidth(2),()->{read();draft.supply=PrinterSupply.Source.values()[(draft.supply.ordinal()+1)%PrinterSupply.Source.values().length];refresh();},true,false);
-        toggle("破基岩",1,118,()->draft.bedrock,v->draft.bedrock=v);
+        int x=cellX(1,2),width=cellWidth(2);
+        buttonAt("破基岩："+(draft.bedrock?"开":"关"),x,118,width-28,()->{read();draft.bedrock=!draft.bedrock;refresh();},true,draft.bedrock);
+        iconAt(dev.betterlitematica.runtime.UiGlyphArt.Kind.TUNE,"破基岩设置",x+width-20,118,20,()->{read();client.setScreen(new BedrockScreen(this,controller));},true,Look.GHOST,0);
     }
     private void highlightPage(){
         toggle("施工高亮",0,56,()->draft.highlights,v->draft.highlights=v);toggle("高亮置顶",1,56,()->draft.highlightOnTop,v->draft.highlightOnTop=v);

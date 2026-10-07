@@ -27,6 +27,9 @@ public final class PrinterDiscovery {
                     if(policy.print&&(f&ADJUSTABLE)!=0)kind=PrinterQueue.Kind.ADJUST;
                     else if(policy.print&&(f&WANTED_AIR)==0&&(f&REPLACEABLE)!=0)kind=PrinterQueue.Kind.PLACE;
                     else if((f&ACTUAL_AIR)==0&&((f&WANTED_AIR)!=0?policy.breakExtra:((f&SAME_BLOCK)!=0?policy.breakState:policy.breakWrong)))kind=PrinterQueue.Kind.BREAK;
+                    // The native piston transaction owns this obstacle. Scheduling a
+                    // normal BREAK first would cool the same position and starve it.
+                    if(kind==PrinterQueue.Kind.BREAK&&policy.bedrock&&(scope&8)!=0&&(f&BEDROCK)!=0)kind=null;
                     if(kind!=null)jobs.add(job(page,i,page.expected[i],kind));
                 }
             }

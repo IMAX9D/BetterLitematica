@@ -44,7 +44,10 @@ public final class BetterLitematicaClient implements ClientModInitializer {
     public static boolean printerSignOpened(net.minecraft.block.entity.SignBlockEntity sign,boolean front){var c=activeController;return c!=null&&MinecraftClient.getInstance().isOnThread()&&c.printer().signOpened(sign,front);}
     public static void manualSignInteraction(net.minecraft.util.math.BlockPos pos){var c=activeController;if(c!=null&&MinecraftClient.getInstance().isOnThread())c.printer().manualSignInteraction(pos);}
     public static void manualInventory(){var c=activeController;if(c!=null)c.printer().manualInventory();}
-    public static void confirmedProjectionBlock(net.minecraft.util.math.BlockPos pos,net.minecraft.block.BlockState state){var controller=activeController;if(controller!=null)controller.printer().confirmed(pos,state);}
+    public static void confirmedProjectionBlock(net.minecraft.util.math.BlockPos pos,net.minecraft.block.BlockState state){var controller=activeController;if(controller!=null&&MinecraftClient.getInstance().isOnThread()){controller.printer().confirmed(pos,state);NativeMiner.update(pos,state);}}
+    public static boolean nativeMiningBusy(){var c=activeController;return NativeMiner.busy()||c!=null&&(c.bedrock().enabled()||c.printer().running()&&c.options().printer.bedrock);}
+    public static float miningYaw(float original){return NativeMiner.packetYaw(original);}
+    public static float miningPitch(float original){return NativeMiner.packetPitch(original);}
     public static void projectionBlockChanged(net.minecraft.world.BlockView world,net.minecraft.util.math.BlockPos pos){var controller=activeController;if(controller!=null)controller.worldBlockChanged(world,pos);}
     public static void projectionChunkChanged(net.minecraft.world.BlockView world,int x,int z){var controller=activeController;if(controller!=null)controller.worldChunkChanged(world,x,z);}
     static int wheelKeyCode(){return activeController==null?GLFW.GLFW_KEY_TAB:ModeWheelInput.bindingCode(activeController.options().keys.getOrDefault("wheel","TAB"));}
@@ -63,11 +66,12 @@ public final class BetterLitematicaClient implements ClientModInitializer {
         interactions=new BuildingInteractions(client,controller);
         ClientTickEvents.START_CLIENT_TICK.register(mc->{modeWheelInput.tick();menuOpen.tick(mc.world,mc.getNetworkHandler(),mc.currentScreen);});
         // Shortcut transitions are captured by inputEvent, including taps between ticks.
-        ClientTickEvents.END_CLIENT_TICK.register(mc->{controller.tick();interactions.tick();if(!controller.printer().running())PrinterColdWarmup.step(mc);controller.printer().tick();});
+        ClientTickEvents.END_CLIENT_TICK.register(mc->{controller.tick();interactions.tick();if(!controller.printer().running())PrinterColdWarmup.step(mc);controller.bedrock().tick();if(!controller.bedrock().enabled())controller.printer().tick();});
         net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player,world,hand,pos,direction)->{
+            if(world==client.world&&controller.bedrock().attack(pos))return net.minecraft.util.ActionResult.FAIL;
             if(world==client.world&&interactions.blockClick(true,new net.minecraft.util.hit.BlockHitResult(net.minecraft.util.math.Vec3d.ofCenter(pos),direction,pos,false)))return net.minecraft.util.ActionResult.FAIL;return net.minecraft.util.ActionResult.PASS;
         });
-        net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player,world,hand,hit)->world==client.world&&interactions.blockClick(false,hit)?net.minecraft.util.ActionResult.FAIL:net.minecraft.util.ActionResult.PASS);
+        net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player,world,hand,hit)->world==client.world&&(controller.bedrock().use(hit.getBlockPos())||interactions.blockClick(false,hit))?net.minecraft.util.ActionResult.FAIL:net.minecraft.util.ActionResult.PASS);
         ClientPlayConnectionEvents.DISCONNECT.register((handler,mc)->mc.execute(()->{
             // Network-driven disconnects may arrive off-thread, after another session has opened.
             if(mc.getNetworkHandler()!=null&&mc.getNetworkHandler()!=handler)return;
@@ -120,6 +124,9 @@ public final class BetterLitematicaClient implements ClientModInitializer {
             root.then(literal("replaceworld").then(argument("from",StringArgumentType.string()).then(argument("to",StringArgumentType.string()).executes(c->controller.action(()->controller.fill(StringArgumentType.getString(c,"to"),StringArgumentType.getString(c,"from")))))));
             root.then(literal("deletearea").executes(c->controller.action(()->controller.fill("minecraft:air",null))));
             root.then(literal("printer").executes(c->controller.action(()->openFromCommand(client,controller,parent->new PrinterScreen(parent,controller)))));
+            root.then(literal("bedrock").executes(c->controller.action(()->openFromCommand(client,controller,parent->new BedrockScreen(parent,controller))))
+                .then(literal("toggle").executes(c->controller.action(()->controller.bedrock().toggle())))
+                .then(literal("clear").executes(c->controller.action(()->controller.bedrock().clear()))));
             root.then(literal("tasks").executes(c->controller.action(()->openFromCommand(client,controller,parent->new TaskScreen(parent,controller)))));
             root.then(literal("mcfunction").then(argument("output",StringArgumentType.string()).executes(c->controller.action(()->controller.commands(StringArgumentType.getString(c,"output"),dev.betterlitematica.core.ReplaceRule.ALL,true)))));
             root.then(literal("pastecommands").then(argument("replace",StringArgumentType.word()).executes(c->controller.action(()->controller.commands(null,dev.betterlitematica.core.ReplaceRule.valueOf(StringArgumentType.getString(c,"replace").toUpperCase(java.util.Locale.ROOT)),false)))));

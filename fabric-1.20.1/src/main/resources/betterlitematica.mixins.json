@@ -23,6 +23,7 @@
     "VerificationChunkMixin",
     "PrinterBlockUpdateMixin",
     "PrinterSignMixin",
+    "MiningLookMixin",
     "SupplyInteractionMixin",
     "ExternalMinerMixin",
     "RenderLayerAccessor",

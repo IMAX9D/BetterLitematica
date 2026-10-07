@@ -53,6 +53,7 @@ final class PrinterEngine implements AutoCloseable {
         settings().validate();if(!settings().print&&!mining(settings())&&!settings().fill&&!settings().fluid&&!settings().bedrock)throw new IllegalStateException("请选择工作模式");
         fillState=checkedFill(settings());
         if(settings().bedrock)actions.checkMiner();
+        if(controller.bedrock().enabled())controller.bedrock().clear();
         if(state==State.STOPPED)operations=0;
         Context next=current();if(context==null||!context.equals(next)){clearWork();context=next;}
         startupBurst=state!=State.RUNNING&&!coldBurstUsed;state=State.RUNNING;status="打印中";
@@ -175,7 +176,7 @@ final class PrinterEngine implements AutoCloseable {
             if(current.getBlock()==wanted.getBlock())f|=PrinterDiscovery.SAME_BLOCK;
             if(PrinterRules.adjustable(current,wanted,s))f|=PrinterDiscovery.ADJUSTABLE;
             if(s.fluid){var fluid=current.getFluidState();if(!fluid.isEmpty()&&PrinterRules.fluidMatches(Registries.FLUID.getId(fluid.getFluid()).toString(),s.fluids))f|=PrinterDiscovery.FLUID;if(fluid.isStill())f|=PrinterDiscovery.FLUID_SOURCE;}
-            if(s.bedrock&&current.isOf(Blocks.BEDROCK))f|=PrinterDiscovery.BEDROCK;
+            if(s.bedrock&&current!=wanted&&controller.bedrock().accepts(pos))f|=PrinterDiscovery.BEDROCK;
             if(PrinterRules.filtered(wanted,s.skip)||s.skipWaterlogged&&wanted.contains(net.minecraft.state.property.Properties.WATERLOGGED)&&wanted.get(net.minecraft.state.property.Properties.WATERLOGGED))f|=PrinterDiscovery.SKIP;
             if(s.coralSubstitute&&actions.waitingCoral(pos,current,wanted,ticks))f|=PrinterDiscovery.SKIP;
             flags[i]=f;
