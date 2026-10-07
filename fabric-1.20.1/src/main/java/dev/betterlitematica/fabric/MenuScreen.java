@@ -26,6 +26,9 @@ abstract class MenuScreen extends Screen {
     private boolean presented;
     private double animatedX,animatedY;
     private BlueprintPreviewPanel previewCapture;
+    private ButtonWidget back;
+    private ClickableWidget hintTarget;private long hintSince;
+    private static final long HINT_DELAY=350_000_000L;
     MenuScreen(String title,String description,Screen parent,ProjectionController controller,boolean wide){super(Text.literal(title));this.description=description;this.parent=parent;this.controller=controller;this.wide=wide;sessionEpoch=controller.sessionEpoch();}
     @Override protected final void init(){
         cancelPreviewCapture();
@@ -38,7 +41,7 @@ abstract class MenuScreen extends Screen {
         innerWidth=Math.max(160,Math.min(width-48,wide?680:440));left=(width-innerWidth)/2;
         int panelHeight=Math.min(height-20,preferredHeight());panelTop=(height-panelHeight)/2;panelBottom=panelTop+panelHeight;
         bodyTop=panelTop+(description.isEmpty()?40:58);bodyBottom=panelBottom-56;
-        buildMenu();fixed(backLabel(),innerWidth-76,76,this::close);building=false;position();
+        buildMenu();back=fixed(backLabel(),innerWidth-76,76,this::close);building=false;position();
         if(previousFocus!=null)for(var item:body)if(item.y==previousFocus.y&&item.widget.getX()==previousFocus.widget.getX()&&item.widget instanceof OverlayTextField field&&field.getMessage().equals(previousFocus.widget.getMessage())){field.setSelectionStart(Math.min(cursor,field.getText().length()));field.setSelectionEnd(Math.min(anchor,field.getText().length()));setFocused(field);break;}
     }
     protected abstract void buildMenu();
@@ -101,11 +104,15 @@ abstract class MenuScreen extends Screen {
         if(pages<=1)return;
         var prev=fixed("上一页",0,60,previous);prev.active=page>0;navigation.add(prev);
         var forward=fixed("下一页",68,60,next);forward.active=page+1<pages;navigation.add(forward);
-        var count=fixed((page+1)+" / "+Math.max(1,pages),136,54,()->{});count.active=false;navigation.add(count);
+        // The position is read-only text, not a greyed-out control.
+        navigation.add(fixedControl(new OverlayLabel(0,54,(page+1)+" / "+Math.max(1,pages)),142));
         if(!building)position();
     }
     private UiMotion buttonMotion(String key){var value=buttonMotions.get(key);if(value==null){if(buttonMotions.size()>=256)buttonMotions.remove(buttonMotions.keySet().iterator().next());value=new UiMotion();buttonMotions.put(key,value);}return value;}
-    protected final ButtonWidget fixed(String text,int x,int w,Runnable action){var b=new MenuButton(left+x,panelBottom-41,w,text,()->runAction(action),false,buttonMotion("footer:"+x+":"+w));footer.add(b);addDrawableChild(b);return b;}
+    protected final ButtonWidget fixed(String text,int x,int w,Runnable action){return footerButton(text,x,w,action,Look.STANDARD);}
+    /** The page's one committing action (load, save); drawn solid so it is never mistaken for Back. */
+    protected final ButtonWidget fixedAction(String text,int x,int w,Runnable action){return footerButton(text,x,w,action,Look.ACCENT);}
+    private ButtonWidget footerButton(String text,int x,int w,Runnable action,Look look){var b=new MenuButton(left+x,panelBottom-41,w,text,()->runAction(action),look,buttonMotion("footer:"+x+":"+w));footer.add(b);addDrawableChild(b);return b;}
     protected final <T extends ClickableWidget> T fixedControl(T widget,int x){widget.setX(left+x);widget.setY(panelBottom-41);footer.add(widget);addDrawableChild(widget);return widget;}
     protected int scrollLeft(){return left;}
     protected int scrollRight(){return left+innerWidth;}
@@ -150,7 +157,11 @@ abstract class MenuScreen extends Screen {
         if(x>=scrollLeft()&&x<=scrollRight()+8&&y>=scrollTop()&&y<bodyBottom&&maxScroll()>0){scroll-=Math.round(amount*26);position();return true;}return super.mouseScrolled(x,y,amount);
     }
     @Override public boolean keyPressed(int key,int scan,int modifiers){if(getFocused() instanceof OverlayList list&&list.keyPressed(key,scan,modifiers))return true;if(getFocused() instanceof VerificationList results&&results.keyPressed(key,scan,modifiers))return true;if(getFocused() instanceof MaterialGrid grid&&grid.keyPressed(key,scan,modifiers))return true;if(getFocused() instanceof BrowserGrid grid&&grid.keyPressed(key,scan,modifiers))return true;if(key==org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_DOWN||key==org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_UP){scroll+=(key==org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_DOWN?1:-1)*Math.max(26,bodyBottom-bodyTop-26);position();return true;}return super.keyPressed(key,scan,modifiers);}
-    @Override public void tick(){if(sessionEpoch!=controller.sessionEpoch()){client.setScreen(null);return;}checkPreviewCapture();if(getFocused()!=null&&!children().contains(getFocused()))setFocused(null);for(var item:List.copyOf(body))if(item.widget instanceof TextFieldWidget field)field.tick();updateMenu();}
+    @Override public void tick(){
+        if(sessionEpoch!=controller.sessionEpoch()){client.setScreen(null);return;}checkPreviewCapture();if(getFocused()!=null&&!children().contains(getFocused()))setFocused(null);for(var item:List.copyOf(body))if(item.widget instanceof TextFieldWidget field)field.tick();updateMenu();
+        // Back can read "放弃" once a page holds a draft; keep its wording current without rebuilding.
+        if(back!=null){String label=backLabel();if(!back.getMessage().getString().equals(label))back.setMessage(Text.literal(label));}
+    }
     @Override public final void render(DrawContext ctx,int mouseX,int mouseY,float delta){
         checkPreviewCapture();
         var v=viewport();var window=client.getWindow();
@@ -207,12 +218,19 @@ abstract class MenuScreen extends Screen {
         for(var widget:footer)widget.render(ctx,mouseX,mouseY,delta);
         String status=displayedStatus();
         if(!status.isEmpty()){int color=statusColor();double sy=panelBottom-15;ui.roundRect(left,sy+ui.lineHeight()/2-1.5,left+3,sy+ui.lineHeight()/2+1.5,1.5,color==UiTheme.MUTED?UiTheme.ACCENT:color);ui.text(status,left+8,sy,innerWidth-8,color);}
-        for(var entry:hints.entrySet())if(entry.getKey().visible&&entry.getKey().isMouseOver(mouseX,mouseY)&&(!(entry.getKey() instanceof BlueprintPreviewPanel panel)||!panel.capturing())){
+        // Tooltips wait for a short rest on one control so sweeping the pointer across icons stays quiet.
+        ClickableWidget resting=null;
+        for(var entry:hints.entrySet())if(entry.getKey().visible&&entry.getKey().isMouseOver(mouseX,mouseY)){resting=entry.getKey();break;}
+        if(resting==null)for(var item:body)if(item.widget.visible&&item.widget instanceof MenuButton&&item.widget.isMouseOver(mouseX,mouseY)){resting=item.widget;break;}
+        long now=System.nanoTime();if(resting!=hintTarget){hintTarget=resting;hintSince=now;}
+        if(resting==null||now-hintSince<HINT_DELAY)return;
+        for(var entry:hints.entrySet())if(entry.getKey()==resting&&(!(entry.getKey() instanceof BlueprintPreviewPanel panel)||!panel.capturing()&&!panel.recentlyUsed())){
             String[] lines=entry.getValue().split("\n");double w=Arrays.stream(lines).mapToDouble(ui::measure).max().orElse(0)+20,h=lines.length*(ui.lineHeight()+2)+10;
             double x=Math.max(8,Math.min(width-w-8,entry.getKey().getX()+entry.getKey().getWidth()/2d-w/2)),y=entry.getKey().getY()-h-6;if(y<8)y=entry.getKey().getY()+entry.getKey().getHeight()+6;
             tooltip(ui,x,y,w,h);for(int i=0;i<lines.length;i++)ui.text(lines[i],x+9,y+5+i*(ui.lineHeight()+2),w-18,UiTheme.TEXT);return;
         }
-        for(var item:body)if(item.widget.visible&&item.widget instanceof MenuButton&&item.widget.isMouseOver(mouseX,mouseY)&&ui.measure(item.widget.getMessage().getString())>item.widget.getWidth()-12){
+        if(hints.containsKey(resting))return;
+        for(var item:body)if(item.widget==resting&&ui.measure(item.widget.getMessage().getString())>item.widget.getWidth()-12){
             String text=item.widget.getMessage().getString();List<String> lines=new ArrayList<>();
             while(!text.isEmpty()&&lines.size()<8){String line=ui.trim(text,320);if(line.endsWith("…"))line=line.substring(0,line.length()-1);if(line.isEmpty())break;lines.add(line);text=text.substring(line.length());}
             double step=ui.lineHeight()+2,h=lines.size()*step+12;int x=Math.min(width-336,Math.max(8,mouseX+12)),y=(int)Math.max(8,Math.min(height-h-8,mouseY+16));
@@ -237,7 +255,7 @@ abstract class MenuScreen extends Screen {
     @Override public void close(){client.setScreen(parent);}
     @Override public void removed(){cancelPreviewCapture();presented=false;departed=new java.lang.ref.WeakReference<>(this);departureTime=System.nanoTime();super.removed();}
     @Override public boolean shouldPause(){return false;}
-    enum Look { STANDARD, PRIMARY, GHOST, TAB, TAB_SELECTED }
+    enum Look { STANDARD, PRIMARY, ACCENT, GHOST, TAB, TAB_SELECTED }
     static final class MenuButton extends ButtonWidget {
         private static final java.util.WeakHashMap<UiMotion,UiMotion> SWITCHES=new java.util.WeakHashMap<>();
         private final Look look;private final UiMotion motion;private final UiMotion switchMotion;
@@ -269,7 +287,7 @@ abstract class MenuScreen extends Screen {
                 ui.text(name,getX()+12,ty,vx-getX()-20,!active?UiTheme.DISABLED_TEXT:UiTheme.TEXT);
                 return;
             }
-            int color=!active?UiTheme.DISABLED_TEXT:look==Look.PRIMARY?UiMotion.mix(UiTheme.FOCUS,UiTheme.ACCENT_HOVER,hover*.6):look==Look.GHOST?UiMotion.mix(UiTheme.SECONDARY,UiTheme.TEXT,hover):UiTheme.TEXT;
+            int color=!active?UiTheme.DISABLED_TEXT:look==Look.ACCENT?UiTheme.ON_ACCENT:look==Look.PRIMARY?UiMotion.mix(UiTheme.FOCUS,UiTheme.ACCENT_HOVER,hover*.6):look==Look.GHOST?UiMotion.mix(UiTheme.SECONDARY,UiTheme.TEXT,hover):UiTheme.TEXT;
             ui.centered(getMessage().getString(),getX(),y,width,height,color);
         }
         private void paintTab(double hover){
@@ -288,10 +306,11 @@ abstract class MenuScreen extends Screen {
             int fill,edge;
             switch(look){
                 case PRIMARY -> {fill=UiMotion.mix(UiTheme.SELECTED,UiTheme.PRESSED,hover*.7);edge=UiMotion.mix(UiMotion.alpha(UiTheme.ACCENT,.45),UiTheme.ACCENT,hover*.6);}
+                case ACCENT -> {fill=UiMotion.mix(UiTheme.ACCENT,UiTheme.ACCENT_HOVER,hover);edge=fill;}
                 case GHOST -> {fill=UiMotion.alpha(UiTheme.HOVER,hover);edge=UiMotion.alpha(UiTheme.BORDER,hover);}
                 default -> {fill=UiMotion.mix(UiTheme.SURFACE,UiTheme.HOVER,hover);edge=UiMotion.mix(UiTheme.BORDER,UiTheme.BORDER_STRONG,hover);}
             }
-            fill=UiMotion.mix(fill,look==Look.PRIMARY?UiTheme.PRESSED:UiTheme.HOVER,press*.8);
+            fill=UiMotion.mix(fill,look==Look.ACCENT?UiTheme.FOCUS:look==Look.PRIMARY?UiTheme.PRESSED:UiTheme.HOVER,press*.8);
             if(focused)ui.ring(l,top,r,b,radius,1);
             if(look!=Look.GHOST&&!UiTheme.DARK)ui.contact(l,top,r,b,radius);
             if((fill>>>24)!=0)ui.roundRect(l,top,r,b,radius,fill);

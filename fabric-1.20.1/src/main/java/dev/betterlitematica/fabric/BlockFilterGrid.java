@@ -45,11 +45,12 @@ final class BlockFilterGrid extends ButtonWidget {
         try{if(rows.isEmpty())ui.text("无匹配方块",getX()+4,getY()+6,width-8,UiTheme.MUTED);
             int first=(int)(scroll/ROW),last=Math.min((rows.size()+COLUMNS-1)/COLUMNS,(int)Math.ceil((scroll+height)/ROW));
             for(int row=first;row<last;row++)for(int col=0;col<COLUMNS;col++){int index=row*COLUMNS+col;if(index>=rows.size())break;var entry=rows.get(index);int x=getX()+col*(w+GAP);double y=getY()+row*ROW-scroll;boolean chosen=selected.contains(entry.id());double hot=motion(entry.id()).hover(index==hover);
-                ui.roundRect(x,y,x+w,y+ROW-GAP,UiTheme.BUTTON_RADIUS,UiMotion.mix(chosen?UiTheme.SELECTED:UiTheme.SURFACE,UiTheme.HOVER,hot*.45));
-                ui.roundFrame(x,y,x+w,y+ROW-GAP,UiTheme.BUTTON_RADIUS,isFocused()&&cursor==index?UiTheme.ACCENT:chosen?UiTheme.FOCUS:UiTheme.BORDER);
+                // Inactive (filter off): every card reads as disabled so nothing invites a click.
+                ui.roundRect(x,y,x+w,y+ROW-GAP,UiTheme.BUTTON_RADIUS,!active?UiTheme.DISABLED:UiMotion.mix(chosen?UiTheme.SELECTED:UiTheme.SURFACE,UiTheme.HOVER,hot*.45));
+                ui.roundFrame(x,y,x+w,y+ROW-GAP,UiTheme.BUTTON_RADIUS,!active?UiTheme.DIVIDER:isFocused()&&cursor==index?UiTheme.ACCENT:chosen?UiTheme.FOCUS:UiTheme.BORDER);
                 if(entry.icon().isEmpty())ui.glyph(UiGlyphArt.Kind.BRAND,x+7,y+9,17,UiTheme.MUTED);else ui.item(entry.icon(),x+6,y+7,21);
                 ui.text(entry.name(),x+32,y+(ROW-GAP-ui.lineHeight())/2,w-52,active?UiTheme.TEXT:UiTheme.DISABLED_TEXT);
-                if(chosen)ui.glyph(UiGlyphArt.Kind.CHECK,x+w-16,y+12,11,UiTheme.ACCENT);
+                if(chosen)ui.glyph(UiGlyphArt.Kind.CHECK,x+w-16,y+12,11,active?UiTheme.ACCENT:UiTheme.DISABLED_TEXT);
             }
         }finally{ui.unclip();}
         if(maxScroll()>0){double thumb=Math.max(18,height*(double)height/content()),y=getY()+(height-thumb)*scroll/maxScroll();ui.roundRect(getX()+width-4,getY(),getX()+width-2,getY()+height,1,UiTheme.TRACK);ui.roundRect(getX()+width-4,y,getX()+width-2,y+thumb,1,UiTheme.THUMB);}

@@ -39,8 +39,9 @@ public final class UnlimitedPlacementChecks {
         try(var sources=new TemporarySources(directory.resolve("temporary"))){
             var ids=new ArrayList<String>();for(int i=0;i<32;i++)ids.add(sources.create(root,Cancellation.NEVER));
             for(var id:ids)check(Files.isRegularFile(sources.reference(directory,id).read()),"More than 16 complete temporary sources remain individually readable");
-            var lease=sources.lease(directory,ids.get(0));var leased=lease.reference().read();sources.clear();sources.cleanupAsync().get(5,java.util.concurrent.TimeUnit.SECONDS);
-            check(Files.exists(leased),"Leased temporary source survives retirement with larger catalog");lease.close();sources.cleanupAsync().get(5,java.util.concurrent.TimeUnit.SECONDS);check(!Files.exists(leased),"Final lease release permits exact source cleanup");
+            // Generous bound: the full build runs this beside Gradle compilation, where 5 s was observed to time out.
+            var lease=sources.lease(directory,ids.get(0));var leased=lease.reference().read();sources.clear();sources.cleanupAsync().get(30,java.util.concurrent.TimeUnit.SECONDS);
+            check(Files.exists(leased),"Leased temporary source survives retirement with larger catalog");lease.close();sources.cleanupAsync().get(30,java.util.concurrent.TimeUnit.SECONDS);check(!Files.exists(leased),"Final lease release permits exact source cleanup");
             rejects(()->sources.create(root,()->true),"Cancelled temporary creation is rejected");
             var id=sources.create(root,Cancellation.NEVER);check(Files.exists(sources.reference(directory,id).read()),"Cancelled reservation does not poison subsequent creation");
         }

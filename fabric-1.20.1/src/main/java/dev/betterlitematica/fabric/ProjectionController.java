@@ -581,8 +581,8 @@ final class ProjectionController implements AutoCloseable {
         return prefix + " | " + entry.placement.name() + " | " + detail + (error.isEmpty() ? "" : " | " + error);
     }
     private void requireWorld() {
-        if (client.world == null || client.player == null) throw new IllegalStateException("Join a world first");
-        if (!ready) throw new IllegalStateException("Wait for placement settings to finish loading");
+        if (client.world == null || client.player == null) throw new IllegalStateException("请先进入世界");
+        if (!ready) throw new IllegalStateException("摆放设置仍在加载，请稍候");
     }
     AreaSelection selection() { return selection; }
     void selectionAdd(String name) { requireSelection(); Vec3i here=playerPosition();selection=selection.add(new SelectionBox(name,here,here));selectionTarget=null;selectionDirty=true; }
@@ -714,7 +714,7 @@ final class ProjectionController implements AutoCloseable {
     }
     List<String> tasks(){List<String> list=new ArrayList<>();if(toolWorld.busy())list.add(toolWorld.status());if(hasDraftRecovery())list.add("编辑草稿："+draftRecoveryStatus());if(editor.busy())list.add("投影编辑："+editor.status);if(projectLoading!=null||projectActivation!=null)list.add("项目版本加载中");if(printer.state()!=PrinterEngine.State.STOPPED)list.add("打印机："+printer.status());if(importing!=null)list.add("投影导入："+loader.status().phase());if(analysis!=null)list.add(analysis.status());if(capture!=null||captureStarting!=null||capturePreparing!=null)list.add(captureStatus());if(paste!=null||pasteStarting!=null)list.add(pasteStatus());if(fill!=null||fillStarting!=null)list.add(fill==null?"准备填充":fill.status());if(commands!=null)list.add(commands.status());if(commandsLoading!=null)list.add("命令任务读取中");list.addAll(background.keySet());return list;}
     void cancelTasks(){toolWorld.cancel();editor.cancel();for(var id:List.copyOf(draftAdoptions.keySet()))draftLoadFailed(id);cancelProjectActivation(null);printer.stop();cancelAnalysis();cancelCapture();cancelPaste();loader.cancel();if(importing!=null){var entry=entries.get(importing);if(entry!=null)entry.state="已取消，可重新加载";}importing=null;for(var request:resourceRequests.entrySet())resourceFailures.put(request.getValue(),"已取消");resourceRequests.clear();for(var id:queued){var entry=entries.get(id);if(entry!=null)entry.state="已取消，可重新加载";}queued.clear();if(projectLoading!=null)projectLoading.cancel(true);projectLoading=null;if(commands!=null)commands.cancel();if(commandsLoading!=null)commandsLoading.cancel(true);commandsLoading=null;commands=null;var task=serverFill.getAndSet(null);if(task!=null)task.cancel();fillStarting=null;fill=null;for(var job:background.values())job.cancel(true);}
-    private Entry require() { requireWorld(); Entry entry = entries.get(selected); if (entry == null) throw new IllegalStateException("Select a placement first"); return entry; }
+    private Entry require() { requireWorld(); Entry entry = entries.get(selected); if (entry == null) throw new IllegalStateException("请先选择投影"); return entry; }
     private Entry require(UUID id){requireWorld();Entry entry=entries.get(id);if(entry==null)throw new IllegalStateException("目标投影已移除");return entry;}
     record ResourceView(String source,String name,int placements,String status){}
     private static String sourceKey(String source){return Path.of(source).normalize().toString().replace('\\','/');}
@@ -748,7 +748,7 @@ final class ProjectionController implements AutoCloseable {
     private void add(Placement placement) {
         entries.put(placement.id(), new Entry(placement)); queued.add(placement.id()); selected = placement.id(); dirty = true;
     }
-    void select(UUID id) { requireWorld(); if (id != null && !entries.containsKey(id)) throw new IllegalArgumentException("Placement not found"); selected = id; dirty = true; }
+    void select(UUID id) { requireWorld(); if (id != null && !entries.containsKey(id)) throw new IllegalArgumentException("投影已移除"); selected = id; dirty = true; }
     void selectNumber(int number) {
         List<Placement> list = placements(); if (number < 1 || number > list.size()) throw new IllegalArgumentException("Invalid placement number"); select(list.get(number - 1).id());
     }
@@ -787,7 +787,7 @@ final class ProjectionController implements AutoCloseable {
     void here(){var placement=require().placement;var current=placement.transform().origin();var p=client.player.getBlockPos();int axes=placement.lockedAxes();move((axes&1)!=0?current.x():p.getX(),(axes&2)!=0?current.y():p.getY(),(axes&4)!=0?current.z():p.getZ());}
     void move(int x, int y, int z) { update(p -> p.placed(new PlacementTransform(new Vec3i(x, y, z), p.transform().quarterTurns(), p.transform().mirrorX(), p.transform().mirrorZ()))); }
     void rotate(int degrees) {
-        if (Math.floorMod(degrees, 90) != 0) throw new IllegalArgumentException("Rotation must be a multiple of 90");
+        if (Math.floorMod(degrees, 90) != 0) throw new IllegalArgumentException("旋转角度须为 90° 的倍数");
         update(p -> p.placed(new PlacementTransform(p.transform().origin(), degrees / 90, p.transform().mirrorX(), p.transform().mirrorZ())));
     }
     void rotateNext() { rotate((require().placement.transform().quarterTurns() + 1) * 90); }
