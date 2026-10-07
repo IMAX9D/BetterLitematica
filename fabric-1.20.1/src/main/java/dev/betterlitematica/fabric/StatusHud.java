@@ -2,6 +2,7 @@ package dev.betterlitematica.fabric;
 
 import java.util.List;
 import dev.betterlitematica.runtime.StatusBadgeArt;
+import dev.betterlitematica.runtime.UiGlyphArt;
 import net.minecraft.item.ItemStack;
 
 /** Bounded presentation snapshots; ordinary status uses symbols, not instructional sentences. */
@@ -11,6 +12,8 @@ final class StatusHud {
     private List<ItemStack> shortages=List.of();
     private PrinterEngine.State printerState=PrinterEngine.State.STOPPED;
     private boolean printerVisible,error;
+    private long motionEpoch=Long.MIN_VALUE;
+    private UiMotion printerMotion=new UiMotion();
 
     private void snapshot(ProjectionController controller){
         long now=System.nanoTime();var printer=controller.printer();
@@ -37,10 +40,14 @@ final class StatusHud {
         // Read the switches every frame; only the explanatory detail below uses the 5 Hz snapshot.
         boolean projectionBadge=controller.hasProjection();var currentState=controller.printer().state();
         boolean printerBadge=controller.options().printer.hud&&(projectionBadge||currentState!=PrinterEngine.State.STOPPED);
+        if(motionEpoch!=controller.sessionEpoch()){
+            motionEpoch=controller.sessionEpoch();printerMotion=new UiMotion();
+        }
+        double expansion=printerMotion.hover(printerBadge&&currentState==PrinterEngine.State.RUNNING);
         if(projectionBadge||printerBadge){
             double diameter=24,tx=x;ui.prepareStatusBadges(diameter);
             if(projectionBadge){ui.statusBadge(controller.projectionRenderingEnabled()?StatusBadgeArt.Kind.EYE_OPEN:StatusBadgeArt.Kind.EYE_CLOSED,tx,y,diameter);tx+=diameter+HudLayout.GAP;}
-            if(printerBadge)ui.statusBadge(currentState==PrinterEngine.State.RUNNING?StatusBadgeArt.Kind.PRINTER_ON:StatusBadgeArt.Kind.PRINTER_OFF,tx,y,diameter);
+            if(printerBadge)drawPrinterBadge(ui,tx,y,diameter,expansion);
             y+=diameter+HudLayout.GAP;
         }
         double shortageWidth=shortages.isEmpty()?0:10+shortages.size()*18+4;
@@ -54,6 +61,26 @@ final class StatusHud {
             for(var item:shortages){ui.item(item,tx,ty,17);tx+=18;}
             if(!detail.isEmpty())ui.text(firstDetail,tx,ty+(row-line)/2,Math.max(0,x+width-6-tx),error?UiTheme.ERROR:UiTheme.SECONDARY);
             if(!errorTail.isEmpty())ui.text(errorTail,x+18,ty+(row-line)/2+line+1,width-24,UiTheme.ERROR);
+        }
+    }
+
+    /** One continuous surface; only the right edge moves, with no rescaled icons or text rasters. */
+    static void drawPrinterBadge(IndependentUi ui,double x,double y,double diameter,double expansion){
+        double progress=UiMotion.clamp(expansion),radius=diameter/2;
+        String label="打印中";
+        ui.prepareText(label);
+        double width=diameter+(ui.measure(label)+10)*progress;
+        int surface=UiTheme.DARK?0xee1f2027:0xe3f6f9fc;
+        int border=UiTheme.DARK?0x1effffff:0x3a8191a7;
+        int icon=UiMotion.mix(UiTheme.DARK?0xff82868f:0xff8993a1,UiTheme.DARK?0xff6ed69c:0xff0ab463,progress);
+        ui.shadow(x,y,x+width,y+diameter,radius);
+        ui.roundRect(x,y,x+width,y+diameter,radius,surface);
+        ui.roundFrame(x,y,x+width,y+diameter,radius,border);
+        ui.glyph(UiGlyphArt.Kind.PRINTER,x+5,y+5,diameter-10,icon);
+        if(progress>0){
+            ui.clip(x+diameter,y,x+width-5,y+diameter);
+            ui.rawText(label,x+diameter+1,y+(diameter-ui.lineHeight())/2,UiMotion.alpha(UiTheme.TEXT,progress));
+            ui.unclip();
         }
     }
 }

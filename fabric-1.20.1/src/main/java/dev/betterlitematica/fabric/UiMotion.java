@@ -9,7 +9,9 @@ final class UiMotion {
     UiMotion(double settled){hover=clamp(settled);}
 
     double hover(boolean active) {
-        long now=System.nanoTime();
+        return hover(active,System.nanoTime());
+    }
+    double hover(boolean active,long now) {
         double seconds=hoverTime==0?0:Math.min(.1,Math.max(0,(now-hoverTime)/1e9));
         hoverTime=now;
         hover+=( (active?1:0)-hover)*(1-Math.exp(-seconds*19));

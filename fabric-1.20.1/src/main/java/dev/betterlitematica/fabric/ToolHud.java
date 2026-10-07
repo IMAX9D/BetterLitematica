@@ -29,7 +29,18 @@ final class ToolHud {
     private double height(IndependentUi ui) {double height=30;for(var row:data.rows())height+=rowHeight(ui,row);return height;}
     double top(MinecraftClient client,IndependentUi ui,ProjectionController controller,HudLayout layout) {
         if(!visible(client,controller))return layout.toolBottom();snapshot(controller);
-        return layout.toolBottom()-height(ui);
+        double bottom=layout.toolBottom();
+        if(hotbarSpace(client,layout)<110){
+            var view=layout.viewport();
+            bottom=Math.min(bottom,view.localPixelY(view.pixelHeight()-22*view.guiScale())-HudLayout.GAP);
+        }
+        return bottom-height(ui);
+    }
+    private static double hotbarSpace(MinecraftClient client,HudLayout layout){
+        var view=layout.viewport();
+        boolean leftOffhand=client.player.getMainArm()==net.minecraft.util.Arm.RIGHT&&!client.player.getOffHandStack().isEmpty();
+        double hotbarLeft=view.pixelWidth()/2d-(91+(leftOffhand?29:0))*view.guiScale();
+        return view.localPixelX(hotbarLeft)-layout.toolLeft()-HudLayout.GAP;
     }
     void draw(MinecraftClient client,IndependentUi ui,ProjectionController controller,HudLayout layout,double top) {
         if(!visible(client,controller))return;
@@ -40,7 +51,10 @@ final class ToolHud {
             width=Math.max(width,14+labelWidth+ui.measure(text)+3+(block==null?0:23));
         }
         width=Math.min(248,Math.min(width,(layout.right()-layout.left())*.46));
-        double x=layout.left(),y=top,line=ui.lineHeight(),rowY=y+25;
+        // The card now shares the bottom edge with vanilla's hotbar, including its offhand slot.
+        double besideHotbar=hotbarSpace(client,layout);
+        if(besideHotbar>=110)width=Math.min(width,besideHotbar);
+        double x=layout.toolLeft(),y=top,line=ui.lineHeight(),rowY=y+25;
         HudLayout.card(ui,x,y,width,height(ui));
         if(data.area())HudIcons.selection(ui,x+7,y+7,11,previous.expand(),UiTheme.ACCENT);
         else HudIcons.tool(ui,x+7,y+7,11,UiTheme.ACCENT);

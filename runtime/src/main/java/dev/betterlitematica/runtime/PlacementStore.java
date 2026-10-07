@@ -8,7 +8,7 @@ import java.util.zip.CRC32;
 
 /** Small versioned settings file. Never stores or edits source blueprint data. Call from an IO worker. */
 public final class PlacementStore {
-    private static final int MAGIC = 0x424c5053, VERSION = 4, MAX_BYTES = 8 * 1024 * 1024;
+    private static final int MAGIC = 0x424c5053, VERSION = 5, MAX_BYTES = 8 * 1024 * 1024;
     private PlacementStore() {}
     public static PlacementSession read(Path file) throws IOException {
         if (!Files.exists(file)) return PlacementSession.EMPTY;
@@ -29,7 +29,7 @@ public final class PlacementStore {
             LayerRange layer = new LayerRange(LayerRange.Axis.values()[axis], in.readInt(), in.readInt());
             float opacity = in.readFloat(); boolean rendering = in.readBoolean(); int count = in.readInt();
             // Reject impossible declared counts before allocating or iterating, without a UI placement limit.
-            int minimumRecordBytes=version==1?37:version==2?41:version==3?48:53;
+            int minimumRecordBytes=version==1?37:version==2?41:version==3?48:version==4?53:57;
             if (count < 0 || count > (in.available()-Long.BYTES)/minimumRecordBytes) throw new IOException("Invalid placement count");
             List<Placement> entries = new ArrayList<>();
             for (int i = 0; i < count; i++) {
@@ -43,16 +43,10 @@ public final class PlacementStore {
                 if(version>=3){render=in.readBoolean();axes=in.readUnsignedByte();int mode=in.readUnsignedByte();if(mode>=ReplaceRule.values().length)throw new IOException("Invalid overlap rule");overlap=ReplaceRule.values()[mode];int n=in.readInt();if(n<0||n>1024)throw new IOException("Invalid region override count");for(int j=0;j<n;j++){String key=in.readUTF();var pos=new Vec3i(in.readInt(),in.readInt(),in.readInt());int rotation=in.readUnsignedByte();if(rotation>3)throw new IOException("Invalid region rotation");var value=new RegionPlacement(pos,rotation,in.readBoolean(),in.readBoolean(),in.readBoolean(),in.readBoolean());if(regions.put(key,value)!=null)throw new IOException("Duplicate region override");}}
                 BlockDisplayFilter filter=BlockDisplayFilter.OFF;
                 if(version>=4){
-                    int filterMode=in.readUnsignedByte(),n=in.readInt();
+                    int filterMode=in.readUnsignedByte();
                     if(filterMode>=BlockDisplayFilter.Mode.values().length)throw new IOException("Invalid display filter mode");
-                    if(n<0||n>BlockDisplayFilter.MAX_IDS||n>(in.available()-Long.BYTES)/5)throw new IOException("Invalid display filter count");
-                    Set<String> ids=new LinkedHashSet<>();int characters=0;
-                    for(int j=0;j<n;j++){
-                        String raw=in.readUTF(),key=BlockDisplayFilter.canonicalId(raw);
-                        if(!raw.equals(key)||!ids.add(key))throw new IOException("Invalid or duplicate display filter ID");
-                        characters+=key.length();if(characters>BlockDisplayFilter.MAX_ID_CHARACTERS)throw new IOException("Display filter exceeds budget");
-                    }
-                    filter=new BlockDisplayFilter(BlockDisplayFilter.Mode.values()[filterMode],ids);
+                    var mode=BlockDisplayFilter.Mode.values()[filterMode];var ids=filterIds(in);
+                    filter=version>=5?new BlockDisplayFilter(mode,ids,filterIds(in)):new BlockDisplayFilter(mode,ids);
                 }
                 entries.add(new Placement(id,name,source,transform,enabled,locked,alpha,regions,render,axes,overlap,filter));
             }
@@ -87,14 +81,25 @@ public final class PlacementStore {
                 out.writeBoolean(entry.enabled()); out.writeBoolean(entry.locked()); out.writeFloat(entry.opacity());
                 out.writeBoolean(entry.renderBlocks());out.writeByte(entry.lockedAxes());out.writeByte(entry.overlapRule().ordinal());out.writeInt(entry.regions().size());
                 for(var override:entry.regions().entrySet()){out.writeUTF(override.getKey());var r=override.getValue();out.writeInt(r.position().x());out.writeInt(r.position().y());out.writeInt(r.position().z());out.writeByte(r.quarterTurns());out.writeBoolean(r.mirrorX());out.writeBoolean(r.mirrorZ());out.writeBoolean(r.enabled());out.writeBoolean(r.locked());}
-                out.writeByte(entry.displayFilter().mode().ordinal());out.writeInt(entry.displayFilter().blockIds().size());
-                for(String id:entry.displayFilter().blockIds())out.writeUTF(id);
+                out.writeByte(entry.displayFilter().mode().ordinal());
+                filterIds(out,entry.displayFilter().blacklist());filterIds(out,entry.displayFilter().whitelist());
             }
             CRC32 crc = new CRC32(); crc.update(bytes.toByteArray()); out.writeLong(crc.getValue());
         }
         if (bytes.size() > MAX_BYTES) throw new IOException("Placement settings exceed limit");
         return bytes.toByteArray();
     }
+    private static Set<String> filterIds(DataInputStream in)throws IOException{
+        int n=in.readInt();if(n<0||n>BlockDisplayFilter.MAX_IDS||n>(in.available()-Long.BYTES)/5)throw new IOException("Invalid display filter count");
+        Set<String> ids=new LinkedHashSet<>();int characters=0;
+        for(int j=0;j<n;j++){
+            String raw=in.readUTF(),key=BlockDisplayFilter.canonicalId(raw);
+            if(!raw.equals(key)||!ids.add(key))throw new IOException("Invalid or duplicate display filter ID");
+            characters+=key.length();if(characters>BlockDisplayFilter.MAX_ID_CHARACTERS)throw new IOException("Display filter exceeds budget");
+        }
+        return ids;
+    }
+    private static void filterIds(DataOutput out,Set<String> ids)throws IOException{out.writeInt(ids.size());for(String id:ids)out.writeUTF(id);}
     private static UUID uuid(DataInput in) throws IOException { return new UUID(in.readLong(), in.readLong()); }
     private static void uuid(DataOutput out, UUID id) throws IOException { out.writeLong(id.getMostSignificantBits()); out.writeLong(id.getLeastSignificantBits()); }
 }

@@ -44,6 +44,24 @@ public final class UiDesignChecks {
         }
         check(Double.isFinite(UiMotion.easeOut(Double.NaN)),"Invalid progress cannot poison rendering coordinates");
 
+        long motionStart=1_000_000_000L;
+        var reversible=new UiMotion();near(reversible.hover(true,motionStart),0,"Starting an expansion does not jump to its endpoint");
+        double expanding=reversible.hover(true,motionStart+80_000_000L);
+        check(expanding>0&&expanding<1,"Expansion progresses between settled endpoints");
+        near(reversible.hover(false,motionStart+80_000_000L),expanding,"Reversing toward collapsed at the same instant retains the displayed width");
+        double collapsing=reversible.hover(false,motionStart+100_000_000L);
+        check(collapsing>0&&collapsing<expanding,"Collapse continues smoothly from the current expansion");
+        near(reversible.hover(true,motionStart+100_000_000L),collapsing,"Restarting mid-collapse does not reset the animation");
+        double resumed=reversible.hover(true,motionStart+120_000_000L);
+        check(resumed>collapsing&&resumed<1,"Resumed expansion approaches the running state without overshoot");
+        var sparse=new UiMotion();var dense=new UiMotion();sparse.hover(true,motionStart);dense.hover(true,motionStart);
+        double sparseValue=0,denseValue=0;
+        for(int i=1;i<=8;i++)sparseValue=sparse.hover(true,motionStart+120_000_000L*i/8);
+        for(int i=1;i<=18;i++)denseValue=dense.hover(true,motionStart+120_000_000L*i/18);
+        near(sparseValue,denseValue,"Equal elapsed animation time produces equal progress at different rendering rates");
+        var pausedFrame=new UiMotion();var cappedFrame=new UiMotion();pausedFrame.hover(true,motionStart);cappedFrame.hover(true,motionStart);
+        near(pausedFrame.hover(true,motionStart+2_000_000_000L),cappedFrame.hover(true,motionStart+100_000_000L),"Returning after a hidden or stalled frame respects the bounded time step");
+
         for(double[] direction:new double[][]{{11,0},{-11,0},{0,7}}){
             var start=UiWindowMotion.sample(0,direction[0],direction[1]);near(start.x(),direction[0],"Navigation keeps its requested initial X");near(start.y(),direction[1],"Navigation keeps its requested initial Y");near(start.alpha(),0,"Navigation starts transparent");
             var backwardsTime=UiWindowMotion.sample(-1,direction[0],direction[1]);check(backwardsTime.equals(start),"Clock-before-start samples stay at the initial frame");

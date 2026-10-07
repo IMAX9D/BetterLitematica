@@ -4,14 +4,19 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /** Visual block-type selection only; never removes source data or construction requirements. */
-public record BlockDisplayFilter(Mode mode,Set<String> blockIds) {
+public record BlockDisplayFilter(Mode mode,Set<String> blacklist,Set<String> whitelist) {
     public enum Mode { OFF, BLACKLIST, WHITELIST }
     public static final int MAX_IDS=65536,MAX_ID_LENGTH=1024,MAX_ID_CHARACTERS=1<<20;
     private static final Pattern ID=Pattern.compile("[a-z0-9_.-]+:[a-z0-9_./-]+");
     public static final BlockDisplayFilter OFF=new BlockDisplayFilter(Mode.OFF,Set.of());
 
+    /** Legacy shared-selection input belongs only to its active mode; OFF retains it as blacklist. */
+    public BlockDisplayFilter(Mode mode,Set<String> blockIds){this(mode,mode==Mode.WHITELIST?Set.of():blockIds,mode==Mode.WHITELIST?blockIds:Set.of());}
     public BlockDisplayFilter {
-        Objects.requireNonNull(mode,"mode");Objects.requireNonNull(blockIds,"blockIds");
+        Objects.requireNonNull(mode,"mode");blacklist=validated(blacklist);whitelist=validated(whitelist);
+    }
+    private static Set<String> validated(Set<String> blockIds){
+        Objects.requireNonNull(blockIds,"blockIds");
         if(blockIds.size()>MAX_IDS)throw new IllegalArgumentException("Too many display-filter blocks");
         var copy=new TreeSet<String>();int characters=0;
         for(String input:blockIds){
@@ -19,7 +24,7 @@ public record BlockDisplayFilter(Mode mode,Set<String> blockIds) {
             if(copy.add(id)){characters+=id.length();if(characters>MAX_ID_CHARACTERS)throw new IllegalArgumentException("Display-filter block IDs exceed budget");}
         }
         // Stable serialization order, with constant-time membership on the rendering path.
-        blockIds=Collections.unmodifiableSet(new LinkedHashSet<>(copy));
+        return Collections.unmodifiableSet(new LinkedHashSet<>(copy));
     }
     public static String canonicalId(String id){
         Objects.requireNonNull(id,"block ID");
@@ -29,7 +34,9 @@ public record BlockDisplayFilter(Mode mode,Set<String> blockIds) {
         return id;
     }
     /** Input is a canonical registry ID. No parsing or allocation is performed per rendered block. */
-    public boolean allows(String canonicalBlockId){return mode==Mode.OFF||(blockIds.contains(canonicalBlockId)==(mode==Mode.WHITELIST));}
+    public boolean allows(String canonicalBlockId){return switch(mode){case OFF->true;case BLACKLIST->!blacklist.contains(canonicalBlockId);case WHITELIST->whitelist.contains(canonicalBlockId);};}
+    /** Compatibility view only. Switching modes never transfers this selection to the other list. */
+    public Set<String> blockIds(){return mode==Mode.WHITELIST?whitelist:blacklist;}
     public boolean allows(BlockStateSpec state){return allows(state.name());}
-    public BlockDisplayFilter mode(Mode next){return next==mode?this:new BlockDisplayFilter(next,blockIds);}
+    public BlockDisplayFilter mode(Mode next){return next==mode?this:new BlockDisplayFilter(next,blacklist,whitelist);}
 }

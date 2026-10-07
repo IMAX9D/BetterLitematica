@@ -13,7 +13,8 @@ final class BlockDisplayFilterScreen extends MenuScreen {
     private final UUID id;
     private final long epoch;
     private final List<BlockFilterGrid.Entry> registry;
-    private final Set<String> selected=new HashSet<>();
+    private final Set<String> blacklist=new HashSet<>(),whitelist=new HashSet<>();
+    private Set<String> selected=blacklist;
     private BlockDisplayFilter.Mode mode;
     private String query="",error="";
     private String[] terms=new String[0];
@@ -21,14 +22,14 @@ final class BlockDisplayFilterScreen extends MenuScreen {
     private BlockFilterGrid grid;
     private OverlayLabel count;
     private ButtonWidget selectResults,clear,save;
-    BlockDisplayFilterScreen(Screen parent,ProjectionController controller,UUID id){super("方块显示","",parent,controller,true);this.id=id;epoch=controller.sessionEpoch();var placement=controller.placement(id);var filter=placement==null?BlockDisplayFilter.OFF:placement.displayFilter();mode=filter.mode();selected.addAll(filter.blockIds());registry=Registries.BLOCK.stream().map(block->new BlockFilterGrid.Entry(Registries.BLOCK.getId(block).toString(),block.getName().getString(),new ItemStack(block.asItem()))).sorted(Comparator.comparing(BlockFilterGrid.Entry::id)).toList();}
+    BlockDisplayFilterScreen(Screen parent,ProjectionController controller,UUID id){super("方块显示","",parent,controller,true);this.id=id;epoch=controller.sessionEpoch();var placement=controller.placement(id);var filter=placement==null?BlockDisplayFilter.OFF:placement.displayFilter();mode=filter.mode();blacklist.addAll(filter.blacklist());whitelist.addAll(filter.whitelist());selected=mode==BlockDisplayFilter.Mode.WHITELIST?whitelist:blacklist;registry=Registries.BLOCK.stream().map(block->new BlockFilterGrid.Entry(Registries.BLOCK.getId(block).toString(),block.getName().getString(),new ItemStack(block.asItem()))).sorted(Comparator.comparing(BlockFilterGrid.Entry::id)).toList();}
     @Override protected String backLabel(){return "放弃";}
     @Override protected void runAction(Runnable action){try{error="";action.run();}catch(RuntimeException ex){error=ex.getMessage()==null?"操作失败":ex.getMessage();}}
     @Override protected String displayedStatus(){return error;}
     @Override protected int statusColor(){return UiTheme.ERROR;}
     @Override protected void buildMenu(){var placement=controller.placement(id);if(placement==null){label("投影已移除",0);return;}
         addBody(new OverlayLabel(left,innerWidth,placement.name()),0);
-        var modes=BlockDisplayFilter.Mode.values();String[] names={"关闭","黑名单","白名单"};for(int i=0;i<modes.length;i++){var value=modes[i];tabAt(names[i],cellX(i,3),24,cellWidth(3),()->{mode=value;refresh();},mode==value);}
+        var modes=BlockDisplayFilter.Mode.values();String[] names={"关闭","黑名单","白名单"};for(int i=0;i<modes.length;i++){var value=modes[i];tabAt(names[i],cellX(i,3),24,cellWidth(3),()->{if(mode==value)return;mode=value;selected=mode==BlockDisplayFilter.Mode.WHITELIST?whitelist:blacklist;grid=null;refresh();},mode==value);}
         var search=fieldAt("搜索",query,left,54,innerWidth-134,128);
         buttonAt(selectedOnly?"已选":"全部",left+innerWidth-126,68,126,()->{selectedOnly=!selectedOnly;refresh();refilter(true);},true,false);
         selectResults=buttonAt("全选搜索结果",left,98,128,this::selectResults,true,false);
@@ -43,7 +44,7 @@ final class BlockDisplayFilterScreen extends MenuScreen {
     private void refilter(boolean reset){if(grid==null)return;grid.rows(registry.stream().filter(this::matches).filter(e->!selectedOnly||selected.contains(e.id())).toList(),reset);count.setMessage(Text.literal("已选 "+selected.size()));selectResults.active=registry.stream().anyMatch(e->matches(e)&&!selected.contains(e.id()));clear.active=!selected.isEmpty();error="";}
     private void toggle(String blockId){if(!selected.remove(blockId))selected.add(blockId);refilter(false);}
     private void selectResults(){for(var entry:registry)if(matches(entry))selected.add(entry.id());refilter(false);}
-    private void save(){if(epoch!=controller.sessionEpoch()||controller.placement(id)==null)throw new IllegalStateException("投影已移除");controller.placementDisplayFilter(id,new BlockDisplayFilter(mode,selected));super.close();}
+    private void save(){if(epoch!=controller.sessionEpoch()||controller.placement(id)==null)throw new IllegalStateException("投影已移除");controller.placementDisplayFilter(id,new BlockDisplayFilter(mode,blacklist,whitelist));super.close();}
     @Override protected void updateMenu(){if(controller.placement(id)==null){error="投影已移除";if(grid!=null)grid.active=false;if(save!=null)save.active=false;if(selectResults!=null)selectResults.active=false;if(clear!=null)clear.active=false;}}
     @Override public boolean keyPressed(int key,int scan,int modifiers){if(getFocused()==grid&&grid!=null&&grid.keyPressed(key,scan,modifiers))return true;return super.keyPressed(key,scan,modifiers);}
     @Override public boolean mouseReleased(double x,double y,int button){boolean owned=grid!=null&&grid.mouseReleased(0,0,button);return super.mouseReleased(x,y,button)||owned;}

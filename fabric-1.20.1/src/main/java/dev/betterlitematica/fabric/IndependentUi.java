@@ -221,6 +221,8 @@ final class IndependentUi implements AutoCloseable {
     int startForCursor(String text,int cursor,double width){return font.startForCursor(text,cursor,textPixels,(float)(width*view.scale()));}
     String fittingText(String text,double width){return font.trim(text,textPixels,(float)Math.min(rasterWidthLimit(textPixels),width*view.scale()),false);}
     void rawText(String text,double x,double y,int color){draw(text,px(x),py(y),textPixels,color);}
+    /** Queue a stable label before its first animated reveal, using the existing bounded worker. */
+    void prepareText(String text){if(!text.isEmpty())texture(text,textPixels);}
     double lineHeight(){return font.lineHeight(textPixels)/view.scale();}
     double titleLineHeight(){return font.lineHeight(UiTypography.titlePixels(view.scale(),font))/view.scale();}
     double measureTitle(String text){if(!ready())return 0;int size=UiTypography.titlePixels(view.scale(),font);return measurePixels(bounded(text),size)/view.scale();}

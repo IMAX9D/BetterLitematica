@@ -21,7 +21,9 @@ record HudLayout(UiViewport viewport,double left,double top,double right,double 
         double information=doubleInformation?Math.min(228,(available-status-GAP*2)/2):228;
         return new HudLayout(view,left,top,right,bottom,status,information);
     }
-    double toolBottom(){return bottom-32;}
+    private double toolEdgePixels(){return Math.max(8,5*viewport.scale());}
+    double toolLeft(){return viewport.localPixelX(toolEdgePixels());}
+    double toolBottom(){return viewport.localPixelY(viewport.pixelHeight()-toolEdgePixels());}
     static void card(IndependentUi ui,double x,double y,double width,double height){
         double radius=UiTheme.CARD_RADIUS;
         ui.shadow(x,y,x+width,y+height,radius);
