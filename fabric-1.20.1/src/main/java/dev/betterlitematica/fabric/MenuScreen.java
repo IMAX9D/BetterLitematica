@@ -25,8 +25,10 @@ abstract class MenuScreen extends Screen {
     private final UiWindowMotion motion=new UiWindowMotion();
     private boolean presented;
     private double animatedX,animatedY;
+    private BlueprintPreviewPanel previewCapture;
     MenuScreen(String title,String description,Screen parent,ProjectionController controller,boolean wide){super(Text.literal(title));this.description=description;this.parent=parent;this.controller=controller;this.wide=wide;sessionEpoch=controller.sessionEpoch();}
     @Override protected final void init(){
+        cancelPreviewCapture();
         if(!presented){var previous=departed.get();motion.enter(previous!=null&&previous.previewControl()==null&&System.nanoTime()-departureTime<500_000_000L,previous!=null&&previous.parent==this);presented=true;}
         Item previousFocus=body.stream().filter(i->i.widget==getFocused()&&i.widget instanceof OverlayTextField).findFirst().orElse(null);
         int cursor=previousFocus==null?0:((OverlayTextField)previousFocus.widget).getCursor(),anchor=previousFocus==null?0:((OverlayTextField)previousFocus.widget).selectionAnchor();
@@ -117,14 +119,40 @@ abstract class MenuScreen extends Screen {
     protected final boolean hits(ClickableWidget widget,double x,double y){var v=viewport();return widget!=null&&widget.isMouseOver(inputX(v,x),inputY(v,y));}
     protected final boolean controlHit(double x,double y){return footerHit(x,y)||body.stream().anyMatch(i->hits(i.widget,x,y));}
     protected final boolean footerHit(double x,double y){return footer.stream().anyMatch(w->hits(w,x,y));}
-    @Override public boolean mouseClicked(double x,double y,int button){var v=viewport();return super.mouseClicked(inputX(v,x),inputY(v,y),button);}
-    @Override public boolean mouseReleased(double x,double y,int button){var v=viewport();return super.mouseReleased(inputX(v,x),inputY(v,y),button);}
+    private void cancelPreviewCapture(){if(previewCapture!=null){previewCapture.cancelCapture();previewCapture=null;setDragging(false);}}
+    private void checkPreviewCapture(){
+        if(previewCapture==null)return;previewCapture.pollCapture();
+        if(!previewCapture.capturing()||!children().contains(previewCapture)||previewControl()!=null)cancelPreviewCapture();
+    }
+    @Override public boolean mouseClicked(double x,double y,int button){
+        var v=viewport();x=inputX(v,x);y=inputY(v,y);checkPreviewCapture();
+        if(previewCapture!=null)return true;
+        if(previewControl()==null)for(var item:body)if(item.widget instanceof BlueprintPreviewPanel panel&&panel.mouseClicked(x,y,button)){
+            previewCapture=panel;setFocused(panel);setDragging(button==0);return true;
+        }
+        return super.mouseClicked(x,y,button);
+    }
+    @Override public boolean mouseReleased(double x,double y,int button){
+        // Release goes to its owner even beyond the preview or menu; no hovered-child lookup.
+        if(previewCapture!=null){previewCapture.releaseDrag(button);if(!previewCapture.capturing()){previewCapture=null;setDragging(false);}return true;}
+        var v=viewport();return super.mouseReleased(inputX(v,x),inputY(v,y),button);
+    }
     @Override public void mouseMoved(double x,double y){var v=viewport();super.mouseMoved(inputX(v,x),inputY(v,y));}
-    @Override public boolean mouseDragged(double x,double y,int button,double dx,double dy){var v=viewport();return super.mouseDragged(inputX(v,x),inputY(v,y),button,v.deltaX(dx),v.deltaY(dy));}
-    @Override public final boolean mouseScrolled(double x,double y,double amount){var v=viewport();x=inputX(v,x);y=inputY(v,y);if(x>=scrollLeft()&&x<=scrollRight()+8&&y>=scrollTop()&&y<bodyBottom&&maxScroll()>0){scroll-=Math.round(amount*26);position();return true;}return super.mouseScrolled(x,y,amount);}
+    @Override public boolean mouseDragged(double x,double y,int button,double dx,double dy){
+        var v=viewport();checkPreviewCapture();
+        if(previewCapture!=null){previewCapture.mouseDragged(inputX(v,x),inputY(v,y),button,v.deltaX(dx),v.deltaY(dy));return true;}
+        return super.mouseDragged(inputX(v,x),inputY(v,y),button,v.deltaX(dx),v.deltaY(dy));
+    }
+    @Override public final boolean mouseScrolled(double x,double y,double amount){
+        var v=viewport();x=inputX(v,x);y=inputY(v,y);
+        if(previewControl()==null)for(var item:body)if(item.widget instanceof BlueprintPreviewPanel panel&&panel.mouseScrolled(x,y,amount))return true;
+        if(previewCapture!=null)return true;
+        if(x>=scrollLeft()&&x<=scrollRight()+8&&y>=scrollTop()&&y<bodyBottom&&maxScroll()>0){scroll-=Math.round(amount*26);position();return true;}return super.mouseScrolled(x,y,amount);
+    }
     @Override public boolean keyPressed(int key,int scan,int modifiers){if(getFocused() instanceof OverlayList list&&list.keyPressed(key,scan,modifiers))return true;if(getFocused() instanceof VerificationList results&&results.keyPressed(key,scan,modifiers))return true;if(getFocused() instanceof MaterialGrid grid&&grid.keyPressed(key,scan,modifiers))return true;if(getFocused() instanceof BrowserGrid grid&&grid.keyPressed(key,scan,modifiers))return true;if(key==org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_DOWN||key==org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_UP){scroll+=(key==org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_DOWN?1:-1)*Math.max(26,bodyBottom-bodyTop-26);position();return true;}return super.keyPressed(key,scan,modifiers);}
-    @Override public void tick(){if(sessionEpoch!=controller.sessionEpoch()){client.setScreen(null);return;}if(getFocused()!=null&&!children().contains(getFocused()))setFocused(null);for(var item:List.copyOf(body))if(item.widget instanceof TextFieldWidget field)field.tick();updateMenu();}
+    @Override public void tick(){if(sessionEpoch!=controller.sessionEpoch()){client.setScreen(null);return;}checkPreviewCapture();if(getFocused()!=null&&!children().contains(getFocused()))setFocused(null);for(var item:List.copyOf(body))if(item.widget instanceof TextFieldWidget field)field.tick();updateMenu();}
     @Override public final void render(DrawContext ctx,int mouseX,int mouseY,float delta){
+        checkPreviewCapture();
         var v=viewport();var window=client.getWindow();
         var preview=previewControl();
         var frame=motion.frame();animatedX=preview==null?frame.x():0;animatedY=preview==null?frame.y():0;
@@ -179,7 +207,7 @@ abstract class MenuScreen extends Screen {
         for(var widget:footer)widget.render(ctx,mouseX,mouseY,delta);
         String status=displayedStatus();
         if(!status.isEmpty()){int color=statusColor();double sy=panelBottom-15;ui.roundRect(left,sy+ui.lineHeight()/2-1.5,left+3,sy+ui.lineHeight()/2+1.5,1.5,color==UiTheme.MUTED?UiTheme.ACCENT:color);ui.text(status,left+8,sy,innerWidth-8,color);}
-        for(var entry:hints.entrySet())if(entry.getKey().visible&&entry.getKey().isMouseOver(mouseX,mouseY)){
+        for(var entry:hints.entrySet())if(entry.getKey().visible&&entry.getKey().isMouseOver(mouseX,mouseY)&&(!(entry.getKey() instanceof BlueprintPreviewPanel panel)||!panel.capturing())){
             String[] lines=entry.getValue().split("\n");double w=Arrays.stream(lines).mapToDouble(ui::measure).max().orElse(0)+20,h=lines.length*(ui.lineHeight()+2)+10;
             double x=Math.max(8,Math.min(width-w-8,entry.getKey().getX()+entry.getKey().getWidth()/2d-w/2)),y=entry.getKey().getY()-h-6;if(y<8)y=entry.getKey().getY()+entry.getKey().getHeight()+6;
             tooltip(ui,x,y,w,h);for(int i=0;i<lines.length;i++)ui.text(lines[i],x+9,y+5+i*(ui.lineHeight()+2),w-18,UiTheme.TEXT);return;
@@ -207,7 +235,7 @@ abstract class MenuScreen extends Screen {
         ui.roundRect(l,t,r,b,UiTheme.BUTTON_RADIUS,UiTheme.INPUT);ui.roundFrame(l,t,r,b,UiTheme.BUTTON_RADIUS,field.isFocused()?UiTheme.ACCENT:UiTheme.BORDER);
     }
     @Override public void close(){client.setScreen(parent);}
-    @Override public void removed(){presented=false;departed=new java.lang.ref.WeakReference<>(this);departureTime=System.nanoTime();super.removed();}
+    @Override public void removed(){cancelPreviewCapture();presented=false;departed=new java.lang.ref.WeakReference<>(this);departureTime=System.nanoTime();super.removed();}
     @Override public boolean shouldPause(){return false;}
     enum Look { STANDARD, PRIMARY, GHOST, TAB, TAB_SELECTED }
     static final class MenuButton extends ButtonWidget {

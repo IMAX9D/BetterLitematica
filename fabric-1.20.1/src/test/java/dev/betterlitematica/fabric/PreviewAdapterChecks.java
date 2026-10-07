@@ -61,6 +61,7 @@ final class PreviewAdapterChecks {
             byte[] packed=Files.readAllBytes(modelFile);packed[packed.length-8]^=1;Files.write(modelFile,packed);
             finish(previews,previews.interactive(ref));check(previews.stats().modelBuilds()==buildCount+1,"Corrupt compressed model is rebuilt from source");
             check(original.equals(SchematicImporter.sha256(source,Cancellation.NEVER)),"Interactive rotation and repair preserve source bytes");
+            adaptive(root);
         }finally{try(var files=Files.walk(root)){for(Path path:files.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);}}
         return checks;
     }
@@ -68,6 +69,59 @@ final class PreviewAdapterChecks {
         var region=new Region("test",new Vec3i(-3,2,-4),new Vec3i(3,3,2));int[] blocks=new int[18];blocks[0]=1;blocks[2]=2;blocks[17]=3;
         var palette=List.of(BlockStateSpec.AIR,BlockStateSpec.parse("minecraft:red_concrete"),BlockStateSpec.parse("minecraft:lime_concrete"),BlockStateSpec.parse("minecraft:blue_concrete"));
         return LitematicExport.create("preview","test",3465,Vec3i.ZERO,List.of(new LitematicExport.Capture(region,palette,blocks,List.of(),List.of(),List.of(),List.of())));
+    }
+    private static void adaptive(Path root)throws Exception{
+        Path source=root.resolve("fine-source.litematic"),cache=root.resolve("fine-service");
+        int[] values=new int[320*16*8];for(int i=0;i<values.length;i++)values[i]=(i%320&1)==0?1:2;
+        var palette=List.of(BlockStateSpec.AIR,BlockStateSpec.parse("minecraft:red_concrete"),BlockStateSpec.parse("minecraft:lime_concrete"));
+        NbtWriter.writeNew(source,LitematicExport.create("fine","test",3465,Vec3i.ZERO,List.of(new LitematicExport.Capture(new Region("stripes",new Vec3i(-160,-39,-4),new Vec3i(320,16,8)),palette,values,List.of(),List.of(),List.of(),List.of()))),Cancellation.NEVER);
+        String sha=SchematicImporter.sha256(source,Cancellation.NEVER);var reference=new TemporarySources.Reference(source,root,false);var identity=new PlacementTransform(Vec3i.ZERO,0,false,false);
+        try(var previews=new FilePreviews(cache)){
+            var loaded=finish(previews,previews.interactive(reference));
+            var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
+            var worker=executor(previews,"worker");var barrier=worker.submit(()->{entered.countDown();try{release.await();}catch(InterruptedException e){Thread.currentThread().interrupt();}});
+            check(entered.await(5,TimeUnit.SECONDS),"Fine-build gate acquired without changing production scheduling");
+            try(var orbit=previews.orbit(loaded)){
+                long sequence=orbit.request(0,0,3,.03,-.02,256,false,identity);
+                var base=frame(orbit,sequence);
+                check(!base.detailed()&&base.zoom()==3&&base.panX()==.03&&base.panY()==-.02,"Base frame responds while fine source worker is busy");
+                release.countDown();barrier.get(5,TimeUnit.SECONDS);
+                var fine=detailFrame(previews,orbit,sequence);
+                check(fine.sequence()==base.sequence()&&fine.detailed(),"Fine completion upgrades the unchanged camera sequence");
+                check(!Arrays.equals(base.pixels(),fine.pixels()),"Fine completion restores source detail rather than enlarging the base raster");
+                check(previews.stats().detailBuilds()==1&&previews.stats().sourceReads()==2,"First refinement reads the full source once beyond the base build");
+                long dragSequence=orbit.request(0,0,3,.03,-.02,256,true,identity);
+                var duringDrag=frame(orbit,dragSequence);
+                check(duringDrag.detailed()&&Arrays.equals(fine.pixels(),duringDrag.pixels()),"Navigation retains resident fine geometry instead of reverting to chunky drag voxels");
+                long last=0;for(int i=0;i<80;i++)last=orbit.request(i*.02,.1,2+i*.01,(i%5)*.01,0,384,true,identity);
+                var pose=new PlacementTransform(new Vec3i(99,-39,777),1,true,false);
+                last=orbit.request(-.8,.3,2.2,-.06,.04,512,false,pose);
+                var finalFrame=detailFrame(previews,orbit,last);
+                check(finalFrame.sequence()==last&&finalFrame.side()==512&&finalFrame.pixels().length==512*512&&finalFrame.yaw()==-.8&&finalFrame.zoom()==2.2&&finalFrame.panX()==-.06,"Latest camera wins rapid rotation, zoom, pan and viewport changes");
+                check(finalFrame.transform().equals(new PlacementTransform(Vec3i.ZERO,1,true,false)),"Published pose retains root orientation and removes world translation");
+                check(previews.stats().detailBuilds()==1&&previews.stats().sourceReads()==2,"Camera and pose changes reuse fine source geometry");
+            }finally{release.countDown();}
+            check(previews.stats().orbits()==0,"Fine orbit releases ownership on close");
+        }
+        try(var restarted=new FilePreviews(cache)){
+            var loaded=finish(restarted,restarted.interactive(reference));
+            try(var orbit=restarted.orbit(loaded)){
+                long sequence=orbit.request(0,0,3,0,0,256,false,identity);detailFrame(restarted,orbit,sequence);
+                check(restarted.stats().detailHits()==1&&restarted.stats().detailBuilds()==0&&restarted.stats().sourceReads()==0,"Fresh service reads both detail and base disk models without reparsing source");
+            }
+            var abandoned=restarted.orbit(loaded);abandoned.request(.8,.4,16,0,0,1024,false,identity);abandoned.close();
+            executor(restarted,"worker").submit(()->{}).get(5,TimeUnit.SECONDS);
+            executor(restarted,"orbitWorker").submit(()->{}).get(5,TimeUnit.SECONDS);
+            check(abandoned.poll()==null&&abandoned.request(0,0,1,0,0,256,false,identity)==0&&restarted.stats().orbits()==0,"Closed fine request cannot publish or accept later camera work after workers drain");
+        }
+        check(sha.equals(SchematicImporter.sha256(source,Cancellation.NEVER)),"Fine build, cache reuse and cancellation preserve original source bytes");
+        try(var paths=Files.walk(cache)){check(paths.noneMatch(p->p.toString().endsWith(".part")),"Fine cache publication and cancellation leave no partial files");}
+    }
+    private static ExecutorService executor(FilePreviews previews,String name)throws Exception{var field=FilePreviews.class.getDeclaredField(name);field.setAccessible(true);return (ExecutorService)field.get(previews);}
+    private static FilePreviews.Orbit.Frame detailFrame(FilePreviews previews,FilePreviews.Orbit orbit,long sequence)throws Exception{
+        long deadline=System.nanoTime()+15_000_000_000L;
+        while(System.nanoTime()<deadline){previews.tick();var frame=orbit.poll();if(frame!=null&&frame.sequence()==sequence&&frame.detailed())return frame;Thread.sleep(2);}
+        throw new AssertionError("Fine frame never completed for sequence "+sequence);
     }
     private static <T>T finish(FilePreviews previews,CompletableFuture<T> result)throws Exception{
         long deadline=System.nanoTime()+15_000_000_000L;

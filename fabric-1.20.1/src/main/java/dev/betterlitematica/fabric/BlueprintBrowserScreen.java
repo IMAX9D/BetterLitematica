@@ -48,7 +48,8 @@ final class BlueprintBrowserScreen extends MenuScreen {
         if(grid==null)grid=new BrowserGrid(left,gridWidth,bodyHeight,file->controller.action(()->click(file)));
         addBody(grid,46);
         if(preview==null){preview=new BlueprintPreviewPanel(controller,left+gridWidth+14,innerWidth-gridWidth-14,bodyHeight);preview.selected(selectedName);requestPreview();}
-        addBody(preview,46);
+        preview.layout(left+gridWidth+14,innerWidth-gridWidth-14,bodyHeight);addBody(preview,46);
+        hint(preview,"左键旋转 · 滚轮缩放 · 中键平移 · 双击复位");
         search.setChangedListener(this::searchChanged);rows();
         manage=fixed("文件管理",0,80,()->client.setScreen(new SchematicFileScreen(this,controller,selectedPath)));
         fixed("新建目录",88,80,()->client.setScreen(new NewDirectoryScreen(this,controller,directory,()->{read(true);rows();})));
@@ -72,8 +73,6 @@ final class BlueprintBrowserScreen extends MenuScreen {
         }
     }
     @Override protected String statusLine(){return status;}
-    // Vanilla releases the hovered child, which can differ from the child that owns a drag.
-    @Override public boolean mouseReleased(double x,double y,int button){boolean released=preview!=null&&preview.releaseDrag(button);return super.mouseReleased(x,y,button)||released;}
     @Override public void removed(){cancelRead();cancelPreview();preview=null;reloadOnInit=true;super.removed();}
     @Override public void close(){cancelRead();cancelPreview();super.close();}
 }

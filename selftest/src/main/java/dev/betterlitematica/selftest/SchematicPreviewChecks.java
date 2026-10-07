@@ -98,7 +98,65 @@ public final class SchematicPreviewChecks {
         var configuredCache=new OrbitPreviewCache(temp.resolve("configured-cache"));String configuredKey=SchematicPreview.configuredKey(sha,overrides);configuredCache.write(configuredKey,configuredModel,Cancellation.NEVER);var reopened=new OrbitPreviewCache(temp.resolve("configured-cache")).read(configuredKey,Cancellation.NEVER);check(reopened!=null&&Arrays.equals(SchematicPreview.renderOrbit(reopened,.7,.4,false,Cancellation.NEVER),SchematicPreview.renderOrbit(configuredModel,.7,.4,false,Cancellation.NEVER)),"Fresh cache instance restores configured model");
         for(int turn=0;turn<4;turn++)for(boolean mx:new boolean[]{false,true})for(boolean mz:new boolean[]{false,true}){var pose=new PlacementTransform(Vec3i.ZERO,turn,mx,mz);var posed=SchematicPreview.posedOrbitModel(cubeModel,pose,Cancellation.NEVER);var shiftedPose=new PlacementTransform(new Vec3i(-400,500,123),turn,mx,mz);check(Arrays.equals(SchematicPreview.renderOrbit(posed,.8,.5,false,Cancellation.NEVER),SchematicPreview.renderOrbit(SchematicPreview.posedOrbitModel(cubeModel,shiftedPose,Cancellation.NEVER),.8,.5,false,Cancellation.NEVER)),"Root pose translation does not change pixels "+pose);}
         cancelled(()->SchematicPreview.readGeometry(placedSource,overrides,()->true));cancelled(()->SchematicPreview.posedOrbitModel(configuredModel,mirror,()->true));invalidOrbit(Arrays.copyOf(configuredBytes.toByteArray(),configuredBytes.size()-1));
+        adaptive(temp);
         return checks;
+    }
+    private static int[] bounds(int[] pixels,int side){int x0=side,y0=side,x1=-1,y1=-1;for(int i=0;i<pixels.length;i++)if((pixels[i]>>>24)!=0){x0=Math.min(x0,i%side);y0=Math.min(y0,i/side);x1=Math.max(x1,i%side);y1=Math.max(y1,i/side);}return new int[]{x0,y0,x1,y1};}
+    private static void adaptive(Path temp)throws Exception{
+        var camera=PreviewCamera.DEFAULT.pan(30,-15,300);check(camera.panX()==.1&&camera.panY()==-.05&&camera.yaw()==PreviewCamera.DEFAULT.yaw(),"Middle drag changes only normalized camera pan");
+        var zoomCamera=camera.scroll(3,.2,-.1);
+        check(Math.abs((.2-camera.panX())/camera.zoom()-(.2-zoomCamera.panX())/zoomCamera.zoom())<1e-12&&Math.abs((-.1-camera.panY())/camera.zoom()-(-.1-zoomCamera.panY())/zoomCamera.zoom())<1e-12,"Wheel zoom retains the source point under the cursor anchor");
+        var roundTrip=zoomCamera.scroll(-3,.2,-.1);check(Math.abs(roundTrip.zoom()-camera.zoom())<1e-12&&Math.abs(roundTrip.panX()-camera.panX())<1e-12&&Math.abs(roundTrip.panY()-camera.panY())<1e-12,"Unclipped zoom reverses without camera drift");
+        check(camera.scroll(100,0,0).zoom()==16&&camera.scroll(-100,0,0).zoom()==.5,"Zoom extremes clamp to bounded model magnification");
+        check(camera.pan(1e8,-1e8,100).panX()==16&&camera.pan(1e8,-1e8,100).panY()==-16,"Large middle drags stay bounded");
+        check(camera.rotate(0,1e6,100).pitch()==PreviewCamera.MAX_PITCH&&camera.rotate(0,-1e6,100).pitch()==-PreviewCamera.MAX_PITCH,"Rotation cannot flip over the poles");
+        for(Task invalid:List.<Task>of(()->camera.pan(1,1,0),()->camera.rotate(Double.NaN,0,300),()->camera.scroll(1,Double.POSITIVE_INFINITY,0),()->new PreviewCamera(0,0,Double.NaN,0,0))){try{invalid.run();throw new AssertionError("Nonfinite preview camera accepted");}catch(IllegalArgumentException expected){checks++;}}
+        // Every coarse cell ends with green; only rereading the real packed source can recover red.
+        int[] stripes=new int[320*16*8];for(int i=0;i<stripes.length;i++)stripes[i]=(i%320&1)==0?1:2;
+        var source=root(Map.of("stripes",region(-160,-39,-4,320,16,8,stripes)));
+        var sourceRegion=NbtReader.compound(NbtReader.compound(source.get("Regions"),"Regions").get("stripes"),"stripes");
+        long[] words=((long[])sourceRegion.get("BlockStates")).clone();
+        var baseGeometry=SchematicPreview.readGeometry(source,Cancellation.NEVER);
+        var detailGeometry=SchematicPreview.readGeometry(source,Map.of(),SchematicPreview.DETAIL_LOD,Cancellation.NEVER);
+        int[] colors={0xffff2020,0xff20ff20,0xff2020ff};
+        var base=SchematicPreview.createOrbitModel(baseGeometry,colors,Cancellation.NEVER);
+        var fine=SchematicPreview.createOrbitModel(detailGeometry,colors,Cancellation.NEVER);
+        int[] coarsePixels=SchematicPreview.renderOrbit(base,base,0,0,2,0,0,256,false,Cancellation.NEVER);
+        int[] finePixels=SchematicPreview.renderOrbit(fine,base,0,0,2,0,0,256,false,Cancellation.NEVER);
+        check(center(coarsePixels,0)[2]==0&&center(finePixels,0)[2]>100,"Fine source reconstruction restores narrow red stripes lost by the 160-cell model");
+        check(center(finePixels,1)[2]>100,"Recovered detail retains neighboring green stripes");
+        png(temp.resolve("adaptive-base.png"),coarsePixels);png(temp.resolve("adaptive-detail.png"),finePixels);
+        check(Arrays.equals(words,(long[])sourceRegion.get("BlockStates")),"Refinement and camera rendering never mutate packed source");
+        for(double yaw:new double[]{0,.7,-1.1}){
+            int[] low=SchematicPreview.renderOrbit(base,base,yaw,.23,.6,0,0,256,false,Cancellation.NEVER);
+            int[] high=SchematicPreview.renderOrbit(fine,base,yaw,.23,.6,0,0,256,false,Cancellation.NEVER);
+            check(Arrays.equals(bounds(low,256),bounds(high,256)),"Fine upgrade retains the base camera silhouette at yaw "+yaw);
+        }
+        var singleGeometry=SchematicPreview.readGeometry(root(Map.of("one",region(-5,-39,8,1,1,1,new int[]{1}))),Cancellation.NEVER);
+        var single=SchematicPreview.createOrbitModel(singleGeometry,colors,Cancellation.NEVER);
+        int[] centered=SchematicPreview.renderOrbit(single,single,.7,.4,.5,0,0,256,false,Cancellation.NEVER);
+        int[] panned=SchematicPreview.renderOrbit(single,single,.7,.4,.5,.125,-.125,256,false,Cancellation.NEVER);
+        int[] a=bounds(centered,256),b=bounds(panned,256);
+        check(b[0]-a[0]==32&&b[2]-a[2]==32&&b[1]-a[1]==-32&&b[3]-a[3]==-32,"Pan is exactly normalized viewport displacement on both axes");
+        check(count(centered)==count(panned),"Unclipped panning preserves coverage");
+        int[] zoomed=SchematicPreview.renderOrbit(single,single,.7,.4,1,0,0,256,false,Cancellation.NEVER);
+        check(count(zoomed)>count(centered)*3.8&&count(zoomed)<count(centered)*4.2,"Twofold camera zoom increases projected area fourfold");
+        for(int side:new int[]{128,512,1024}){var pixels=SchematicPreview.renderOrbit(single,single,.7,.4,.5,0,0,side,false,Cancellation.NEVER);check(pixels.length==side*side&&count(pixels)>0,"Viewport resolution really changes raster size "+side);}
+        for(double[] invalidCamera:new double[][]{{.49,0,0,256},{16.01,0,0,256},{1,16.01,0,256},{1,0,-16.01,256},{1,0,0,127},{1,0,0,1025},{Double.NaN,0,0,256}}){try{SchematicPreview.renderOrbit(single,single,0,0,invalidCamera[0],invalidCamera[1],invalidCamera[2],(int)invalidCamera[3],false,Cancellation.NEVER);throw new AssertionError("Invalid camera accepted");}catch(IllegalArgumentException expected){checks++;}}
+        var insideTriangle=new java.util.concurrent.atomic.AtomicBoolean();
+        cancelled(()->SchematicPreview.renderOrbit(single,single,0,0,16,0,0,1024,false,()->{
+            boolean rasterizing=StackWalker.getInstance().walk(frames->frames.anyMatch(f->f.getMethodName().equals("triangle")&&f.getClassName().contains("SchematicPreview")));
+            if(rasterizing)insideTriangle.set(true);return rasterizing;
+        }));
+        check(insideTriangle.get(),"Cancellation is checked inside a screen-covering triangle, not only between voxels");
+        cancelled(()->SchematicPreview.readGeometry(source,Map.of(),SchematicPreview.DETAIL_LOD,()->true));
+        var cachePath=temp.resolve("fine-cache");String key="d".repeat(64);new OrbitPreviewCache(cachePath,true).write(key,fine,Cancellation.NEVER);
+        var restored=new OrbitPreviewCache(cachePath,true).read(key,Cancellation.NEVER);
+        check(restored!=null&&Arrays.equals(finePixels,SchematicPreview.renderOrbit(restored,base,0,0,2,0,0,256,false,Cancellation.NEVER)),"Fresh detail cache restores fine geometry with unchanged base framing");
+        check(new OrbitPreviewCache(cachePath).read(key,Cancellation.NEVER)==null,"Base cache reader cannot accept a fine grid exceeding its budget");
+        var bytes=new ByteArrayOutputStream();SchematicPreview.writeOrbitModel(fine,new DataOutputStream(bytes),Cancellation.NEVER);
+        byte[] corrupt=bytes.toByteArray();java.nio.ByteBuffer.wrap(corrupt).putInt(4,321);
+        try{SchematicPreview.readOrbitModel(new DataInputStream(new ByteArrayInputStream(corrupt)),Cancellation.NEVER,true);throw new AssertionError("Oversize fine dimension accepted");}catch(IOException expected){checks++;}
     }
     public static void main(String[] args)throws Exception{Path temp=args.length==0?Files.createTempDirectory("preview-checks-"):Path.of(args[0]);System.out.println("SchematicPreviewChecks: "+run(temp)+" checks; fixtures "+temp);}
 }

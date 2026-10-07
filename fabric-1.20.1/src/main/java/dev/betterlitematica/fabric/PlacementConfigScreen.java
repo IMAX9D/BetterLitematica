@@ -36,7 +36,8 @@ final class PlacementConfigScreen extends MenuScreen {
         name=fieldAt("摆放名称",name==null?p.name():name.getText(),left,0,innerWidth-88,120);
         buttonAt("保存名称",left+innerWidth-80,14,80,()->act(()->controller.rename(name.getText())),true,true);
         if(schematicPreview==null)schematicPreview=new BlueprintPreviewPanel(controller,left,previewWidth,196,false);
-        addBody(schematicPreview,44);syncPreview(p);
+        schematicPreview.layout(left,previewWidth,196);addBody(schematicPreview,44);syncPreview(p);
+        hint(schematicPreview,"左键旋转 · 滚轮缩放 · 中键平移 · 双击复位");
 
         caption("位置",controlsLeft,42,columnWidth);
         buttonAt("移到玩家位置",controlsLeft,58,columnWidth,()->act(()->{controller.here();resetCoordinates();}),!p.locked(),false);
@@ -92,8 +93,7 @@ final class PlacementConfigScreen extends MenuScreen {
     }
     @Override protected net.minecraft.client.gui.widget.ClickableWidget previewControl(){return previewing?opacitySlider:null;}
     @Override public boolean mouseReleased(double x,double y,int button){
-        boolean released=schematicPreview!=null&&schematicPreview.releaseDrag(button);
-        try{return super.mouseReleased(x,y,button)||released;}finally{if(button==0)endPreview();}
+        try{return super.mouseReleased(x,y,button);}finally{if(button==0)endPreview();}
     }
     @Override public boolean keyPressed(int key,int scan,int modifiers){
         if(previewing){
