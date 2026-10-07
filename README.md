@@ -1,6 +1,6 @@
 # BetterLitematica
 
-Minecraft **1.20.1 / Fabric** 的独立投影与建造辅助模组，当前版本 **0.3.87-dev**。不依赖 Litematica 或 MaLiLib，仍在开发中，尚未实现原模组的全部功能。
+Minecraft **1.20.1 / Fabric** 的独立投影与建造辅助模组，当前版本 **0.3.88-dev**。不依赖 Litematica 或 MaLiLib，仍在开发中，尚未实现原模组的全部功能。
 
 ## 安装与使用
 

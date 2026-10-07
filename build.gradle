@@ -1,4 +1,4 @@
-allprojects { group = 'dev.betterlitematica'; version = '0.3.87-dev'; repositories { mavenCentral() } }
+allprojects { group = 'dev.betterlitematica'; version = '0.3.88-dev'; repositories { mavenCentral() } }
 subprojects {
     apply plugin: 'java-library'
     java { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

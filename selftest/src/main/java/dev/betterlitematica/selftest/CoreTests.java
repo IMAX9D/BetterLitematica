@@ -19,6 +19,37 @@ public final class CoreTests {
     private static Map<String,Object> compound(Object v)throws IOException{return NbtReader.compound(v,"test");}
     private static Path write(String name,Map<String,Object> root)throws IOException{Path p=temp.resolve(name);Fixtures.write(p,root);return p;}
     private static Path imported(Path p)throws IOException{return SchematicImporter.importFile(p,temp.resolve("cache"),Cancellation.NEVER,x->{}).path();}
+    @SuppressWarnings("unchecked")
+    private static java.util.concurrent.BlockingQueue<Object> streamerReady(SectionStreamer stream)throws Exception{
+        var field=SectionStreamer.class.getDeclaredField("ready");field.setAccessible(true);return (java.util.concurrent.BlockingQueue<Object>)field.get(stream);
+    }
+    private static Object decoded(SectionStreamer stream,SectionKey key)throws Exception{
+        check(stream.request(key),"Fresh section request accepted");var ready=streamerReady(stream).poll(5,java.util.concurrent.TimeUnit.SECONDS);check(ready!=null,"Actual disk decode reached ready queue");return ready;
+    }
+    private static void streamerRevisionChecks()throws Exception{
+        try(var stream=new SectionStreamer(BlueprintCache.open(cachePath),65536)){
+            var key=stream.source().index().keySet().iterator().next();var ready=streamerReady(stream);var old=decoded(stream,key);
+            check(stream.revision()==0&&stream.get(key)==null,"Submission and worker completion do not announce cache admission");
+            stream.cancelPending();check(stream.revision()==0,"Cancellation is not a successful decode wakeup");
+            // Replay an actual decoded old-generation result after cancellation, deterministically.
+            check(ready.offer(old),"Old decoded result placed back at the consumer boundary");stream.drain();
+            check(stream.revision()==0&&stream.get(key)==null,"Late old-generation decode neither enters cache nor wakes renderer");
+            var current=decoded(stream,key);check(stream.revision()==0,"Fresh completion still waits for owner-thread drain");
+            check(ready.offer(current),"Current decoded result returned to consumer queue");stream.drain();
+            check(stream.revision()==1&&stream.get(key)!=null,"Successful current cache admission advances revision exactly once");
+            check(!stream.request(key),"Resident data does not decode again");stream.drain();stream.cancelPending();
+            check(stream.revision()==1&&stream.get(key)!=null,"Empty drain and cancellation keep the loaded revision and resident value");
+        }
+        try(var stream=new SectionStreamer(BlueprintCache.open(cachePath),1)){
+            var key=stream.source().index().keySet().iterator().next();var result=decoded(stream,key);check(streamerReady(stream).offer(result),"Oversize decoded result returned to consumer");stream.drain();
+            check(stream.revision()==0&&stream.cachedBytes()==0&&stream.get(key)==null,"Cache budget rejection cannot claim newly loaded data");
+        }
+        var closed=new SectionStreamer(BlueprintCache.open(cachePath),65536);
+        try{
+            var key=closed.source().index().keySet().iterator().next();var result=decoded(closed,key);var ready=streamerReady(closed);closed.close();check(ready.offer(result),"Late ready result replayed after close");closed.drain();
+            check(closed.revision()==0&&closed.cachedBytes()==0&&!closed.request(key),"Closed streamer never admits or announces late data");
+        }finally{closed.close();}
+    }
     public static void main(String[] args)throws Exception{
         long started=System.nanoTime();temp=Files.createTempDirectory("betterlitematica-test-");
         try{
@@ -499,6 +530,7 @@ public final class CoreTests {
                     while(System.nanoTime()<until){stream.drain();if(stream.get(keys.get(0))!=null)break;Thread.sleep(2);}
                     check(stream.get(keys.get(0))!=null,"Async decode");check(stream.cachedBytes()<=65536,"CPU memory bound");check(stream.queuedJobs()<=34,"Task bound");stream.cancelPending();
                 }
+                streamerRevisionChecks();
             });
             test("decode backpressure retains work and cancellation resumes",()->{
                 Path path=write("backpressure.litematic",Fixtures.litematic(Map.of("r",Fixtures.region(0,0,0,16*48,1,1,i->1)),"backpressure"));

@@ -17,11 +17,12 @@ public final class SectionStreamer implements AutoCloseable {
     private final ArrayBlockingQueue<Ready> ready=new ArrayBlockingQueue<>(16);
     private final WeightedLru<SectionKey,PackedSection> cache;
     private final AtomicLong sequence=new AtomicLong();private final AtomicLong epoch=new AtomicLong();private volatile boolean closed;private String error="";
+    private long revision;
     public SectionStreamer(BlueprintCache source,long maxCpuBytes){this(source,maxCpuBytes,true);}
     public SectionStreamer(BlueprintCache source,long maxCpuBytes,boolean ownsSource){this.source=source;this.ownsSource=ownsSource;cache=new WeightedLru<>(maxCpuBytes,PackedSection::estimatedBytes,s->{});}
     public void drain(){
         Ready r;while((r=ready.poll())!=null){inFlight.remove(r.key,r.request);if(r.request.epoch!=epoch.get()||closed)continue;
-            if(r.section!=null)cache.put(r.key,r.section);if(!r.error.isEmpty())error=r.error;
+            if(r.section!=null&&cache.put(r.key,r.section))revision++;if(!r.error.isEmpty())error=r.error;
         }
     }
     public PackedSection get(SectionKey key){return cache.get(key);}
@@ -51,6 +52,8 @@ public final class SectionStreamer implements AutoCloseable {
 
     public void cancelPending(){epoch.incrementAndGet();workers.getQueue().clear();inFlight.clear();ready.clear();}
     public long cachedBytes(){return cache.usedBytes();}public int queuedJobs(){return inFlight.size();}public String error(){return error;}
+    /** Owner-thread wakeup token: advances only when a current decode is admitted by drain(). */
+    public long revision(){return revision;}
     public BlueprintCache source(){return source;}
     @Override public void close(){
         if(closed)return;closed=true;cancelPending();workers.shutdownNow();cache.close();

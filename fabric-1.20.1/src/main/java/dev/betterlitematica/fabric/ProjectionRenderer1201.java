@@ -66,8 +66,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private CompletableFuture<QueryResult> query;
     private long queryGeneration;
     private final net.minecraft.client.texture.Sprite[] lightSprites=new net.minecraft.client.texture.Sprite[16];
-    private long nextWorkProbe;
-    private int buildChoice,buildCursor,surroundingCursor;
+    private long nextWorkProbe,decodedRevision=-1;
+    private int buildCursor,surroundingCursor,boundsCursor;
     private boolean visibilityDirty=true;
     private Vec3d lastCullCamera;
     private final Matrix4f lastCullView=new Matrix4f(),lastCullProjection=new Matrix4f();
@@ -236,6 +236,9 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     String error(){return !failure.isEmpty()?failure:!detailsError.isEmpty()?detailsError:!entities.error().isEmpty()?entities.error():stream.error();}
     void prepareFrame(WorldRenderContext context,boolean active){
         stream.drain();drawCalls=0;lastBuildNanos=0;frameReady=active&&visible&&client.world!=null;
+        // Disk workers can finish between frames. Wake builds on admitted data instead of
+        // leaving a ready section idle until the fallback polling interval expires.
+        if(decodedRevision!=stream.revision()){decodedRevision=stream.revision();nextWorkProbe=0;}
         if(!frameReady){discardJob();if(resourcesVisible)meshes.forEach((key,mesh)->mesh.resources().priority(RenderResources.COLD));resourcesVisible=false;entities.prepare(context,List.of(),false);return;}
         boolean budgetChanged=visibilityDirty||!resourcesVisible;resourcesVisible=true;
         try{
@@ -247,7 +250,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                     var members=result.membership();budgetChanged=true;
                     boundsCache.keySet().retainAll(members);worldBases.keySet().retainAll(members);failed.retainAll(members);visibilityDirty=true;nextWorkProbe=0;
                     visibleSet.retainAll(members);deferred.clear();budgetSaturated=false;
-                    candidates=result.keys();candidateSet=result.membership();entityCandidates=result.entities();lastCamera=result.camera();lastRadius=radius;
+                    candidates=result.keys();candidateSet=result.membership();entityCandidates=result.entities();lastCamera=result.camera();lastRadius=radius;boundsCursor=0;
                     if(job!=null&&!members.contains(job.key))discardJob();
                 }
             }
@@ -261,9 +264,15 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             visibilityDirty=false;
             visibleKeys.clear();boolean visibilityChanged=false;
             int newBounds=0;long boundsDeadline=System.nanoTime()+1_000_000L;
+            // Advance through new bounds once. Scanning thousands of already-known boxes
+            // must not consume the entire new-box allowance and starve the distant tail.
+            while(boundsCursor<candidates.size()&&newBounds<256&&System.nanoTime()<boundsDeadline){
+                var key=candidates.get(boundsCursor++);if(boundsCache.containsKey(key))continue;
+                var cached=meshes.get(key);boundsCache.put(key,cached==null?bounds(key):cached.bounds());newBounds++;
+            }
+            if(boundsCursor<candidates.size())visibilityDirty=true;
             for(SectionKey key:candidates){
-                Box box=boundsCache.get(key);if(box==null){var cached=meshes.get(key);if(cached!=null)box=cached.bounds();}
-                if(box==null){if(newBounds>=256||System.nanoTime()>=boundsDeadline){visibilityDirty=true;continue;}box=bounds(key);boundsCache.put(key,box);newBounds++;}
+                Box box=boundsCache.get(key);if(box==null)continue;
                 boolean inView=context.frustum()==null||context.frustum().isVisible(box);
                 if(inView){visibleKeys.add(key);visibilityChanged|=visibleSet.add(key);}else visibilityChanged|=visibleSet.remove(key);
             }
@@ -282,13 +291,12 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             long workNow=started;boolean schedule=(job!=null||workNow>=nextWorkProbe)&&waitingRevision!=resources.revision();
             boolean missingWork=job!=null||stream.queuedJobs()>0;
             if(schedule){
-            // Reserve decode opportunities for the surrounding view, not only the current frustum.
+            // A mesh needs its six neighboring source sections too. Queue a bounded
+            // working set of complete neighborhoods before filling the queue with more
+            // centers; otherwise their dependencies sit behind unrelated requests.
+            missingWork|=prefetch(visibleKeys,buildCursor,deadline,false);
             boolean warm=resources.warm()&&meshes.usedBytes()<meshes.capacity()*3/4&&meshes.size()<24576;
-            if(warm){int requested=0;for(SectionKey key:candidates){
-                if(requested>=6||stream.queuedJobs()>=24)break;
-                if(!visibleSet.contains(key)&&needsMesh(key)&&!failed.contains(key)&&!deferred.contains(key)){missingWork=true;if(stream.request(key))requested++;}
-            }}
-            for(SectionKey key:visibleKeys){if(stream.queuedJobs()>=24)break;if(needsMesh(key)&&!failed.contains(key)&&!deferred.contains(key)){missingWork=true;stream.request(key);}}
+            if(warm&&stream.queuedJobs()<16)missingWork|=prefetch(candidates,surroundingCursor,deadline,true);
             }
             boolean warm=resources.warm()&&meshes.usedBytes()<meshes.capacity()*3/4&&meshes.size()<24576;
             if(schedule&&!missingWork)nextWorkProbe=Long.MAX_VALUE;
@@ -297,7 +305,6 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                 int completed=0;
                 while(completed<1&&System.nanoTime()<deadline&&frameUploadBytes<frameUploadLimit){
                     if(job==null){
-                        if(warm&&(buildChoice++&3)==0)job=findJob(candidates,deadline,true);
                         if(job==null&&!budgetSaturated)job=findJob(visibleKeys,deadline,false);
                         if(job==null&&warm)job=findJob(candidates,deadline,true);
                         if(job==null)break;
@@ -336,6 +343,19 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             Job next=prepare(key,section);if(next!=null){if(surrounding)surroundingCursor=at+1;else buildCursor=at+1;return next;}
         }
         return null;
+    }
+    private boolean prefetch(List<SectionKey> keys,int cursor,long deadline,boolean surrounding){
+        boolean missing=false;int neighborhoods=0,start=Math.floorMod(cursor,Math.max(1,keys.size()));
+        for(int visited=0;visited<keys.size()&&neighborhoods<(surrounding?2:8);visited++){
+            if(System.nanoTime()>=deadline||stream.queuedJobs()>=24)return true;
+            var key=keys.get((start+visited)%keys.size());
+            if(surrounding&&visibleSet.contains(key)||failed.contains(key)||deferred.contains(key)||!needsMesh(key))continue;
+            missing=true;neighborhoods++;stream.request(key);
+            for(var side:DIRECTIONS){int x=key.x()+side.getOffsetX(),y=key.y()+side.getOffsetY(),z=key.z()+side.getOffsetZ();
+                if(x>=0&&y>=0&&z>=0)stream.request(new SectionKey(key.region(),x,y,z));
+            }
+        }
+        return missing;
     }
     private Vec3i localBase(SectionKey key){return stream.source().metadata().regions().get(key.region()).sectionOrigin(key);}
     private static double distanceSquared(Vec3i a,Vec3i b){double x=(double)a.x()-b.x(),y=(double)a.y()-b.y(),z=(double)a.z()-b.z();return x*x+y*y+z*z;}
@@ -464,7 +484,10 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         return neighbor.isOpaqueFullCube(EmptyBlockView.INSTANCE,BlockPos.ORIGIN);
     }
     private boolean cull(Job current,int x,int y,int z,Vec3i world,BlockState state,Direction side){
-        var neighborPosition=world.add(new Vec3i(side.getOffsetX(),side.getOffsetY(),side.getOffsetZ()));if(!layer.contains(neighborPosition))return false;
+        // The usual single-placement, full-height path needs only local palette data.
+        // Avoid six temporary world positions for every source block in a huge schematic.
+        Vec3i neighborPosition=null;
+        if(layer.mode()!=LayerRange.Mode.ALL||current.overlaps.size()>1){neighborPosition=world.add(new Vec3i(side.getOffsetX(),side.getOffsetY(),side.getOffsetZ()));if(!layer.contains(neighborPosition))return false;}
         BlockState neighbor;
         if(current.overlaps.size()>1){var cell=scene.sampleDisplayed(current.overlaps,neighborPosition);if(cell==null||cell.unknown())return false;neighbor=cell.renderer().resolve(cell.region().index(),cell.id());}
         else {Vec3i delta=current.offsets[side.ordinal()];int id=current.neighborhood.globalId(x+delta.x(),y+delta.y(),z+delta.z());if(!displays(id))return false;neighbor=current.states.resolve(id);}
