@@ -21,10 +21,10 @@ final class CreativePasteTask {
     private final boolean entities,nbt;
     private final PasteChunks chunks;
     private final Map<SectionKey,SectionWork> sections=new HashMap<>();
-    private int part,extra,validationPart,validationState;
+    private int part,extra;
     private final DeferredSections queue;private final List<Set<Integer>> accepted=new ArrayList<>();private final List<BitSet> extraDone=new ArrayList<>();private long extrasRemaining,ticks,processed;
-    private boolean validated;private volatile boolean cancelled,paused;private volatile String status="检查投影";
-    private long changed;
+    private volatile boolean cancelled,paused;private volatile String status="检查投影";
+    private long changed,skippedUnknown;
     private static final class SectionWork {
         final PlacementBounds bounds;final Vec3i origin;final List<PlacementLayout.Part> overlaps;
         final int baseIndex,strideY,strideZ;final PlacementTransform transform;
@@ -53,7 +53,6 @@ final class CreativePasteTask {
         var actor=world.getServer().getPlayerManager().getPlayer(player);if(actor==null||!actor.isCreative()||actor.getServerWorld()!=world){result.completeExceptionally(new IllegalStateException("玩家已离开当前世界或创造模式"));return;}
         ticks++;chunks.beginTick();long until=System.nanoTime()+16_000_000L;int budget=32768;
         try{
-            if(!validated){while(validationPart<states.size()&&budget-->0&&System.nanoTime()<until){if(!layout.enabled(validationPart)){validationPart++;validationState=0;continue;}var p=document.parts().get(validationPart);var resolver=states.get(validationPart);if(resolver.unresolved(validationState))throw new IllegalArgumentException("源投影包含未知方块，未开始粘贴："+p.palette().get(validationState));if(++validationState==p.palette().size()){validationPart++;validationState=0;}}if(validationPart<states.size())return;validated=true;return;}
             queue.discover(512,this::admit,until);
             int turns=Math.min(queue.pending(),512);boolean waiting=false;
             while(turns-->0&&budget>0&&!cancelled&&System.nanoTime()<until){
@@ -76,8 +75,17 @@ final class CreativePasteTask {
                     if(context.overlaps.size()!=1||layout.placement().overlapRule()==ReplaceRule.NON_AIR){var owner=layout.sample(context.overlaps,at,cells);if(owner==null||owner.part().index()!=work.key.region()){work.done.set(i);continue;}}
                     BlockPos pos=new BlockPos(at.x(),at.y(),at.z());var chunk=context.chunk(pos);
                     int index=context.baseIndex+(i&15)+((i>>>4)&15)*context.strideZ+(i>>>8)*context.strideY;
-                    var expected=states.get(work.key.region()).resolve(p.blocks().get(index));var actual=chunk.getBlockState(pos);budget--;
+                    var resolver=states.get(work.key.region());int id=p.blocks().get(index);budget--;
+                    if(resolver.unresolvedState(id)){work.done.set(i);processed++;skippedUnknown++;continue;}
+                    var expected=resolver.resolve(id);var actual=chunk.getBlockState(pos);
                     if(rule.permits(expected.isAir(),actual.isAir())&&!expected.isOf(net.minecraft.block.Blocks.STRUCTURE_VOID)){
+                        // Validate detached payload before replacing a block or clearing its inventory.
+                        NbtCompound tag=null;
+                        if(nbt&&p.blockEntities().containsKey(index)){
+                            tag=(NbtCompound)NbtBridge.game(p.blockEntities().get(index));
+                            try{BlockEntityNbtTransform.placed(tag,transform);}
+                            catch(BlockEntityNbtTransform.UnknownSourceState unknown){work.done.set(i);processed++;skippedUnknown++;continue;}
+                        }
                         if(p.tickCells().contains(index))accepted.get(work.key.region()).add(index);
                         if(!expected.equals(actual)){
                             var saved=replacementInventory(actual,expected,world.getBlockEntity(pos));boolean placed;
@@ -86,8 +94,8 @@ final class CreativePasteTask {
                             if(!placed){if(world.getBlockState(pos).equals(actual))CreativeFillTask.restoreInventory(world.getBlockEntity(pos),saved);throw new IllegalStateException("粘贴方块被拒绝："+pos);}
                             changed++;
                         }
-                        if(nbt&&p.blockEntities().containsKey(index)){
-                            var be=world.getBlockEntity(pos);if(be!=null){NbtCompound tag=(NbtCompound)NbtBridge.game(p.blockEntities().get(index));BlockEntityNbtTransform.placed(tag,transform);tag.putInt("x",pos.getX());tag.putInt("y",pos.getY());tag.putInt("z",pos.getZ());be.readNbt(tag);
+                        if(tag!=null){
+                            var be=world.getBlockEntity(pos);if(be!=null){tag.putInt("x",pos.getX());tag.putInt("y",pos.getY());tag.putInt("z",pos.getZ());be.readNbt(tag);
                                 // BlockEntity.markDirty also probes comparator neighbors and can synchronously load far chunks.
                                 // Bulk writes retain source states; persist the owned chunk and send the block-entity update directly.
                                 chunk.setNeedsSaving(true);world.updateListeners(pos,expected,expected,Block.NOTIFY_LISTENERS);}
@@ -111,10 +119,11 @@ final class CreativePasteTask {
                     if(ready){extraDone.get(part).set(item);extrasRemaining--;}
                 }
             }
-            if(queue.finished()&&extrasRemaining==0){status="粘贴完成，修改 "+changed+" 格";result.complete(status);}
-            else status="粘贴 "+(100L*queue.completed()/Math.max(1,queue.total()))+"% · 修改 "+changed+(waiting?" · 准备区块":"");
+            if(queue.finished()&&extrasRemaining==0){status="粘贴完成，修改 "+changed+" 格"+skippedStatus();result.complete(status);}
+            else status="粘贴 "+(100L*queue.completed()/Math.max(1,queue.total()))+"% · 修改 "+changed+skippedStatus()+(waiting?" · 准备区块":"");
         }catch(Exception e){status="粘贴失败："+e.getMessage();result.completeExceptionally(e);}
     }
+    private String skippedStatus(){return skippedUnknown==0?"":" · 跳过未知 "+skippedUnknown+" 格";}
     static NbtCompound replacementInventory(net.minecraft.block.BlockState actual,net.minecraft.block.BlockState expected,net.minecraft.block.entity.BlockEntity entity){
         // Property-only edits retain the existing container; changing its block type can scatter items.
         return actual.getBlock()==expected.getBlock()?null:CreativeFillTask.emptyInventory(entity);

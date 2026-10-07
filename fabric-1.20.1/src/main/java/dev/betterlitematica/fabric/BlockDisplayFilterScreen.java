@@ -41,7 +41,7 @@ final class BlockDisplayFilterScreen extends MenuScreen {
         save=fixed("保存",innerWidth-160,76,this::save);
     }
     private boolean matches(BlockFilterGrid.Entry e){if(terms.length==0)return true;String value=e.id()+" "+e.name().toLowerCase(Locale.ROOT);for(String part:terms)if(!value.contains(part))return false;return true;}
-    private void refilter(boolean reset){if(grid==null)return;grid.rows(registry.stream().filter(this::matches).filter(e->!selectedOnly||selected.contains(e.id())).toList(),reset);count.setMessage(Text.literal("已选 "+selected.size()));selectResults.active=registry.stream().anyMatch(e->matches(e)&&!selected.contains(e.id()));clear.active=!selected.isEmpty();error="";}
+    private void refilter(boolean reset){if(grid==null)return;grid.rows(registry.stream().filter(this::matches).filter(e->!selectedOnly||selected.contains(e.id())).sorted(Comparator.comparing(e->!selected.contains(e.id()))).toList(),reset);count.setMessage(Text.literal("已选 "+selected.size()));selectResults.active=registry.stream().anyMatch(e->matches(e)&&!selected.contains(e.id()));clear.active=!selected.isEmpty();error="";}
     private void toggle(String blockId){if(!selected.remove(blockId))selected.add(blockId);refilter(false);}
     private void selectResults(){for(var entry:registry)if(matches(entry))selected.add(entry.id());refilter(false);}
     private void save(){if(epoch!=controller.sessionEpoch()||controller.placement(id)==null)throw new IllegalStateException("投影已移除");controller.placementDisplayFilter(id,new BlockDisplayFilter(mode,blacklist,whitelist));super.close();}

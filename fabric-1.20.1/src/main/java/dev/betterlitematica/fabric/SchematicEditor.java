@@ -44,7 +44,7 @@ final class SchematicEditor {
             return cursor.done();
         }
     }
-    private record ToolPlan(Placement placement,LayerRange layer,BlockState expected,BlockState replacement,boolean byType,boolean exceptType,boolean fillAir,ToolScan scan,BitSet validated){}
+    private record ToolPlan(Placement placement,LayerRange layer,BlockState expected,BlockState replacement,boolean byType,boolean exceptType,boolean fillAir,ToolScan scan){}
     SchematicEditor(MinecraftClient client,ProjectionController controller){this.client=client;this.controller=controller;}
     UUID target(){return target;}boolean active(){return active;}boolean claimsInput(){return input.owns();}boolean owns(UUID id){return draft!=null&&Objects.equals(target,id);}
     boolean dirty(){return draft!=null&&draft.dirty();}boolean busy(){return baseline!=null||plan!=null||toolPlan!=null||save!=null||saved!=null;}
@@ -120,7 +120,7 @@ final class SchematicEditor {
             var hit=hit();if(hit==null)return;
             var wanted=place?replacement(hit,hit.world()):Blocks.AIR.getDefaultState();
             var layout=renderer.layout();var parts=new ArrayList<PlacementLayout.Part>();for(int i=0;i<layout.size();i++)if(layout.enabled(i))parts.add(layout.part(i));
-            var layer=controller.layerRange();toolPlan=new ToolPlan(controller.placement(target),layer,hit.state(),wanted,byType,exceptType,fillAir,new ToolScan(parts,layer),new BitSet());status="编辑中";advanceTool();
+            var layer=controller.layerRange();toolPlan=new ToolPlan(controller.placement(target),layer,hit.state(),wanted,byType,exceptType,fillAir,new ToolScan(parts,layer));status="编辑中";advanceTool();
         });return true;
     }
     boolean pick(){
@@ -139,7 +139,7 @@ final class SchematicEditor {
             if(region>=0){var part=renderer.layout().part(region);if(!renderer.layout().enabled(region)||!part.contains(at))continue;var local=part.local(at);cell=new PlacementLayout.Cell(part,local,renderer.sampleRaw(part.section(local),part.cell(local)));}
             else cell=renderer.layout().sample(at,new PlacementLayout.Source(){public int state(PlacementLayout.Part part,Vec3i local){return renderer.sampleRaw(part.section(local),part.cell(local));}public BlockStateSpec spec(int index,int id){return renderer.metadata().palette().get(id);}});
             if(cell==null)continue;if(cell.unknown())throw new ProjectionBlockView.Pending();if(renderer.metadata().palette().get(cell.state()).isAir())continue;
-            StateResolver1201.checked(renderer.metadata().palette().get(cell.state()));var state=renderer.resolve(cell.part().index(),cell.state());var position=new BlockPos(at.x(),at.y(),at.z());var view=view(at);var shape=state.getOutlineShape(view,position);if(shape.isEmpty())shape=net.minecraft.util.shape.VoxelShapes.fullCube();var ray=shape.raycast(eye,end,position);if(ray==null)continue;
+            if(renderer.resolver(cell.part().index()).unresolvedState(cell.state()))return null;var state=renderer.resolve(cell.part().index(),cell.state());var position=new BlockPos(at.x(),at.y(),at.z());var view=view(at);var shape=state.getOutlineShape(view,position);if(shape.isEmpty())shape=net.minecraft.util.shape.VoxelShapes.fullCube();var ray=shape.raycast(eye,end,position);if(ray==null)continue;
             var side=ray.getSide();return new Hit(cell.part(),at,cell.local(),new Vec3i(side.getOffsetX(),side.getOffsetY(),side.getOffsetZ()),ray.getPos(),state);
         }return null;
     }
@@ -165,7 +165,7 @@ final class SchematicEditor {
         if(direction==0){var heading=client.player.getHorizontalFacing();var p=hit.point();step=EditDirection.choose(hit.face(),p.x-hit.world().x(),p.y-hit.world().y(),p.z-hit.world().z(),new Vec3i(heading.getOffsetX(),0,heading.getOffsetZ()),place&&!replace);}
         else step=switch(direction){case 1->new Vec3i(1,0,0);case 2->new Vec3i(-1,0,0);case 3->new Vec3i(0,1,0);case 4->new Vec3i(0,-1,0);case 5->new Vec3i(0,0,1);default->new Vec3i(0,0,-1);};
         var local=hit.part().local(start);int first=renderer.sampleRaw(hit.part().section(local),hit.part().cell(local));if(first<0)throw new IllegalStateException("目标正在加载");
-        var expected=renderer.resolve(hit.part().index(),first);if(place&&!replace&&!expected.isAir())throw new IllegalStateException("目标位置已有投影方块");
+        if(renderer.resolver(hit.part().index()).unresolvedState(first)){status="已跳过无法识别的方块";return;}var expected=renderer.resolve(hit.part().index(),first);if(place&&!replace&&!expected.isAir())throw new IllegalStateException("目标位置已有投影方块");
         int limit=line?(waitUnknown?SchematicEdits.MAX_TRANSACTION+1:10001):1;var last=start.add(new Vec3i(step.x()*(limit-1),step.y()*(limit-1),step.z()*(limit-1)));var bounds=new PlacementBounds(new Vec3i(Math.min(start.x(),last.x()),Math.min(start.y(),last.y()),Math.min(start.z(),last.z())),new Vec3i(Math.max(start.x(),last.x()),Math.max(start.y(),last.y()),Math.max(start.z(),last.z())));
         plan=new Plan(controller.placement(target),controller.layerRange(),hit,start,step,expected,wanted,limit,region<0,controller.editorScene().overlapping(bounds));plan.waitUnknown=waitUnknown;status="";advance();
     }
@@ -188,7 +188,7 @@ final class SchematicEditor {
             boolean done=current.scan().advance((part,local)->{
                 var key=part.section(local);int cell=part.cell(local),base=renderer.baseState(key,cell),state=renderer.sampleRaw(key,cell);
                 if(base<0||state<0)throw new ProjectionBlockView.Pending();
-                if(!current.validated().get(state)){StateResolver1201.checked(renderer.metadata().palette().get(state));current.validated().set(state);}var before=renderer.resolve(part.index(),state);
+                if(renderer.resolver(part.index()).unresolvedState(state))return null;var before=renderer.resolve(part.index(),state);
                 var after=toolReplacement(before,current.expected(),current.replacement(),current.byType(),current.exceptType(),current.fillAir());if(after==null)return null;
                 var stored=StateResolver1201.spec(StateResolver1201.unplace(after,part.transform()));boolean same=before.getBlock()==after.getBlock();
                 return new SchematicEdits.Request(key,cell,base,stored,same,same,before.getFluidState().getFluid().matchesType(after.getFluidState().getFluid()));
@@ -215,7 +215,7 @@ final class SchematicEditor {
                 if(current.composed){var visible=controller.editorScene().sample(current.sceneParts,at);if(visible!=null&&visible.unknown()){if(current.waitUnknown){status="投影正在加载";return;}status="已停止于未加载区域";stopped=true;break;}
                     boolean visibleAir=visible==null||visible.renderer().metadata().palette().get(visible.id()).isAir();
                     if(current.expected.isAir()?!visibleAir:visibleAir||visible.renderer()!=renderer||visible.region().index()!=current.part.index()){stopped=true;break;}}
-                StateResolver1201.checked(renderer.metadata().palette().get(state));var before=renderer.resolve(current.part.index(),state);if(!before.equals(current.expected)){stopped=true;break;}
+                if(renderer.resolver(current.part.index()).unresolvedState(state)){status="已停止于未知方块";stopped=true;break;}var before=renderer.resolve(current.part.index(),state);if(!before.equals(current.expected)){stopped=true;break;}
                 var after=current.replacement;if(before.isOf(Blocks.MOVING_PISTON)&&after.isOf(Blocks.MOVING_PISTON)&&before!=after)throw new IllegalArgumentException("运动活塞请先替换为普通方块");
                 boolean same=before.getBlock()==after.getBlock();
                 if(current.waitUnknown&&current.changes.size()==SchematicEdits.MAX_TRANSACTION)throw new IllegalArgumentException("本次编辑超过 16384 格，草稿未改变");
