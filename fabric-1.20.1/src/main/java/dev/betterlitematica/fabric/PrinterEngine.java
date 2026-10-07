@@ -203,7 +203,7 @@ final class PrinterEngine implements AutoCloseable {
         if(!pacing.canRun(false))return true;var s=settings();
         while(pacing.canRun(false)&&budget.attempt(System.nanoTime())){
             boolean resuming=waiting!=null;int held=PrinterActions.heldMaterial(client.player.getMainHandStack());var job=resuming?waiting:queue.pollBatch(held);waiting=null;
-            if(job==null){status=lastUnknown>0?"等待加载":missing.isEmpty()?"等待可施工位置":"等待材料";return false;}
+            if(job==null){status=!PrinterReach.intersectsBuildHeight(client.player.getEyePos(),range(s),s.shape,client.world.getBottomY(),client.world.getTopY())?"超出建造高度":lastUnknown>0?"等待加载":missing.isEmpty()?"等待可施工位置":"等待材料";return false;}
             actions.diagnostics.attempts++;
             if(!valid(job)){actions.diagnostics.stale++;if(resuming)actions.reset();continue;}
             if(!actions.inProgress(job)&&pacing.cooling(job.position()))continue;

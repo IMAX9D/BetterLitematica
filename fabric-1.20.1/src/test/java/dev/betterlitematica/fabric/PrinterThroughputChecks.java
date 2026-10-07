@@ -73,6 +73,14 @@ public final class PrinterThroughputChecks {
         return checks.count;
     }
     private static void reachableFaceGeometry(Checks checks){
+        for(var shape:dev.betterlitematica.core.PrinterRange.Shape.values()){
+            checks.require(!PrinterReach.intersectsBuildHeight(new Vec3d(0,410,0),5,shape,-64,320),"Out-of-height idle reason covers the reported Y410 case: "+shape);
+            checks.require(!PrinterReach.intersectsBuildHeight(new Vec3d(0,-80,0),5,shape,-64,320),"Below-world reach reports the same limitation: "+shape);
+            checks.require(PrinterReach.intersectsBuildHeight(new Vec3d(0,320,0),5,shape,-64,320),"Standing above the limit can still reach the top legal blocks: "+shape);
+            checks.require(PrinterReach.intersectsBuildHeight(new Vec3d(0,410,0),5,shape,-64,512),"Custom dimension height is respected: "+shape);
+        }
+        checks.require(PrinterReach.intersectsBuildHeight(new Vec3d(0,325,0),5,dev.betterlitematica.core.PrinterRange.Shape.SPHERE,-64,320),"Topmost block surface exactly at reach remains eligible");
+        checks.require(!PrinterReach.intersectsBuildHeight(new Vec3d(0,325.001,0),5,dev.betterlitematica.core.PrinterRange.Shape.SPHERE,-64,320),"Beyond the last reachable surface reports height limitation");
         var eye=new Vec3d(498.0010838,176.62,567.9090834);
         var below=new BlockPos(496,171,566);
         var oldBelow=EasyPlacementRules.hitPoint(below,Direction.UP,.25);
