@@ -66,7 +66,11 @@ public final class BetterLitematicaClient implements ClientModInitializer {
             if(world==client.world&&interactions.blockClick(true,new net.minecraft.util.hit.BlockHitResult(net.minecraft.util.math.Vec3d.ofCenter(pos),direction,pos,false)))return net.minecraft.util.ActionResult.FAIL;return net.minecraft.util.ActionResult.PASS;
         });
         net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player,world,hand,hit)->world==client.world&&interactions.blockClick(false,hit)?net.minecraft.util.ActionResult.FAIL:net.minecraft.util.ActionResult.PASS);
-        ClientPlayConnectionEvents.DISCONNECT.register((handler,mc)->{modeWheelInput.clear();menuOpen.clear();controller.disconnect();EntityOverlayMask.close();});
+        ClientPlayConnectionEvents.DISCONNECT.register((handler,mc)->mc.execute(()->{
+            // Network-driven disconnects may arrive off-thread, after another session has opened.
+            if(mc.getNetworkHandler()!=null&&mc.getNetworkHandler()!=handler)return;
+            modeWheelInput.clear();menuOpen.clear();controller.disconnect();EntityOverlayMask.close();
+        }));
         IndependentUi ui=IndependentUi.INSTANCE;ProjectionInformation information=new ProjectionInformation();ToolHud toolHud=new ToolHud();StatusHud statusHud=new StatusHud();final int[] informationTick={0};ClientTickEvents.END_CLIENT_TICK.register(mc->{if(++informationTick[0]%4==0)information.update(mc,controller);});
         ClientLifecycleEvents.CLIENT_STOPPING.register(mc->{modeWheelInput.clear();controller.close();ui.close();EntityOverlayMask.close();});
         WorldRenderEvents.START.register(context->EntityOverlayMask.reset());

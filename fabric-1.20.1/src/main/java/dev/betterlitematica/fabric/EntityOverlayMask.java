@@ -44,5 +44,5 @@ final class EntityOverlayMask {
             GL11.glCopyTexSubImage2D(GL11.GL_TEXTURE_2D,0,0,0,0,0,width,height);
         }finally{GL11.glBindTexture(GL11.GL_TEXTURE_2D,previous);GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER,read);}
     }
-    static void close(){reset();if(before!=0)GL11.glDeleteTextures(before);if(after!=0)GL11.glDeleteTextures(after);before=after=width=height=0;}
+    static void close(){com.mojang.blaze3d.systems.RenderSystem.assertOnRenderThread();reset();if(before!=0)GL11.glDeleteTextures(before);if(after!=0)GL11.glDeleteTextures(after);before=after=width=height=0;}
 }

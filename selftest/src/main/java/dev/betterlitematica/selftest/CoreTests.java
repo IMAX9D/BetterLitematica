@@ -137,6 +137,13 @@ public final class CoreTests {
             });
             test("action highlights are bounded and expire independently",()->{
                 var history=new ActionHighlights(3);for(int i=0;i<10;i++)history.add(i,ActionHighlights.Kind.PLACE,i,100);check(history.live(20).size()==3&&history.live(20).stream().allMatch(m->m.position()>=7),"Events evict oldest entries");history.add(9,ActionHighlights.Kind.FAILED,20,50);check(history.live(20).size()==3&&history.live(20).stream().filter(m->m.position()==9).findFirst().orElseThrow().kind()==ActionHighlights.Kind.FAILED,"Same location updates event, not duplicates");check(history.live(200).isEmpty(),"All elapsed feedback removed");
+                var feedback=new ActionHighlights(4);for(var kind:ActionHighlights.Kind.values()){long duration=HighlightFades.duration(kind,1_500_000_000L);feedback.add(kind.ordinal(),kind,0,duration);check(duration==(kind==ActionHighlights.Kind.PLACE?450_000_000L:1_500_000_000L),"Only placement feedback is shortened");}
+                check(feedback.live(449_000_000L).size()==4,"All feedback visible before placement deadline");check(feedback.live(450_000_000L).size()==3,"Other action feedback retains its duration");check(feedback.live(450_000_000L).stream().noneMatch(m->m.kind()==ActionHighlights.Kind.PLACE),"Placement feedback expires at its real deadline");
+                check(HighlightFades.duration(ActionHighlights.Kind.PLACE,100_000_000L)==100_000_000L,"Short user durations remain short");
+                var mark=new ActionHighlights.Mark(0,ActionHighlights.Kind.PLACE,0,450_000_000L);float previous=1;
+                for(long now=0;now<=450_000_000L;now+=1_000_000L){float opacity=HighlightFades.action(mark,now);check(opacity>=0&&opacity<=previous,"Placement fade never flashes back brighter");previous=opacity;}
+                check(previous==0,"Placement fade reaches zero");
+                for(int range:new int[]{1,2,8,32,128}){float prior=1;for(int i=0;i<=1000;i++){double distance=range*i/1000d;float opacity=HighlightFades.missing(distance,range,1);check(Float.isFinite(opacity)&&opacity>=0&&opacity<=prior,"Distance fade is finite and monotonic at all supported ranges");prior=opacity;}check(prior==0,"Missing highlight vanishes at range edge");check(HighlightFades.missing(range*.5,range,-1)>0,"Turning away never culls a nearby cell");check(HighlightFades.missing(range*.5,range,1)>=HighlightFades.missing(range*.5,range,-1),"Crosshair emphasis remains gentle and positive");}
             });
             test("subregion signed anchors and all composed orientations",()->{
                 var r=new Region("negative",new Vec3i(8,17,26),new Vec3i(3,4,5),new Vec3i(10,20,30));

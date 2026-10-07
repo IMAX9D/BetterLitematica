@@ -88,6 +88,7 @@ final class PrinterScreen extends MenuScreen {
         toggle("施工高亮",0,56,()->draft.highlights,v->draft.highlights=v);toggle("高亮置顶",1,56,()->draft.highlightOnTop,v->draft.highlightOnTop=v);
         buttonAt("样式："+switch(draft.highlightStyle){case OUTLINE->"轮廓";case FILLED->"填充";case BOTH->"轮廓与填充";},cellX(0,4),96,cellWidth(4),()->{read();draft.highlightStyle=PrinterSettings.HighlightStyle.values()[(draft.highlightStyle.ordinal()+1)%3];refresh();},true,false);
         number("时长 / ms",draft.highlightMillis,1,4,82,v->draft.highlightMillis=v);
+        hint(fields.get("时长 / ms"),"放置反馈最多 450 ms，其它动作反馈使用此时长");
         number("高亮范围 / 格",draft.highlightRange,2,4,82,v->draft.highlightRange=v);
         number("高亮上限",draft.highlightLimit,3,4,82,v->draft.highlightLimit=v);
         hint(fields.get("高亮上限"),"0 不限");
