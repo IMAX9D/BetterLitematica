@@ -2,6 +2,7 @@ import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 
 def target = project.ext.minecraftTarget
+if (target.artifactVersion) version = target.artifactVersion
 def remapped = target.mappingMode == 'yarn'
 apply plugin: remapped ? 'net.fabricmc.fabric-loom-remap' : 'net.fabricmc.fabric-loom'
 base { archivesName = "betterlitematica-fabric-${target.minecraft}" }

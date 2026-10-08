@@ -1,1 +1,16 @@
-// Intentionally no Minecraft, Fabric, or third-party dependencies.
+// Production core remains dependency-free; IO and runtime are exercised only by regression tests.
+dependencies {
+    testImplementation project(':blueprint-io')
+    testImplementation project(':runtime')
+}
+tasks.register('selfTest', JavaExec) {
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.betterlitematica.selftest.CoreTests'
+    enableAssertions = true
+    maxHeapSize = '1g'
+}
+tasks.named('check') { dependsOn tasks.named('selfTest') }
+
+// This suite uses its own dependency-free runner instead of a JUnit discovery engine.
+tasks.named('test') { enabled = false; dependsOn tasks.named('selfTest') }
