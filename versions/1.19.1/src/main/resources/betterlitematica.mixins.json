@@ -1,0 +1,39 @@
+{
+  "required": true,
+  "package": "dev.betterlitematica.fabric.mixin",
+  "plugin": "dev.betterlitematica.fabric.OptionalMixins",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "EasyPlaceMixin",
+    "EditorKeyboardMixin",
+    "WheelPlayerListMixin",
+    "AccurateBlockItemMixin",
+    "AccurateServerMixin",
+    "compat.LegacyHotkeysMixin",
+    "compat.LegacyInputMixin",
+    "compat.LegacyRenderMixin",
+    "compat.LegacyEasyPlaceMixin",
+    "compat.LegacyPrinterMixin",
+    "compat.TomLegacyPrinterMixin",
+    "compat.TomLegacyKeysMixin",
+    "compat.TweakerooPlacementMixin",
+    "PickBlockMixin",
+    "ToolScrollMixin",
+    "VerificationBlockMixin",
+    "PasteBlockMixin",
+    "VerificationChunkMixin",
+    "PrinterBlockUpdateMixin",
+    "PrinterSignMixin",
+    "MiningLookMixin",
+    "SupplyInteractionMixin",
+    "ExternalMinerMixin",
+    "RenderLayerAccessor",
+    "RenderPhasesAccessor",
+    "TexturePhaseAccessor",
+    "RenderPhaseAccessor",
+    "LegacyShaderReloadMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -35,7 +35,8 @@ def prepareResources = tasks.register('prepareAdapterResources', Sync) {
         metadata.depends.minecraft = target.minecraft
         metadata.depends.java = ">=${target.java}"
         metadata.depends.fabricloader = ">=${target.loader}"
-        metadata.depends.'fabric-api' = ">=${target.fabricApi}"
+        metadata.depends.remove('fabric-api')
+        metadata.depends[target.fabricApiId ?: 'fabric-api'] = ">=${target.fabricApi}"
         file.setText(JsonOutput.prettyPrint(JsonOutput.toJson(metadata)) + '\n', 'UTF-8')
         def mixins = new File(resourceOutput.get().asFile, 'betterlitematica.mixins.json')
         if (mixins.isFile()) {
@@ -52,6 +53,10 @@ tasks.named('processResources') { dependsOn prepareResources }
 def widener = roots.collect { new File(it, 'resources/betterlitematica.accesswidener') }.findAll { it.isFile() }.last()
 loom { accessWidenerPath = widener }
 dependencies {
+    if (target.bundledJoml) {
+        implementation 'org.joml:joml:1.10.5'
+        include 'org.joml:joml:1.10.5'
+    }
     minecraft "com.mojang:minecraft:${target.minecraft}"
     if (remapped) mappings "net.fabricmc:yarn:${target.yarn}:v2"
     add(remapped ? 'modImplementation' : 'implementation', "net.fabricmc:fabric-loader:${target.loader}")

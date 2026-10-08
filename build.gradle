@@ -2,7 +2,7 @@ plugins {
     id 'net.fabricmc.fabric-loom-remap' version '1.17.21' apply false
     id 'net.fabricmc.fabric-loom' version '1.17.21' apply false
 }
-allprojects { group = 'dev.betterlitematica'; version = '0.4.0-dev'; repositories { mavenCentral() } }
+allprojects { group = 'dev.betterlitematica'; version = '0.4.1-dev'; repositories { mavenCentral() } }
 subprojects {
     apply plugin: 'java-library'
     if (rootProject.providers.gradleProperty('buildRoot').isPresent()) {
