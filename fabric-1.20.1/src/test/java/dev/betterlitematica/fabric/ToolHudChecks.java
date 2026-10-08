@@ -19,6 +19,9 @@ public final class ToolHudChecks {
         }catch(ReflectiveOperationException failure){throw new AssertionError(failure);}
     }
     public static int run(){checks=0;
+        check(ToolHud.modeIndex(ToolMode.PASTE,true).equals("5 / 8")&&ToolHud.modeIndex(ToolMode.REBUILD,true).equals("8 / 8"),"HUD numbers omit the hidden legacy mode");
+        check(ToolHud.modeIndex(ToolMode.REBUILD,false).equals("3 / 3"),"Survival HUD counts only the permitted wheel modes");
+        check(ToolHud.modeIndex(ToolMode.GRID_PASTE,true).equals(ToolHud.modeIndex(ToolMode.PASTE,true)),"Legacy settings use the visible replacement index");
         var box=new SelectionBox("反向区域",new Vec3i(-2,-35,4),new Vec3i(-7,-39,-3));
         var area=new AreaSelection(List.of(box),box.name(),new Vec3i(-12,-44,-8),false);
         var seed=input(ToolMode.SELECTION,area,null,List.of());var captured=ToolHudData.capture(seed);

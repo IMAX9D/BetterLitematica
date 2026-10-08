@@ -14,6 +14,24 @@ public final class AdapterChecks {
     private static void check(boolean value,String message){checks++;if(!value)throw new AssertionError(message);}
     public static void main(String[] args)throws Exception{
         SharedConstants.createGameVersion();Bootstrap.initialize();
+        var nearby=new java.util.HashMap<Block,Integer>();
+        NearbyBuildHud.add(nearby,Blocks.STONE.getDefaultState(),Blocks.AIR.getDefaultState());
+        NearbyBuildHud.add(nearby,Blocks.STONE.getDefaultState(),Blocks.DIRT.getDefaultState());
+        NearbyBuildHud.add(nearby,Blocks.STONE.getDefaultState(),Blocks.STONE.getDefaultState());
+        NearbyBuildHud.add(nearby,Blocks.AIR.getDefaultState(),Blocks.STONE.getDefaultState());
+        NearbyBuildHud.add(nearby,Blocks.GOLD_BLOCK.getDefaultState(),null);
+        check(nearby.size()==1&&nearby.get(Blocks.STONE)==2,"Nearby counts unfinished positions, excludes completed, air targets and unknown world");
+        NearbyBuildHud.add(nearby,Blocks.OAK_STAIRS.getDefaultState().with(StairsBlock.FACING,net.minecraft.util.math.Direction.EAST),Blocks.OAK_STAIRS.getDefaultState());
+        check(nearby.get(Blocks.OAK_STAIRS)==1,"Wrong state remains unfinished even when block item matches");
+        for(var block:List.of(Blocks.DIRT,Blocks.GLASS,Blocks.WATER,Blocks.LAVA,Blocks.OAK_PLANKS))NearbyBuildHud.add(nearby,block.getDefaultState(),Blocks.AIR.getDefaultState());
+        var nearbyEntries=NearbyBuildHud.entries(nearby);check(nearbyEntries.size()==7&&HudExpansion.rows(nearbyEntries.size())==2,"All seven block types survive and wrap to two rows");
+        check(nearbyEntries.stream().anyMatch(e->e.block()==Blocks.WATER&&e.icon().isOf(Items.WATER_BUCKET)),"Fluid target retains a visible icon");
+        var expansion=new HudExpansion();long animationStart=1_000_000_000L;
+        check(expansion.height(100,animationStart)==0,"HUD starts collapsed");double middle=expansion.height(100,animationStart+110_000_000L);
+        check(middle>50&&middle<100,"HUD cubic opening is nonlinear");
+        check(expansion.height(160,animationStart+110_000_000L)==middle,"Retargeting rows preserves current visible height");
+        check(expansion.height(160,animationStart+330_000_000L)==160,"HUD settles at exact new row height");
+        expansion.height(0,animationStart+340_000_000L);check(expansion.height(0,animationStart+560_000_000L)==0,"Empty HUD fully collapses without stale content");
         checks+=PreviewAdapterChecks.run();
         checks+=UiDesignChecks.run();checks+=UiTextureQueueChecks.run();checks+=HudNumberChecks.run();checks+=ToolHudChecks.run();
         checks+=ToolEditorChecks.run();checks+=ToolInventoryChecks.run();checks+=ToolInteractionChecks.run();checks+=ToolSelectionResizeChecks.run();
@@ -191,6 +209,10 @@ public final class AdapterChecks {
             var transformed=entity.getList("Pos",6);check(Math.abs(transformed.getDouble(0)-(anchor.x()+0.5))<0.00001&&Math.abs(transformed.getDouble(2)-(anchor.z()+0.5))<0.00001,"Entity center remains attached to transformed anchor");
         }
         var fileMetadata=new BlueprintMetadata("counts",0,"0".repeat(64),List.of(BlockStateSpec.AIR,BlockStateSpec.parse("minecraft:stone"),BlockStateSpec.parse("minecraft:oak_slab[type=double]"),BlockStateSpec.parse("minecraft:oak_door[half=upper]"),BlockStateSpec.parse("missing:unknown")),List.of(new Region("large",Vec3i.ZERO,new Vec3i(1000,100,100))),List.of());
+        check(new ProjectionController.BlockFilterSource(fileMetadata,new long[]{5,9_999_970,10,0,10}).blockIds().equals(List.of("minecraft:oak_slab","minecraft:stone","missing:unknown")),"Display filter uses complete positive block counts, excluding air and unused palette entries while retaining unknown IDs");
+        var variantMetadata=new BlueprintMetadata("variants",0,"0".repeat(64),List.of(BlockStateSpec.AIR,BlockStateSpec.parse("minecraft:oak_slab[type=top]"),BlockStateSpec.parse("minecraft:oak_slab[type=bottom]"),BlockStateSpec.parse("minecraft:water")),fileMetadata.regions(),List.of());
+        check(new ProjectionController.BlockFilterSource(variantMetadata,new long[]{0,1,2,3}).blockIds().equals(List.of("minecraft:oak_slab","minecraft:water")),"Display filter merges block states and keeps blocks without inventory items");
+        check(BlockDisplayFilterScreen.entry("missing:unknown").name().equals("missing:unknown")&&BlockDisplayFilterScreen.entry("missing:unknown").icon().isEmpty(),"Unknown projection blocks keep their identity instead of becoming air");
         var fileMaterials=new FileMaterials(fileMetadata,new long[]{0,9_999_970,10,10,10},new PlacementTransform(Vec3i.ZERO,0,false,false));
         for(int i=0;i<1000&&!fileMaterials.finished();i++)fileMaterials.tick();
         check(fileMaterials.finished(),"File materials complete with no world or renderer");
@@ -227,6 +249,20 @@ public final class AdapterChecks {
         check(opened.size()==openedBefore,"Scrollbar does not open files");
         browser.keyPressed(269,0,0);check(browser.scrollOffset()==810,"Browser End reaches final row");
         browser.entries(files.subList(0,1),"");check(browser.scrollOffset()==0,"Directory change resets scroll");
+        var chosenFiles=new java.util.ArrayList<dev.betterlitematica.runtime.SessionIo.FileEntry>();
+        var activatedFiles=new java.util.ArrayList<dev.betterlitematica.runtime.SessionIo.FileEntry>();
+        var keyboardBrowser=new BrowserGrid(0,552,90,chosenFiles::add,activatedFiles::add);keyboardBrowser.entries(files,"");
+        keyboardBrowser.keyPressed(264,0,0);
+        check(chosenFiles.get(0).equals(files.get(0))&&activatedFiles.isEmpty(),"Arrow navigation highlights a folder without entering it");
+        keyboardBrowser.keyPressed(257,0,0);
+        check(activatedFiles.equals(java.util.List.of(files.get(0))),"Enter activates the highlighted folder");
+        keyboardBrowser.keyPressed(264,0,0);keyboardBrowser.keyPressed(335,0,0);
+        check(chosenFiles.get(1).equals(files.get(1))&&activatedFiles.get(1).equals(files.get(1)),"Down then keypad Enter selects and activates a file");
+        keyboardBrowser.keyPressed(269,0,0);
+        check(keyboardBrowser.selectedPath().equals(files.get(29).path())&&keyboardBrowser.scrollOffset()==810,"End selects and reveals the final file");
+        keyboardBrowser.keyPressed(268,0,0);keyboardBrowser.mouseClicked(10,40,0);
+        check(keyboardBrowser.selectedPath().equals(files.get(1).path())&&activatedFiles.size()==2,"Single file click previews without loading");
+        keyboardBrowser.entries(java.util.List.of(),"");check(!keyboardBrowser.keyPressed(257,0,0)&&activatedFiles.size()==2,"Enter on an empty listing does not activate a stale selection");
         check(BrowserGrid.marqueeOffset(56,0.4)==0,"Marquee pauses at start");
         check(Math.abs(BrowserGrid.marqueeOffset(56,1.8)-28)<0.001,"Marquee moves forward");
         check(BrowserGrid.marqueeOffset(56,3)==56,"Marquee pauses at end");

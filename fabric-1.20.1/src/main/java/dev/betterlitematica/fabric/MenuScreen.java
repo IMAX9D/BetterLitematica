@@ -26,6 +26,7 @@ abstract class MenuScreen extends Screen {
     private boolean presented;
     private double animatedX,animatedY;
     private BlueprintPreviewPanel previewCapture;
+    private ClickableWidget pendingFocus;
     private ButtonWidget back;
     private ClickableWidget hintTarget;private long hintSince;
     private static final long HINT_DELAY=350_000_000L;
@@ -120,6 +121,16 @@ abstract class MenuScreen extends Screen {
     protected boolean scrolls(int x,int y){return true;}
     private int maxScroll(){return Math.max(0,contentHeight-Math.max(20,bodyBottom-bodyTop));}
     private void position(){scroll=Math.max(0,Math.min(scroll,maxScroll()));for(var item:body){boolean moving=scrolls(item.widget.getX(),item.y);item.widget.setY(bodyTop+item.y-(moving?scroll:0));item.widget.visible=item.widget.getY()>=(moving?scrollTop():bodyTop)&&item.widget.getY()+item.widget.getHeight()<=bodyBottom;}}
+    /** Validation must reveal the field, including fields below the current scroll position. */
+    protected final void focusControl(ClickableWidget widget){
+        for(var item:body)if(item.widget==widget&&scrolls(widget.getX(),item.y)){
+            int top=bodyTop+item.y-scroll,bottom=top+widget.getHeight();
+            if(top<scrollTop())scroll-=scrollTop()-top;
+            else if(bottom>bodyBottom)scroll+=bottom-bodyBottom;
+            position();break;
+        }
+        setFocused(widget);pendingFocus=widget;
+    }
     private UiViewport viewport(){var window=client.getWindow();return UiViewport.fit(Math.max(1,window.getFramebufferWidth()),Math.max(1,window.getFramebufferHeight()),Math.max(1,window.getScaledWidth()),Math.max(1,window.getScaledHeight()),window.getScaleFactor());}
     private double inputX(UiViewport v,double x){return v.inputX(x)-(previewControl()==null?animatedX:0);}
     private double inputY(UiViewport v,double y){return v.inputY(y)-(previewControl()==null?animatedY:0);}
@@ -159,10 +170,15 @@ abstract class MenuScreen extends Screen {
     @Override public boolean keyPressed(int key,int scan,int modifiers){if(getFocused() instanceof OverlayList list&&list.keyPressed(key,scan,modifiers))return true;if(getFocused() instanceof VerificationList results&&results.keyPressed(key,scan,modifiers))return true;if(getFocused() instanceof MaterialGrid grid&&grid.keyPressed(key,scan,modifiers))return true;if(getFocused() instanceof BrowserGrid grid&&grid.keyPressed(key,scan,modifiers))return true;if(key==org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_DOWN||key==org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_UP){scroll+=(key==org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_DOWN?1:-1)*Math.max(26,bodyBottom-bodyTop-26);position();return true;}return super.keyPressed(key,scan,modifiers);}
     @Override public void tick(){
         if(sessionEpoch!=controller.sessionEpoch()){client.setScreen(null);return;}checkPreviewCapture();if(getFocused()!=null&&!children().contains(getFocused()))setFocused(null);for(var item:List.copyOf(body))if(item.widget instanceof TextFieldWidget field)field.tick();updateMenu();
+        // Screen.mouseClicked focuses the button after its callback; validation owns the next focus.
+        if(pendingFocus!=null){var requested=pendingFocus;pendingFocus=null;if(children().contains(requested))setFocused(requested);}
         // Back can read "放弃" once a page holds a draft; keep its wording current without rebuilding.
         if(back!=null){String label=backLabel();if(!back.getMessage().getString().equals(label))back.setMessage(Text.literal(label));}
     }
     @Override public final void render(DrawContext ctx,int mouseX,int mouseY,float delta){
+        ctx.getMatrices().push();
+        try{
+        ctx.getMatrices().translate(0,0,IndependentUi.MENU_DEPTH);
         checkPreviewCapture();
         var v=viewport();var window=client.getWindow();
         var preview=previewControl();
@@ -171,7 +187,7 @@ abstract class MenuScreen extends Screen {
         int x=(int)Math.floor(v.localPixelX(client.mouse.getX()*v.pixelWidth()/Math.max(1,window.getWidth()))-animatedX);
         int y=(int)Math.floor(v.localPixelY(client.mouse.getY()*v.pixelHeight()/Math.max(1,window.getHeight()))-animatedY);
         var ui=IndependentUi.INSTANCE;
-        if(!ui.begin(ctx,v)){
+        if(!ui.beginMenu(ctx,v)){
             // A geometric progress indicator during the one-time background font load; no native glyph fallback.
             int cx=window.getScaledWidth()/2,cy=window.getScaledHeight()/2;ctx.fill(cx-24,cy,cx+24,cy+1,UiMotion.alpha(UiTheme.ACCENT,.5));int p=(int)((System.nanoTime()/8_000_000L)%48);ctx.fill(cx-24+Math.max(0,p-12),cy,cx-24+p,cy+1,UiTheme.ACCENT);return;
         }
@@ -181,6 +197,7 @@ abstract class MenuScreen extends Screen {
                 preview.render(ctx,x,y,delta);
             }else{ui.effect(animatedX,animatedY,frame.alpha());renderCanvas(ctx,x,y,delta,ui);}
         }finally{ui.end();}
+        }finally{ctx.getMatrices().pop();}
     }
     private String crumb(){
         if(!(parent instanceof MenuScreen menu))return "";

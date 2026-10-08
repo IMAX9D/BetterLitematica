@@ -28,8 +28,15 @@ final class ToolInteractions {
     boolean legacyGrabActive(){return grabbed!=null||resizing!=null;}
     boolean selectModifierActive(){return modifier("toolGrabModifier")||mode().primary()&&modifier("toolPrimaryModifier")||mode().secondary()&&modifier("toolSecondaryModifier");}
     ToolSettings settings(){return controller.options().tools;}
-    ToolMode mode(){return ToolMode.valueOf(controller.options().mode);}
+    ToolMode mode(){
+        var stored=ToolMode.valueOf(controller.options().mode);
+        var available=stored.usable(client.player==null||client.player.isCreative());
+        // Migrate preferences only. Reading a mode must never start a paste or another world task.
+        if(stored!=available)controller.options().mode=available.name();
+        return available;
+    }
     void mode(ToolMode value){
+        value=value.replacement();
         if(value.creativeOnly()&&(client.player==null||!client.player.isCreative()))throw new IllegalStateException("此工具模式需要创造模式");
         if(mode()==ToolMode.REBUILD&&value!=ToolMode.REBUILD)controller.editor().pause();
         gizmo.cancel();releaseGrab();resizing=null;controller.options().mode=value.name();controller.saveOptions();status="";
@@ -158,7 +165,6 @@ final class ToolInteractions {
             case PASTE->{var target=controller.selectedId();controller.paste(target,settings().pasteRule,settings().pasteEntities,settings().pasteNbt);pasteJob=controller.creativeJob(target);}
             case MOVE->moveWorld(vec(client.player.getBlockPos()));
             case REBUILD->{var p=controller.selectedPlacement();if(p==null)throw new IllegalStateException("请先选择投影");client.setScreen(null);controller.editor().open(p.id());controller.editor().useHeld=false;controller.editor().block=settings().primary;controller.editor().resume(p.id());}
-            case GRID_PASTE->throw new IllegalStateException("参考版本未实现网格粘贴执行");
             default->throw new IllegalStateException("当前模式无需执行");
         }
     }

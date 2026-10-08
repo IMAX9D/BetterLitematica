@@ -32,6 +32,10 @@ final class BlueprintBrowserScreen extends MenuScreen {
     }
     private void click(SessionIo.FileEntry file){
         if(file.directory()){directory=file.path();query="";read(false);refresh();}
+        else{select(file);loadSelected();}
+    }
+    private void highlight(SessionIo.FileEntry file){
+        if(file.directory()){select(null);if(grid!=null)grid.selected(file.path());}
         else select(file);
     }
     private void loadSelected(){
@@ -45,7 +49,7 @@ final class BlueprintBrowserScreen extends MenuScreen {
         buttonAt("上级目录",left+innerWidth-148,14,72,()->{int slash=directory.lastIndexOf('/');directory=slash<0?"":directory.substring(0,slash);query="";read(false);refresh();},!directory.isEmpty(),false);
         buttonAt("刷新",left+innerWidth-70,14,70,()->{cancelPreview();read(true);requestPreview();},true,false);
         int gridWidth=(innerWidth-14)*38/100,bodyHeight=Math.max(30,bodyBottom-bodyTop-46);
-        if(grid==null)grid=new BrowserGrid(left,gridWidth,bodyHeight,file->controller.action(()->click(file)));
+        if(grid==null)grid=new BrowserGrid(left,gridWidth,bodyHeight,this::highlight,file->controller.action(()->click(file)));
         addBody(grid,46);
         if(preview==null){preview=new BlueprintPreviewPanel(controller,left+gridWidth+14,innerWidth-gridWidth-14,bodyHeight);preview.selected(selectedName);requestPreview();}
         preview.layout(left+gridWidth+14,innerWidth-gridWidth-14,bodyHeight);addBody(preview,46);
@@ -73,6 +77,10 @@ final class BlueprintBrowserScreen extends MenuScreen {
         }
     }
     @Override protected String statusLine(){return status;}
+    @Override public boolean keyPressed(int key,int scan,int modifiers){
+        if(key==org.lwjgl.glfw.GLFW.GLFW_KEY_DOWN&&getFocused()==search&&grid!=null&&!files.isEmpty()){setFocused(grid);return grid.keyPressed(key,scan,modifiers);}
+        return super.keyPressed(key,scan,modifiers);
+    }
     @Override public void removed(){cancelRead();cancelPreview();preview=null;reloadOnInit=true;super.removed();}
     @Override public void close(){cancelRead();cancelPreview();super.close();}
 }

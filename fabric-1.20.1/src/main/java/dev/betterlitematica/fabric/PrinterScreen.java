@@ -21,6 +21,7 @@ final class PrinterScreen extends MenuScreen {
         super("打印机","",parent,controller,true);sessionEpoch=controller.sessionEpoch();
         draft=PrinterSettings.read(controller.options().printer.snapshot());
     }
+    @Override protected String backLabel(){return "保存并返回";}
     @Override protected void buildMenu(){
         readers.clear();fields.clear();
         addBody(new OverlayLabel(left,innerWidth,"启用投影 · "+controller.printerPlacements().size()),0);
@@ -33,7 +34,7 @@ final class PrinterScreen extends MenuScreen {
             try{save();engine.start();client.setScreen(null);}catch(RuntimeException e){error=e.getMessage();throw e;}
         });
         stop=fixed("停止",80,64,()->{controller.printer().stop();notice="已停止";});
-        fixed("保存",152,64,this::save);
+        fixed("保存",152,64,()->{save();notice="设置已应用";});
         fixed("放弃更改",224,80,this::discard);updateMenu();
     }
     private void workPage(){
@@ -57,7 +58,7 @@ final class PrinterScreen extends MenuScreen {
         hint(fields.get("每 tick 上限"),"0：按时间预算执行");
         hint(fields.get("位置冷却 / tick"),"同一位置再次尝试前的等待时间");
         toggle("状态 HUD",0,222,()->draft.hud,v->draft.hud=v);
-        toggle("缺料 HUD",1,222,()->draft.missingHud,v->draft.missingHud=v);
+        toggle("周围待建 HUD",1,222,()->draft.missingHud,v->draft.missingHud=v);
     }
     private void settingsPage(){
         buttonAt("范围形状："+switch(draft.shape){case SPHERE->"球形";case OCTAHEDRON->"八面体";case CUBE->"立方体";},cellX(0,2),56,cellWidth(2),()->{read();draft.shape=PrinterRange.Shape.values()[(draft.shape.ordinal()+1)%3];refresh();},true,false);
@@ -133,10 +134,10 @@ final class PrinterScreen extends MenuScreen {
         if(scope==PrinterSettings.Scope.BELOW||scope==PrinterSettings.Scope.ABOVE)hint(button,scope==PrinterSettings.Scope.BELOW?"选区内 · 玩家下方":"选区内 · 玩家上方");
     }
     private void input(String label,String value,int column,int columns,int y,int max,Consumer<String> read){inputAt(label,value,cellX(column,columns),y,cellWidth(columns),max,read);}
-    private void inputAt(String label,String value,int x,int y,int width,int max,Consumer<String> read){TextFieldWidget field=fieldAt(label,rawInputs.getOrDefault(label,value),x,y,width,max);fields.put(label,field);field.setChangedListener(v->{rawInputs.put(label,v);error="";invalidField=null;if(label.equals("填充方块"))updateDirection();});readers.add(()->{try{read.accept(field.getText().trim());}catch(RuntimeException e){focusInvalidField(field);if(e instanceof NumberFormatException)throw new IllegalArgumentException(label+"：请输入有效数值");throw e;}});}
+    private void inputAt(String label,String value,int x,int y,int width,int max,Consumer<String> read){TextFieldWidget field=fieldAt(label,rawInputs.getOrDefault(label,value),x,y,width,max);fields.put(label,field);field.setChangedListener(v->{rawInputs.put(label,v);error="";notice="";invalidField=null;if(label.equals("填充方块"))updateDirection();});readers.add(()->{try{read.accept(field.getText().trim());}catch(RuntimeException e){focusInvalidField(field);if(e instanceof NumberFormatException)throw new IllegalArgumentException(label+"：请输入有效数值");throw e;}});}
     private void number(String label,int value,int column,int columns,int y,IntConsumer read){number(label,Integer.toString(value),column,columns,y,v->read.accept(Integer.parseInt(v)));}
     private void number(String label,String value,int column,int columns,int y,Consumer<String> read){input(label,value,column,columns,y,10,read);}
-    private void focusInvalidField(TextFieldWidget field){invalidField=field;setFocused(field);}
+    private void focusInvalidField(TextFieldWidget field){invalidField=field;focusControl(field);}
     private void focusInvalidField(){for(var field:fields.entrySet()){String label=field.getKey().split("[ /（]",2)[0];if(error.startsWith(label)||label.equals("批次间隔")&&error.startsWith("间隔")||label.equals("时长")&&error.startsWith("高亮时长")){focusInvalidField(field.getValue());break;}}}
     private void read(){invalidField=null;try{for(var reader:readers)reader.run();draft.validate();error="";}catch(RuntimeException e){error=Objects.toString(e.getMessage(),"设置无效");focusInvalidField();throw new IllegalArgumentException(error);}}
     private void save(){if(sessionEpoch!=controller.sessionEpoch())throw new IllegalStateException("世界已切换");read();try{controller.printer().configure(PrinterSettings.read(draft.snapshot()));}catch(RuntimeException e){error=Objects.toString(e.getMessage(),"设置无效");focusInvalidField();throw e;}}

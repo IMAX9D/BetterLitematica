@@ -36,7 +36,12 @@ final class OptionsScreen extends MenuScreen {
             int half=(rw-8)/2;buttonAt("保存",right,124,half,()->bind(chord.getText()),!recording,true);buttonAt("清除",right+half+8,124,half,()->bind(""),!recording,false);
             cancelRecord=buttonAt(recording?"取消":"恢复默认",right,156,rw,()->{if(recording){recording=false;refresh();}else bind(new InteractionOptions().keys.getOrDefault(selected,""));},true,false);
             String current=InputBindings.normalize(s.keys.get(selected));
-            if(!current.isEmpty()&&!current.contains("+")){int code=InputBindings.code(current);if(code>=0){var overlaps=java.util.Arrays.stream(client.options.allKeys).filter(k->k.matchesKey(code,-1)).map(k->net.minecraft.text.Text.translatable(k.getTranslationKey()).getString()).distinct().toList();if(!overlaps.isEmpty())caption("游戏按键重叠："+String.join("、",overlaps),right,192,rw);}}
+            if(!current.isEmpty()&&!current.contains("+")){int code=InputBindings.code(current);if(code>=0){
+                boolean sharedList=selected.equals("wheel")&&client.options.playerListKey.matchesKey(code,-1);
+                var overlaps=java.util.Arrays.stream(client.options.allKeys).filter(k->k.matchesKey(code,-1)&&(!sharedList||k!=client.options.playerListKey)).map(k->net.minecraft.text.Text.translatable(k.getTranslationKey()).getString()).distinct().toList();
+                if(sharedList)caption("按住时同时显示轮盘与玩家列表",right,192,rw);
+                if(!overlaps.isEmpty())caption("游戏按键重叠："+String.join("、",overlaps),right,sharedList?214:192,rw);
+            }}
 
         }
     }

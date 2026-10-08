@@ -22,6 +22,7 @@ public final class BetterLitematicaClient implements ClientModInitializer {
     public static boolean wheelKey(long window,int key,int scan,int action){boolean consumed=modeWheelInput!=null&&modeWheelInput.key(window,key,scan,action);if(consumed&&interactions!=null)interactions.suspendInput();return consumed;}
     public static boolean wheelMouse(long window,int button,int action){return modeWheelInput!=null&&modeWheelInput.mouse(window,button,action);}
     public static boolean wheelBlocksWorldInput(){return modeWheelInput!=null&&modeWheelInput.blocksWorldInput();}
+    public static boolean wheelSharesPlayerListHold(){return modeWheelInput!=null&&modeWheelInput.sharesPlayerListHold();}
     private final DeferredMenuOpen menuOpen=new DeferredMenuOpen();
     public static boolean toolInput(long window,int key,int action){return activeController!=null&&activeController.tool().event(window,key,action);}
     public static boolean toolBlocksWorld(){return activeController!=null&&activeController.tool().blocksVanilla();}
@@ -66,7 +67,7 @@ public final class BetterLitematicaClient implements ClientModInitializer {
         interactions=new BuildingInteractions(client,controller);
         ClientTickEvents.START_CLIENT_TICK.register(mc->{modeWheelInput.tick();menuOpen.tick(mc.world,mc.getNetworkHandler(),mc.currentScreen);});
         // Shortcut transitions are captured by inputEvent, including taps between ticks.
-        ClientTickEvents.END_CLIENT_TICK.register(mc->{controller.tick();interactions.tick();if(!controller.printer().running())PrinterColdWarmup.step(mc);controller.bedrock().tick();if(!controller.bedrock().enabled())controller.printer().tick();});
+        ClientTickEvents.END_CLIENT_TICK.register(mc->{controller.tick();interactions.tick();if(!controller.printer().running())PrinterColdWarmup.step(mc);controller.printer().tickHud();controller.bedrock().tick();if(!controller.bedrock().enabled())controller.printer().tick();});
         net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player,world,hand,pos,direction)->{
             if(world==client.world&&controller.bedrock().attack(pos))return net.minecraft.util.ActionResult.FAIL;
             if(world==client.world&&interactions.blockClick(true,new net.minecraft.util.hit.BlockHitResult(net.minecraft.util.math.Vec3d.ofCenter(pos),direction,pos,false)))return net.minecraft.util.ActionResult.FAIL;return net.minecraft.util.ActionResult.PASS;
@@ -90,7 +91,7 @@ public final class BetterLitematicaClient implements ClientModInitializer {
             try{
                 layout=information.arrange(ui,layout);
                 double toolTop=toolHud.top(client,ui,controller,layout);
-                statusHud.draw(ui,controller,layout);
+                statusHud.draw(ui,controller,layout,toolTop);
                 information.draw(client,ui,layout);
                 toolHud.draw(client,ui,controller,layout,toolTop);
             }finally{ui.end();}

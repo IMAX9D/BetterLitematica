@@ -60,7 +60,7 @@ final class ToolHud {
         else HudIcons.tool(ui,x+7,y+7,11,UiTheme.ACCENT);
         String title=data.mode().label()+(data.badge().isEmpty()?"":" · "+data.badge());
         ui.text(title,x+25,y+5,width-68,UiTheme.TEXT);
-        String index=(data.mode().ordinal()+1)+" / "+ToolMode.values().length;
+        String index=modeIndex(data.mode(),client.player.isCreative());
         ui.text(index,x+width-ui.measure(index)-8,y+5,ui.measure(index)+3,UiTheme.MUTED);
         ui.rect(x+7,y+22,x+width-7,y+22.5,UiTheme.DIVIDER);
         for(var row:data.rows()) {
@@ -78,6 +78,7 @@ final class ToolHud {
             rowY+=rowHeight;
         }
     }
+    static String modeIndex(ToolMode mode,boolean creative){var modes=ToolMode.selectable(creative);return (modes.indexOf(mode.usable(creative))+1)+" / "+modes.size();}
     private static Block block(String spec) {
         try {
             var state=StateResolver1201.checked(BlockStateSpec.parse(spec));String text=state.getBlock().getName().getString();

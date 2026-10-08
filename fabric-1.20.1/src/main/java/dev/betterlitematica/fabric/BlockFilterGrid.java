@@ -8,7 +8,7 @@ import net.minecraft.text.Text;
 import java.util.*;
 import java.util.function.Consumer;
 
-/** Registry-only virtual viewport; item rendering is limited to visible cells. */
+/** Virtual block viewport; item rendering is limited to visible cells. */
 final class BlockFilterGrid extends ButtonWidget {
     record Entry(String id,String name,ItemStack icon) {}
     private static final int COLUMNS=4,ROW=40,GAP=5;

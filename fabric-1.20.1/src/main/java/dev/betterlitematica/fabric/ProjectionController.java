@@ -360,6 +360,18 @@ final class ProjectionController implements AutoCloseable {
         }return result;
     }
     FileMaterials materialTotals(){return materialTotals(selected);}
+    /** Complete source histogram; independent of selection, visibility and resident sections. */
+    record BlockFilterSource(BlueprintMetadata metadata,long[] counts){
+        List<String> blockIds(){
+            var ids=new TreeSet<String>();
+            for(int i=0;i<counts.length;i++)if(counts[i]>0&&!metadata.palette().get(i).isAir())ids.add(metadata.palette().get(i).name());
+            return List.copyOf(ids);
+        }
+    }
+    BlockFilterSource blockFilterSource(UUID id){
+        var entry=entries.get(id);
+        return entry==null||entry.metadata==null||entry.counts==null?null:new BlockFilterSource(entry.metadata,entry.counts);
+    }
     FileMaterials materialTotals(UUID id){
         Entry entry=entries.get(id);if(entry==null||entry.metadata==null||entry.counts==null)return null;
         if(entry.materials==null)entry.materials=new FileMaterials(entry.metadata,entry.counts,entry.placement.transform());

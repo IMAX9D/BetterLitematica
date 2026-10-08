@@ -9,12 +9,28 @@ public final class ModeWheelChecks {
         Object world=new Object(),connection=new Object(),screen;
         boolean focused=true,player=true;
         Input(){update(false,false);}
+        boolean shares(boolean sameKey){return state.sharesHold(world,connection,focused,player,screen,sameKey);}
         ModeWheelInput.Lifecycle.Decision update(boolean down,boolean press){return state.update(world,connection,focused,player,screen,down,press);}
         ModeWheelInput.Lifecycle.Decision update(boolean down,boolean press,boolean retained){return state.update(world,connection,focused,player,screen,down,press,retained);}
         void open(){var result=update(true,true);check(result.open()&&result.consume(),"Physical rising press opens and consumes");screen=new Object();state.bind(screen);}
         void release(){var previous=screen;var result=update(false,false);check(result.close()==previous&&result.consume(),"Release closes exactly the owned screen");screen=null;check(!state.claimed()&&state.owned()==null,"Release clears ownership");}
     }
     public static int run(){checks=0;
+        var shared=new Input();check(!shared.shares(true),"No wheel cannot synthesize the player list hold");shared.open();
+        check(shared.shares(true)&&!shared.shares(false),"Held wheel shares only its actual binding with the player list");
+        shared.update(false,false,true);check(!shared.shares(true)&&shared.state.owned()==shared.screen,"Retained editing releases player list while preserving wheel");
+        for(int change=0;change<8;change++){
+            shared=new Input();shared.open();
+            if(change==0)shared.focused=false;
+            else if(change==1)shared.player=false;
+            else if(change==2)shared.world=new Object();
+            else if(change==3)shared.connection=new Object();
+            else if(change==4)shared.screen=new Object();
+            else if(change==5)shared.screen=null;
+            else if(change==6)shared.state.reset();
+            else shared.release();
+            check(!shared.shares(true),"Context changes revoke shared player list before the next lifecycle tick");
+        }
         var in=new Input();in.open();for(int i=0;i<100;i++){var result=in.update(true,i%2==0);check(!result.open()&&result.consume()&&result.close()==null,"Held/repeated Tab cannot open again");}in.release();
         in.open();in.release(); // A tap entirely between ticks still has exact ownership.
         in=new Input();check(!in.update(true,false).open(),"Polling a held key is not a new press");check(!in.update(true,true).open(),"A late repeat cannot open a missed press");in.update(false,false);in.open();

@@ -36,7 +36,12 @@ final class SelectionScreen extends MenuScreen {
         buttonAt("取消捕获",left+innerWidth-70,258,70,controller::cancelCapture,true,false);
         fixed("创建投影",0,80,()->{controller.selectionCoordinates(read(0),read(1),read(2));seen=controller.selection();controller.captureTemporary();draft=null;refresh();}).active=has;
     }
-    private Vec3i read(int row){return new Vec3i(Integer.parseInt(coordinates[row][0].getText()),Integer.parseInt(coordinates[row][1].getText()),Integer.parseInt(coordinates[row][2].getText()));}
+    private Vec3i read(int row){
+        int[] values=new int[3];
+        for(int axis=0;axis<3;axis++)try{values[axis]=Integer.parseInt(coordinates[row][axis].getText().strip());}
+        catch(NumberFormatException e){focusControl(coordinates[row][axis]);throw new IllegalArgumentException(new String[]{"角点 1","角点 2","原点"}[row]+" · "+new String[]{"X","Y","Z"}[axis]+" 坐标须为整数");}
+        return new Vec3i(values[0],values[1],values[2]);
+    }
     private void write(int row,Vec3i value){coordinates[row][0].setText(Integer.toString(value.x()));coordinates[row][1].setText(Integer.toString(value.y()));coordinates[row][2].setText(Integer.toString(value.z()));}
     @Override protected void updateMenu(){if(!controller.selection().equals(seen))changed();}
     @Override protected String statusLine(){return controller.captureStatus().equals("没有捕获任务")?"":controller.captureStatus();}

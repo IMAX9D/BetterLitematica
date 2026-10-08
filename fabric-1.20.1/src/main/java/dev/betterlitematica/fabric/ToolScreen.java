@@ -16,22 +16,23 @@ final class ToolScreen extends MenuScreen {
     private OverlayList modes;private OverlayLabel targetLabel;
     private TextFieldWidget itemField,primaryField,secondaryField,distanceField;
     private ButtonWidget execute,pause,cancel;
+    private boolean creativeModes;private ToolMode shownMode;private long appliedUntil;
     ToolScreen(Screen parent,ProjectionController controller){
         super("工具","",parent,controller,true);var settings=controller.tool().settings();item=controller.options().toolItem;primary=settings.primary;secondary=settings.secondary;distance=Integer.toString(settings.distance);
         executeRequiresTool=settings.executeRequiresTool;expand=settings.expandSelection;deleteEntities=settings.deleteEntities;deletePlacement=settings.deletePlacement;pasteEntities=settings.pasteEntities;pasteNbt=settings.pasteNbt;pasteRule=settings.pasteRule;
     }
     @Override protected void buildMenu(){
-        var mode=controller.tool().mode();int lw=144,right=left+lw+18,rw=innerWidth-lw-18;
+        var mode=controller.tool().mode();shownMode=mode;creativeModes=client.player!=null&&client.player.isCreative();int lw=144,right=left+lw+18,rw=innerWidth-lw-18;
         if(modes==null)modes=new OverlayList(left,lw,bodyBottom-bodyTop,name->{runAction(()->{controller.tool().mode(ToolMode.valueOf(name));error="";});refresh();});
-        modes.rows(Arrays.stream(ToolMode.values()).map(m->new OverlayList.Row(m.name(),m.label(),m==mode)).toList(),mode.name());addBody(modes,0);
+        modes.rows(ToolMode.selectable(creativeModes).stream().map(m->new OverlayList.Row(m.name(),m.label(),m==mode)).toList(),mode.name());addBody(modes,0);
         targetLabel=new OverlayLabel(right,rw,targetName());addBody(targetLabel,0);
-        itemField=fieldAt("工具物品",item,right,26,rw,4096);itemField.setChangedListener(v->{item=v;error="";});hint(itemField,"物品 ID，可附加 NBT；留空使用空手");
+        itemField=fieldAt("工具物品",item,right,26,rw,4096);itemField.setChangedListener(v->{item=v;edited();});hint(itemField,"物品 ID，可附加 NBT；留空使用空手");
         int half=(rw-8)/2;
         buttonAt(expand?"选点：扩展":"选点：角点",right,88,half,()->{expand=!expand;error="";refresh();},mode.selection(),expand);
-        distanceField=fieldAt("距离",distance,right+half+8,74,half,3);distanceField.setChangedListener(v->{distance=v;error="";});
+        distanceField=fieldAt("距离",distance,right+half+8,74,half,3);distanceField.setChangedListener(v->{distance=v;edited();});
         // Keep both raw state fields reachable so an invalid draft can always be corrected before saving.
-        primaryField=fieldAt(mode==ToolMode.REPLACE?"替换为":"主方块",primary,right,124,half,512);primaryField.setChangedListener(v->{primary=v;error="";});
-        secondaryField=fieldAt(mode==ToolMode.REPLACE?"匹配方块":"副方块",secondary,right+half+8,124,half,512);secondaryField.setChangedListener(v->{secondary=v;error="";});
+        primaryField=fieldAt(mode==ToolMode.REPLACE?"替换为":"主方块",primary,right,124,half,512);primaryField.setChangedListener(v->{primary=v;edited();});
+        secondaryField=fieldAt(mode==ToolMode.REPLACE?"匹配方块":"副方块",secondary,right+half+8,124,half,512);secondaryField.setChangedListener(v->{secondary=v;edited();});
         hint(primaryField,"方块 ID 与状态，例如 minecraft:oak_log[axis=x]");hint(secondaryField,"替换时匹配此方块状态");
         switch(mode){
             case SELECTION->{
@@ -42,7 +43,7 @@ final class ToolScreen extends MenuScreen {
                 buttonAt(deletePlacement?"范围：投影":"范围：选区",right,178,half,()->{deletePlacement=!deletePlacement;error="";refresh();},true,deletePlacement);
                 buttonAt(deleteEntities?"实体：删除":"实体：保留",right+half+8,178,half,()->{deleteEntities=!deleteEntities;error="";refresh();},true,deleteEntities);
             }
-            case PASTE,GRID_PASTE->{
+            case PASTE->{
                 buttonAt(pasteEntities?"实体：包含":"实体：忽略",right,178,half,()->{pasteEntities=!pasteEntities;error="";refresh();},true,pasteEntities);
                 buttonAt(pasteNbt?"方块数据：包含":"方块数据：忽略",right+half+8,178,half,()->{pasteNbt=!pasteNbt;error="";refresh();},true,pasteNbt);
                 buttonAt(ruleLabel(pasteRule),right,208,rw,()->{pasteRule=ReplaceRule.values()[(pasteRule.ordinal()+1)%ReplaceRule.values().length];error="";refresh();},true,false);
@@ -51,7 +52,7 @@ final class ToolScreen extends MenuScreen {
             default->{}
         }
         buttonAt(executeRequiresTool?"执行需持工具：开":"执行需持工具：关",right,242,rw,()->{executeRequiresTool=!executeRequiresTool;refresh();},true,false);
-        fixed("保存",0,64,this::save);execute=fixed("执行",72,64,()->{save();controller.tool().execute();});
+        fixed("保存",0,64,()->{save();appliedUntil=System.nanoTime()+2_500_000_000L;});execute=fixed("执行",72,64,()->{save();controller.tool().execute();});
         pause=cancel=null;
         if(mode==ToolMode.PASTE){pause=fixed("暂停",144,64,()->controller.tool().pausePaste());cancel=fixed("取消",216,64,()->controller.tool().cancelPaste());}
         updateMenu();
@@ -69,10 +70,11 @@ final class ToolScreen extends MenuScreen {
         var settings=controller.tool().settings();settings.executeRequiresTool=executeRequiresTool;settings.primary=nextPrimary;settings.secondary=nextSecondary;settings.distance=nextDistance;settings.expandSelection=expand;settings.deleteEntities=deleteEntities;settings.deletePlacement=deletePlacement;settings.pasteEntities=pasteEntities;settings.pasteNbt=pasteNbt;settings.pasteRule=pasteRule;controller.options().toolItem=nextItem;
         controller.saveOptions();error="";
     }
-    private void focus(TextFieldWidget field){if(field!=null){setFocused(field);field.setCursorToEnd();}}
-    @Override protected void runAction(Runnable action){try{action.run();error="";}catch(RuntimeException failure){error=Objects.toString(failure.getMessage(),"操作失败");}finally{updateMenu();}}
+    private void focus(TextFieldWidget field){if(field!=null){focusControl(field);field.setCursorToEnd();}}
+    private void edited(){error="";appliedUntil=0;}
+    @Override protected void runAction(Runnable action){try{appliedUntil=0;action.run();error="";}catch(RuntimeException failure){error=Objects.toString(failure.getMessage(),"操作失败");}finally{updateMenu();}}
     @Override protected String displayedStatus(){return error.isEmpty()?statusLine():error;}
     @Override protected int statusColor(){return error.isEmpty()?UiTheme.MUTED:UiTheme.ERROR;}
-    @Override protected String statusLine(){var mode=controller.tool().mode();if(mode==ToolMode.GRID_PASTE)return "未实现";if(mode.creativeOnly()&&(client==null||client.player==null||!client.player.isCreative()))return "需要创造模式";return controller.tool().status();}
-    @Override protected void updateMenu(){if(execute==null)return;var mode=controller.tool().mode();boolean executable=mode!=ToolMode.SELECTION&&mode!=ToolMode.PLACEMENT&&mode!=ToolMode.GRID_PASTE;boolean permitted=!mode.creativeOnly()||client.player!=null&&client.player.isCreative();execute.active=executable&&permitted&&!controller.worldWriteBusy()&&(usesSelection()?hasSelection():controller.placement(controller.selectedId())!=null);if(targetLabel!=null)targetLabel.setMessage(Text.literal(targetName()));if(pause!=null){pause.active=controller.tool().pasteActive();pause.setMessage(Text.literal(controller.tool().pastePaused()?"继续":"暂停"));cancel.active=pause.active;}}
+    @Override protected String statusLine(){var mode=controller.tool().mode();if(mode.creativeOnly()&&(client==null||client.player==null||!client.player.isCreative()))return "需要创造模式";return System.nanoTime()<appliedUntil?"设置已应用":controller.tool().status();}
+    @Override protected void updateMenu(){if(execute==null)return;var mode=controller.tool().mode();boolean creative=client.player!=null&&client.player.isCreative();if(shownMode!=mode||creativeModes!=creative){refresh();return;}boolean executable=mode!=ToolMode.SELECTION&&mode!=ToolMode.PLACEMENT;boolean permitted=!mode.creativeOnly()||creative;execute.active=executable&&permitted&&!controller.worldWriteBusy()&&(usesSelection()?hasSelection():controller.placement(controller.selectedId())!=null);if(targetLabel!=null)targetLabel.setMessage(Text.literal(targetName()));if(pause!=null){pause.active=controller.tool().pasteActive();pause.setMessage(Text.literal(controller.tool().pastePaused()?"继续":"暂停"));cancel.active=pause.active;}}
 }

@@ -124,8 +124,8 @@ final class PlacementConfigScreen extends MenuScreen {
         }
     }
     private boolean epochChanged(){return epoch!=controller.sessionEpoch();}
-    private static int coordinate(TextFieldWidget field){
-        try{return Integer.parseInt(field.getText().strip());}catch(NumberFormatException e){throw new IllegalArgumentException(field.getMessage().getString()+" 坐标须为整数");}
+    private int coordinate(TextFieldWidget field){
+        try{return Integer.parseInt(field.getText().strip());}catch(NumberFormatException e){focusControl(field);throw new IllegalArgumentException(field.getMessage().getString()+" 坐标须为整数");}
     }
     private void applyCoordinates(){int x=coordinate(px),y=coordinate(py),z=coordinate(pz);act(()->controller.move(x,y,z));}
     private void applyOpacity(){

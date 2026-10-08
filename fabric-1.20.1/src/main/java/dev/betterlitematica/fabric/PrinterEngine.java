@@ -17,6 +17,7 @@ final class PrinterEngine implements AutoCloseable {
     private final MinecraftClient client;private final ProjectionController controller;private final PrinterActions actions;
     private final PrinterContainers containers;
     private final PrinterSigns signs;
+    private final NearbyBuildHud nearby;
     private final PrinterQueue queue=new PrinterQueue(4096);
     private final ArrayDeque<CompletableFuture<PrinterDiscovery.Result>> searches=new ArrayDeque<>();
     private final PrinterPacing pacing=new PrinterPacing();
@@ -29,7 +30,7 @@ final class PrinterEngine implements AutoCloseable {
     private int ticks,roundCompared,roundMatched,roundUnknown,lastCompared,lastMatched,lastUnknown;
     private BlockState fillState;
     private long operations;private String status="已停止";
-    PrinterEngine(MinecraftClient client,ProjectionController controller){this.client=client;this.controller=controller;containers=new PrinterContainers(client,controller);signs=new PrinterSigns(client,controller);actions=new PrinterActions(client,controller.inventoryTransfers(),()->controller.options().accurate,this::externalAllowed,containers,signs,controller);}
+    PrinterEngine(MinecraftClient client,ProjectionController controller){this.client=client;this.controller=controller;nearby=new NearbyBuildHud(client,controller);containers=new PrinterContainers(client,controller);signs=new PrinterSigns(client,controller);actions=new PrinterActions(client,controller.inventoryTransfers(),()->controller.options().accurate,this::externalAllowed,containers,signs,controller);}
     private boolean externalAllowed(){return running()&&client.world!=null&&client.player!=null&&client.currentScreen==null&&client.isWindowFocused()&&!client.player.isDead()&&!controller.worldWriteBusy()&&Objects.equals(context,current());}
     State state(){return state;}boolean acting(){return actions.acting()||containers.acting();}boolean running(){return state==State.RUNNING;}
     boolean ownsBreaking(){return running()&&actions.breaking()&&client.currentScreen==null&&client.isWindowFocused();}
@@ -40,7 +41,7 @@ final class PrinterEngine implements AutoCloseable {
         if(state==State.STOPPED||!settings().hud)return List.of();var lines=new ArrayList<String>();lines.add("打印机 · "+(context==null?0:context.sources().size())+" 个投影 · "+status+" · 操作 "+operations);
         if(settings().missingHud)missing.entrySet().stream().limit(4).forEach(e->lines.add("缺少 "+e.getKey().getName().getString()));return lines;
     }
-    List<Item> missingHudItems(){return state==State.STOPPED||!settings().hud||!settings().missingHud?List.of():missing.keySet().stream().limit(4).toList();}
+    NearbyBuildHud.Snapshot nearbyHud(){return nearby.snapshot();}
     private PrinterSettings settings(){return controller.options().printer;}
     private Context current(){return new Context(client.world,controller.printerSources(),controller.layerRange(),controller.selection(),settings().revision);}
     static boolean mining(PrinterSettings s){return s.breakWrong||s.breakExtra||s.breakState;}
@@ -59,7 +60,7 @@ final class PrinterEngine implements AutoCloseable {
         startupBurst=state!=State.RUNNING&&!coldBurstUsed;state=State.RUNNING;status="打印中";
     }
     void pause(String reason){containers.pause();if(state==State.RUNNING){state=State.PAUSED;status=reason;actions.diagnostics.reset();actions.reset();if(!actions.cleanupError().isEmpty())status=actions.cleanupError();waiting=null;}}
-    void sourceChanged(){pause("投影编辑");clearWork();context=null;}
+    void sourceChanged(){pause("投影编辑");clearWork();context=null;nearby.clear();}
     void stop(){state=State.STOPPED;startupBurst=false;status="已停止";clearWork();if(!actions.cleanupError().isEmpty())status=actions.cleanupError();highlights.clear();context=null;}
     static BlockState checkedFill(PrinterSettings settings){var resolver=new StateResolver1201(List.of(BlockStateSpec.parse(settings.fillState)),new PlacementTransform(Vec3i.ZERO,0,false,false));if(resolver.unresolved(0))throw new IllegalArgumentException("填充方块或状态不存在");var state=resolver.resolve(0);if((settings.fill||settings.fluid)&&(state.isAir()||!(state.getBlock().asItem() instanceof net.minecraft.item.BlockItem)))throw new IllegalArgumentException("请选择可放置的填充方块");return state;}
     void configure(PrinterSettings next){
@@ -82,6 +83,7 @@ final class PrinterEngine implements AutoCloseable {
     void render(net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext context){if(settings().highlights)ProjectionOverlays.actions(client,context,highlights.live(System.nanoTime()),settings());}
     private void clearWork(){containers.clear();generation++;for(var future:searches)future.cancel(true);searches.clear();if(workers!=null)workers.getQueue().clear();queue.clear();pacing.reset();completedRounds=0;sampler=null;missing.clear();scan=null;center=null;waiting=null;actions.diagnostics.reset();roundCompared=roundMatched=roundUnknown=lastCompared=lastMatched=lastUnknown=0;actions.reset();}
     private void pool(){int count=settings().threads;if(workers!=null&&count==workerCount)return;if(workers!=null)workers.shutdownNow();workerCount=count;workers=new ThreadPoolExecutor(count,count,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(count),r->{Thread t=new Thread(r,"betterlitematica-printer-search");t.setDaemon(true);return t;});}
+    void tickHud(){nearby.tick();}
     void tick(){
         ticks++;signs.tick();
         if(client.world==null||client.player==null||client.interactionManager==null){if(state!=State.STOPPED)stop();containers.tick(ticks,false);return;}
@@ -223,5 +225,5 @@ final class PrinterEngine implements AutoCloseable {
         }
         return true;
     }
-    @Override public void close(){stop();signs.clear();if(workers!=null){workers.shutdownNow();workers=null;}}
+    @Override public void close(){stop();nearby.clear();signs.clear();if(workers!=null){workers.shutdownNow();workers=null;}}
 }

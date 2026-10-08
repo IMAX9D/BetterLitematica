@@ -6,6 +6,7 @@
   "client": [
     "EasyPlaceMixin",
     "EditorKeyboardMixin",
+    "WheelPlayerListMixin",
     "AccurateBlockItemMixin",
     "AccurateServerMixin",
     "compat.LegacyHotkeysMixin",

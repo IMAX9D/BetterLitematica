@@ -9,14 +9,15 @@ import java.util.function.Consumer;
 /** A clipped, virtual single-column directory viewport. */
 final class BrowserGrid extends ButtonWidget {
     private static final int COLUMNS=1,ROW=30,GAP=5;
-    private final Consumer<SessionIo.FileEntry> open;
+    private final Consumer<SessionIo.FileEntry> choose,open;
     private List<SessionIo.FileEntry> entries=List.of();
     private String empty="",selected="";
     private double scroll;
     private boolean dragging;
     private int hovered=-1;
     private long hoverStart;
-    BrowserGrid(int x,int width,int height,Consumer<SessionIo.FileEntry> open){super(x,0,width,height,Text.literal("投影文件"),b->{},DEFAULT_NARRATION_SUPPLIER);this.open=open;}
+    BrowserGrid(int x,int width,int height,Consumer<SessionIo.FileEntry> open){this(x,width,height,open,open);}
+    BrowserGrid(int x,int width,int height,Consumer<SessionIo.FileEntry> choose,Consumer<SessionIo.FileEntry> open){super(x,0,width,height,Text.literal("投影文件"),b->{},DEFAULT_NARRATION_SUPPLIER);this.choose=choose;this.open=open;}
     void entries(List<SessionIo.FileEntry> next,String empty){boolean unchanged=entries.equals(next);entries=List.copyOf(next);this.empty=empty;if(!unchanged){scroll=0;hovered=-1;dragging=false;}}
     void selected(String path){selected=path==null?"":path;}
     String selectedPath(){return selected;}
@@ -35,14 +36,23 @@ final class BrowserGrid extends ButtonWidget {
     @Override public boolean mouseClicked(double x,double y,int button){
         if(!visible||!active||button!=0||!isMouseOver(x,y))return false;setFocused(true);
         dragging=maxScroll()>0&&x>=getX()+width-8;
-        if(dragging)dragTo(y);else{int index=hit(x,y);if(index>=0){motion(index).press();open.accept(entries.get(index));}}return true;
+        if(dragging)dragTo(y);else{int index=hit(x,y);if(index>=0){var entry=entries.get(index);motion(index).press();selected=entry.path();if(entry.directory())open.accept(entry);else choose.accept(entry);}}return true;
     }
     private void dragTo(double y){double thumb=Math.max(18,height*(double)height/Math.max(1,content()));scroll=(y-getY()-thumb/2)/Math.max(1,height-thumb)*maxScroll();clamp();}
     @Override public boolean mouseDragged(double x,double y,int button,double dx,double dy){if(!active||!dragging||button!=0)return false;dragTo(y);return true;}
     @Override public boolean mouseReleased(double x,double y,int button){boolean was=dragging;dragging=false;return was;}
     @Override public boolean keyPressed(int key,int scan,int modifiers){
         if(!visible||!active)return false;
-        if(key==264)scroll+=ROW;else if(key==265)scroll-=ROW;else if(key==267)scroll+=height;else if(key==266)scroll-=height;else if(key==268)scroll=0;else if(key==269)scroll=maxScroll();else return false;clamp();return true;
+        if(entries.isEmpty())return false;
+        int current=-1;for(int i=0;i<entries.size();i++)if(entries.get(i).path().equals(selected)){current=i;break;}
+        int next=current<0?Math.min(entries.size()-1,(int)(scroll/ROW)):current;
+        if(key==257||key==335){open.accept(entries.get(next));return true;}
+        if(key==264){if(current>=0)next++;}else if(key==265){if(current>=0)next--;}
+        else if(key==267)next+=Math.max(1,height/ROW);else if(key==266)next-=Math.max(1,height/ROW);
+        else if(key==268)next=0;else if(key==269)next=entries.size()-1;else return false;
+        next=Math.max(0,Math.min(entries.size()-1,next));int top=next*ROW;
+        if(top<scroll)scroll=top;else if(top+ROW>scroll+height)scroll=top+ROW-height;
+        clamp();selected=entries.get(next).path();choose.accept(entries.get(next));return true;
     }
     // Pause at both ends, move at a constant speed, then repeat without jumping.
     static double marqueeOffset(double overflow,double seconds){

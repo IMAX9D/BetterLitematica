@@ -13,10 +13,18 @@ final class ToolInteractionChecks {
     static int run()throws Exception{
         checks=0;
         check(ToolWorldOperations.recoveryPlacement(Path.of("C:/game/schematics/.betterlitematica-tool-recovery/move-test.litematic"),Vec3i.ZERO).source().equals(".betterlitematica-tool-recovery/move-test.litematic"),"Recovery placement uses legal relative identity even with absolute Windows backing file");
+        check(ToolMode.selectable(true).size()==8&&!ToolMode.selectable(true).contains(ToolMode.GRID_PASTE),"Only implemented tools are offered in creative mode");
+        check(ToolMode.selectable(false).equals(List.of(ToolMode.SELECTION,ToolMode.PLACEMENT,ToolMode.REBUILD)),"Survival list and wheel share the three permitted tools");
+        for(var mode:ToolMode.selectable(true))check(mode.cycle(1,true).cycle(-1,true)==mode,"Creative modes cycle reversibly");
         for(var mode:ToolMode.values()){
-            check(mode.cycle(1,true).cycle(-1,true)==mode,"Creative modes cycle reversibly");
+            check(mode.cycle(1,true)!=ToolMode.GRID_PASTE&&mode.cycle(-1,true)!=ToolMode.GRID_PASTE,"Neither cycle direction reaches unfinished grid paste");
             check(!mode.cycle(1,false).creativeOnly(),"Survival forward skips destructive modes");check(!mode.cycle(-1,false).creativeOnly(),"Survival backward skips destructive modes");
+            check(mode.usable(true).replacement()==mode.usable(true),"Legacy normalization is stable");
+            check(!mode.usable(false).creativeOnly(),"Permission loss selects a safe non-executing mode");
+            check(mode.cycle(0,false)==mode.usable(false),"Zero wheel step never loops or selects a forbidden mode");
         }
+        check(ToolMode.GRID_PASTE.usable(true)==ToolMode.PASTE&&ToolMode.GRID_PASTE.usable(false)==ToolMode.PLACEMENT,"Old grid-paste preference maps to paste only when permitted");
+        check(ToolMode.PASTE.cycle(1,true)==ToolMode.MOVE&&ToolMode.MOVE.cycle(-1,true)==ToolMode.PASTE,"Creative wheel has no gap for the removed entry");
         check(ToolMode.SELECTION.cycle(1,false)==ToolMode.PLACEMENT&&ToolMode.PLACEMENT.cycle(1,false)==ToolMode.REBUILD&&ToolMode.REBUILD.cycle(1,false)==ToolMode.SELECTION,"Three survival modes");
         var stick=new ItemStack(Items.STICK);var tool=ToolItemSpec.parse("minecraft:stick");check(tool.held(ItemStack.EMPTY,stick),"Offhand tools work");check(tool.held(stick,ItemStack.EMPTY),"Mainhand tools work");check(!tool.held(ItemStack.EMPTY,ItemStack.EMPTY),"Empty hands do not match stick");
         var named=ToolItemSpec.parse("minecraft:stick{CustomModelData:3}");var nbt=new NbtCompound();nbt.putInt("CustomModelData",3);nbt.putInt("Damage",8);stick.setNbt(nbt);

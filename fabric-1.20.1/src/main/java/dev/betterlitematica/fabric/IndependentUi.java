@@ -13,6 +13,8 @@ import java.util.concurrent.*;
 
 /** Physical-pixel overlay. Font textures are copied 1:1, never enlarged game glyphs. */
 final class IndependentUi implements AutoCloseable {
+    // Keep menus ahead of HUD depth (including transparent full-screen HUD quads).
+    static final int MENU_DEPTH=2000;
     static final IndependentUi INSTANCE=new IndependentUi();
     private record Key(String text,int pixels){}
     private record Texture(Identifier id,int width,int height){long bytes(){return (long)width*height*4;}}
@@ -50,6 +52,11 @@ final class IndependentUi implements AutoCloseable {
     boolean beginHud(DrawContext ctx,UiViewport viewport){
         if(!begin(ctx,viewport))return false;
         ctx.getMatrices().translate(0,0,1000);
+        return true;
+    }
+    boolean beginMenu(DrawContext ctx,UiViewport viewport){
+        if(!begin(ctx,viewport))return false;
+        ctx.getMatrices().translate(0,0,MENU_DEPTH);
         return true;
     }
     /** Translation only: glyphs keep their physical resolution throughout a transition. */

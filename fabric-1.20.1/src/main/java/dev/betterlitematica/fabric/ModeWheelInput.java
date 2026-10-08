@@ -52,6 +52,10 @@ final class ModeWheelInput {
         return consume;
     }
     boolean blocksWorldInput(){return client.currentScreen instanceof ModeWheelScreen||lifecycle.claimed()||mouseRelease;}
+    boolean sharesPlayerListHold(){
+        boolean sameKey=boundKey>=0&&boundKey==BetterLitematicaClient.wheelKeyCode()&&client.options.playerListKey.matchesKey(boundKey,GLFW.glfwGetKeyScancode(boundKey));
+        return lifecycle.sharesHold(client.world,client.getNetworkHandler(),client.isWindowFocused(),client.player!=null,client.currentScreen,sameKey);
+    }
     void clear(){
         var owned=lifecycle.owned();lifecycle.reset();
         if(owned!=null&&client.currentScreen==owned)((Screen)owned).close();
@@ -80,6 +84,9 @@ final class ModeWheelInput {
         private boolean initialized,down,blocked=true,claimed;
         Object owned(){return owned;}
         boolean claimed(){return claimed;}
+        boolean sharesHold(Object nextWorld,Object nextConnection,boolean focused,boolean player,Object screen,boolean sameKey){
+            return sameKey&&focused&&player&&nextWorld!=null&&world==nextWorld&&connection==nextConnection&&claimed&&down&&owned!=null&&screen==owned;
+        }
         void bind(Object screen){owned=screen;}
         void reset(){world=null;connection=null;owned=null;initialized=false;down=false;blocked=true;claimed=false;}
         Decision update(Object nextWorld,Object nextConnection,boolean focused,boolean player,Object screen,boolean physicalDown,boolean pressEvent){
