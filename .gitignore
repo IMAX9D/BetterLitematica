@@ -23,8 +23,6 @@ hs_err_pid*
 *.litematic
 *.schem
 *.schematic
-!examples/demo.litematic
-!examples/demo.schem
 # Archive installer metadata (not used for a Git checkout)
 /MANIFEST.sha256
 /Install-Workspace.ps1

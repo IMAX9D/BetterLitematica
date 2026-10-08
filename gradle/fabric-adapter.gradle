@@ -1,0 +1,80 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+
+def target = project.ext.minecraftTarget
+def remapped = target.mappingMode == 'yarn'
+apply plugin: remapped ? 'net.fabricmc.fabric-loom-remap' : 'net.fabricmc.fabric-loom'
+base { archivesName = "betterlitematica-fabric-${target.minecraft}" }
+java {
+    sourceCompatibility = JavaVersion.toVersion(target.java)
+    targetCompatibility = JavaVersion.toVersion(target.java)
+}
+tasks.withType(JavaCompile).configureEach { options.release = target.java as Integer }
+
+// Later files replace the same relative path. Shared policy stays outside the API-specific overlays.
+def baseline = rootProject.file(remapped ? 'fabric-1.20.1/src/main' : 'fabric-official/src/main')
+def roots = [baseline] + target.overlays.collect { rootProject.file("versions/$it/src/main") }
+def javaOutput = layout.buildDirectory.dir('generated/sources/adapter')
+def resourceOutput = layout.buildDirectory.dir('generated/resources/adapter')
+def prepareJava = tasks.register('prepareAdapterSources', Sync) {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    roots.each { from new File(it, 'java') }
+    into javaOutput
+}
+def prepareResources = tasks.register('prepareAdapterResources', Sync) {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    roots.each { from new File(it, 'resources') }
+    into resourceOutput
+    inputs.property('target', JsonOutput.toJson(target))
+    inputs.property('modVersion', project.version.toString())
+    doLast {
+        def file = new File(resourceOutput.get().asFile, 'fabric.mod.json')
+        def metadata = new JsonSlurper().parse(file)
+        metadata.version = project.version.toString()
+        metadata.description = 'Independent schematic projection, editing and construction tools.'
+        metadata.depends.minecraft = target.minecraft
+        metadata.depends.java = ">=${target.java}"
+        metadata.depends.fabricloader = ">=${target.loader}"
+        metadata.depends.'fabric-api' = ">=${target.fabricApi}"
+        file.setText(JsonOutput.prettyPrint(JsonOutput.toJson(metadata)) + '\n', 'UTF-8')
+        def mixins = new File(resourceOutput.get().asFile, 'betterlitematica.mixins.json')
+        if (mixins.isFile()) {
+            def config = new JsonSlurper().parse(mixins)
+            config.compatibilityLevel = "JAVA_${target.java}"
+            mixins.setText(JsonOutput.prettyPrint(JsonOutput.toJson(config)) + '\n', 'UTF-8')
+        }
+    }
+}
+sourceSets.main.java.setSrcDirs([javaOutput])
+sourceSets.main.resources.setSrcDirs([resourceOutput])
+tasks.named('compileJava') { dependsOn prepareJava }
+tasks.named('processResources') { dependsOn prepareResources }
+def widener = roots.collect { new File(it, 'resources/betterlitematica.accesswidener') }.findAll { it.isFile() }.last()
+loom { accessWidenerPath = widener }
+dependencies {
+    minecraft "com.mojang:minecraft:${target.minecraft}"
+    if (remapped) mappings "net.fabricmc:yarn:${target.yarn}:v2"
+    add(remapped ? 'modImplementation' : 'implementation', "net.fabricmc:fabric-loader:${target.loader}")
+    add(remapped ? 'modImplementation' : 'implementation', "net.fabricmc.fabric-api:fabric-api:${target.fabricApi}")
+    implementation project(':core')
+    implementation project(':blueprint-io')
+    implementation project(':runtime')
+}
+jar {
+    from project(':core').sourceSets.main.output
+    from project(':blueprint-io').sourceSets.main.output
+    from project(':runtime').sourceSets.main.output
+}
+
+// Failed builds retain usable artifacts. Only obsolete artifacts of this target are removed on success.
+tasks.named('build') {
+    doLast {
+        def latest = tasks.named(remapped ? 'remapJar' : 'jar').get().archiveFile.get().asFile
+        if (!latest.isFile() || latest.length() == 0) throw new GradleException('Installable mod artifact is missing')
+        latest.parentFile.eachFile { candidate ->
+            if (candidate.name.startsWith("betterlitematica-fabric-${target.minecraft}-") &&
+                candidate.name.endsWith('.jar') && candidate.name != latest.name && candidate.isFile() &&
+                !java.nio.file.Files.isSymbolicLink(candidate.toPath())) java.nio.file.Files.delete(candidate.toPath())
+        }
+    }
+}

@@ -1,3 +1,20 @@
 pluginManagement { repositories { maven { url = 'https://maven.fabricmc.net/' }; gradlePluginPortal(); mavenCentral() } }
 rootProject.name = 'BetterLitematica'
-include 'core', 'blueprint-io', 'runtime', 'selftest', 'fabric-1.20.1'
+include 'core', 'blueprint-io', 'runtime'
+
+// Resolve only requested game targets rather than downloading every game for a single build.
+def manifest = new groovy.json.JsonSlurper().parse(file('targets.json'))
+def requested = new LinkedHashSet<String>()
+if (providers.gradleProperty('allVersions').isPresent()) requested.addAll(manifest.targets.collect { it.minecraft })
+else if (providers.gradleProperty('minecraft').isPresent()) requested.addAll(providers.gradleProperty('minecraft').get().split(','))
+else gradle.startParameter.taskNames.each { name ->
+    def matcher = name =~ /(?:^|:)fabric-([^:]+)(?::|$)/
+    if (matcher.find()) requested.add(matcher.group(1))
+}
+if (requested.isEmpty()) requested.add('1.20.1')
+requested.each { version ->
+    if (!manifest.targets.any { it.minecraft == version }) throw new GradleException("Unknown Minecraft target: $version")
+    include "fabric-$version"
+    if (version != '1.20.1') project(":fabric-$version").projectDir = file("versions/$version")
+}
+gradle.ext.minecraftTargets = manifest.targets.findAll { requested.contains(it.minecraft) }
