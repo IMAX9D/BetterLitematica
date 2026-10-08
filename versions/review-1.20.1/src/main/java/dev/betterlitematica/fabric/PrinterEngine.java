@@ -47,16 +47,17 @@ final class PrinterEngine implements AutoCloseable {
     private java.util.function.Function<Vec3i,ProjectionController.PrinterSample> sampler;
     private int ticks,roundCompared,roundMatched,roundUnknown,lastCompared,lastMatched,lastUnknown;
     private BlockState fillState;
-    private long operations;private String status="已停止";
+    private long operations;private PrinterReason status=PrinterReason.STOPPED;
+    private PrinterQueue.Job deferredJob;private PrinterReason deferredReason=PrinterReason.NONE;private int deferredUntil;private boolean deferredMissing;
     PrinterEngine(MinecraftClient client,ProjectionController controller){this.client=client;this.controller=controller;nearby=new NearbyBuildHud(client,controller);containers=new PrinterContainers(client,controller);signs=new PrinterSigns(client,controller);actions=new PrinterActions(client,controller.inventoryTransfers(),()->controller.options().accurate,this::externalAllowed,containers,signs,controller);}
     private boolean externalAllowed(){return running()&&client.world!=null&&client.player!=null&&client.currentScreen==null&&client.isWindowFocused()&&!client.player.isDead()&&!controller.worldWriteBusy()&&Objects.equals(context,current());}
     State state(){return state;}boolean acting(){return actions.acting()||containers.acting();}boolean running(){return state==State.RUNNING;}
     boolean ownsBreaking(){return running()&&actions.breaking()&&client.currentScreen==null&&client.isWindowFocused();}
     long operations(){return operations;}int queued(){return queue.size()+(waiting==null?0:1);}
-    String status(){return status;}
+    String status(){return status.description();} PrinterReason reason(){return status;}
     String progress(){return nearby.compared()==0?"":nearby.matched()+" / "+nearby.compared()+(nearby.snapshot().unknown()>0?" · 待加载 "+nearby.snapshot().unknown():"");}
     List<String> hud(){
-        if(state==State.STOPPED||!settings().hud)return List.of();var lines=new ArrayList<String>();lines.add("打印机 · "+(context==null?0:context.sources().size())+" 个投影 · "+status+" · 操作 "+operations);
+        if(state==State.STOPPED||!settings().hud)return List.of();var lines=new ArrayList<String>();lines.add("打印机 · "+(context==null?0:context.sources().size())+" 个投影 · "+status.description()+" · 操作 "+operations);
         if(settings().missingHud)missing.entrySet().stream().limit(4).forEach(e->lines.add("缺少 "+e.getKey().getName().getString()));return lines;
     }
     NearbyBuildHud.Snapshot nearbyHud(){return settings().missingHud?nearby.snapshot():NearbyBuildHud.Snapshot.EMPTY;}
@@ -75,11 +76,13 @@ final class PrinterEngine implements AutoCloseable {
         if(controller.bedrock().enabled())controller.bedrock().pause();
         if(state==State.STOPPED)operations=0;
         Context next=current();if(context==null||!context.equals(next)){clearWork();context=next;}
-        startupBurst=state!=State.RUNNING&&!coldBurstUsed;state=State.RUNNING;status="打印中";
+        startupBurst=state!=State.RUNNING&&!coldBurstUsed;state=State.RUNNING;status=PrinterReason.of(PrinterReason.Id.RUNNING,"打印中");
     }
-    void pause(String reason){containers.pause();if(state==State.RUNNING){state=State.PAUSED;status=reason;actions.diagnostics.reset();actions.reset();if(!actions.cleanupError().isEmpty())status=actions.cleanupError();waiting=null;}}
+    void pause(String description){pause(PrinterReason.of(PrinterReason.Id.PAUSED,description==null?"已暂停":description));}
+    private void pause(RuntimeException failure){pause(PrinterReason.failure(failure));}
+    void pause(PrinterReason reason){containers.pause();if(state==State.RUNNING){state=State.PAUSED;status=reason;actions.diagnostics.reset();actions.reset();if(!actions.cleanupError().isEmpty())status=PrinterReason.of(PrinterReason.Id.ERROR,actions.cleanupError());waiting=null;}}
     void sourceChanged(){pause("投影编辑");clearWork();context=null;nearby.clear();}
-    void stop(){state=State.STOPPED;startupBurst=false;status="已停止";clearWork();if(!actions.cleanupError().isEmpty())status=actions.cleanupError();highlights.clear();context=null;}
+    void stop(){state=State.STOPPED;startupBurst=false;status=PrinterReason.of(PrinterReason.Id.STOPPED,"已停止");clearWork();if(!actions.cleanupError().isEmpty())status=PrinterReason.of(PrinterReason.Id.ERROR,actions.cleanupError());highlights.clear();context=null;}
     static BlockState checkedFill(PrinterSettings settings){var resolver=new StateResolver1201(List.of(BlockStateSpec.parse(settings.fillState)),new PlacementTransform(Vec3i.ZERO,0,false,false));if(resolver.unresolved(0))throw new IllegalArgumentException("填充方块或状态不存在");var state=resolver.resolve(0);if((settings.fill||settings.fluid)&&(state.isAir()||!(state.getBlock().asItem() instanceof net.minecraft.item.BlockItem)))throw new IllegalArgumentException("请选择可放置的填充方块");return state;}
     void configure(PrinterSettings next){
         next.validate();var fill=checkedFill(next);if(settings().snapshot().equals(next.snapshot()))return;
@@ -89,10 +92,10 @@ final class PrinterEngine implements AutoCloseable {
     void cycle(){var s=PrinterSettings.read(settings().snapshot());var modes=WheelModes.values();int current=-1;for(int i=0;i<modes.length;i++)if(modes[i].enabled(s)){current=i;break;}s.print=s.fill=s.fluid=s.bedrock=s.breakWrong=s.breakExtra=s.breakState=false;configure(WheelModes.toggled(s,modes[(current+1)%modes.length]));announceModes();}
     void allModesOff(){var s=PrinterSettings.read(settings().snapshot());s.print=s.fill=s.fluid=s.bedrock=s.breakWrong=s.breakExtra=s.breakState=false;configure(s);stop();controller.bedrock().pause();announceModes();}
     void announceModes(){if(client.player!=null){String labels=java.util.Arrays.stream(WheelModes.values()).filter(m->m.enabled(settings())).map(WheelModes::label).collect(java.util.stream.Collectors.joining("、"));client.player.sendMessage(net.minecraft.text.Text.literal(labels.isEmpty()?"全部施工模式已关闭":"施工模式："+labels+" · 按施工开关键继续"),true);}}
-    void supplyOpened(int sync,net.minecraft.screen.ScreenHandlerType<?> type){try{containers.opened(sync,type);actions.supplyOpened(sync,type);}catch(RuntimeException e){pause(e.getMessage());}}
+    void supplyOpened(int sync,net.minecraft.screen.ScreenHandlerType<?> type){try{containers.opened(sync,type);actions.supplyOpened(sync,type);}catch(RuntimeException e){pause(e);}}
     void containerOpening(net.minecraft.screen.ScreenHandlerType<?> type){containers.opening(type);}
     void supplyInventory(int sync){actions.supplyInventory(sync);}
-    void manualInventory(){if(acting())return;try{containers.manual();actions.manualInventory();pause("已暂停");controller.inventoryTransfers().reset();}catch(RuntimeException e){pause(e.getMessage());}}
+    void manualInventory(){if(acting())return;try{containers.manual();actions.manualInventory();pause("已暂停");controller.inventoryTransfers().reset();}catch(RuntimeException e){pause(e);}}
     void confirmed(BlockPos pos,BlockState value){actions.confirmed(pos,value);containers.changed(pos,value);}
     void containerInventory(net.minecraft.network.packet.s2c.play.InventoryS2CPacket packet){containers.inventory(packet);}
     void containerSlot(net.minecraft.network.packet.s2c.play.ScreenHandlerSlotUpdateS2CPacket packet){containers.slot(packet);}
@@ -101,26 +104,27 @@ final class PrinterEngine implements AutoCloseable {
     void manualSignInteraction(BlockPos pos){if(!acting())signs.manual(pos);}
     Collection<ActionHighlights.Mark> actionMarks(long now){return highlights.live(now);}
     void render(net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext context){if(settings().highlights)ProjectionOverlays.actions(client,context,highlights.live(System.nanoTime()),settings());}
-    private void clearWork(){containers.clear();generation++;for(var future:searches)future.cancel(true);searches.clear();if(workers!=null)workers.getQueue().clear();queue.clear();pacing.reset();completedRounds=0;sampler=null;missing.clear();missingAge.clear();scan=null;center=null;waiting=null;actions.diagnostics.reset();roundCompared=roundMatched=roundUnknown=lastCompared=lastMatched=lastUnknown=0;actions.reset();}
+    private void clearWork(){deferredJob=null;deferredReason=PrinterReason.NONE;containers.clear();generation++;for(var future:searches)future.cancel(true);searches.clear();if(workers!=null)workers.getQueue().clear();queue.clear();pacing.reset();completedRounds=0;sampler=null;missing.clear();missingAge.clear();scan=null;center=null;waiting=null;actions.diagnostics.reset();roundCompared=roundMatched=roundUnknown=lastCompared=lastMatched=lastUnknown=0;actions.reset();}
     private void pool(){int count=settings().threads;if(workers!=null&&count==workerCount)return;if(workers!=null)workers.shutdownNow();workerCount=count;workers=new ThreadPoolExecutor(count,count,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(count),r->{Thread t=new Thread(r,"betterlitematica-printer-search");t.setDaemon(true);return t;});}
     void tickHud(){nearby.tick();refreshMissing();}
     void tick(){
         ticks++;signs.tick();
         if(client.world==null||client.player==null||client.interactionManager==null){if(state!=State.STOPPED)stop();containers.tick(ticks,false);return;}
         if(state==State.STOPPED){containers.tick(ticks,false);return;}
+        if(state==State.PAUSED&&status.id()==PrinterReason.Id.RETURN_TO_GAME&&client.currentScreen==null&&client.isWindowFocused())status=PrinterReason.PAUSED;
         if(context!=null&&context.world()!=client.world){stop();containers.tick(ticks,false);return;}
         Context next=current();
         if(!Objects.equals(context,next)){clearWork();context=next;}
         boolean canFill=running()&&settings().containerFill&&settings().print&&client.currentScreen==null&&client.isWindowFocused()
             &&!client.player.isSpectator()&&!client.player.isDead()&&!controller.worldWriteBusy();
-        if(containers.tick(ticks,canFill)){if(running())status=containers.reason();return;}
+        if(containers.tick(ticks,canFill)){if(running())status=containers.typedReason();return;}
         if(!running())return;
-        if(!client.isWindowFocused()){pause("已暂停");return;}
-        try{if(actions.supplyTick(ticks)){status=actions.reason();return;}}catch(RuntimeException e){pause(e.getMessage());return;}
-        if(client.currentScreen!=null){pause("已暂停");return;}
+        if(!client.isWindowFocused()){pause(PrinterReason.of(PrinterReason.Id.RETURN_TO_GAME,"等待返回游戏"));return;}
+        try{if(actions.supplyTick(ticks)){status=actions.typedReason();return;}}catch(RuntimeException e){pause(e);return;}
+        if(client.currentScreen!=null){pause(PrinterReason.of(PrinterReason.Id.RETURN_TO_GAME,"等待返回游戏"));return;}
         if(client.player.isSpectator()||client.player.isDead()||controller.worldWriteBusy()){pause("已暂停");return;}
-        if(context.sources().isEmpty()){status="等待启用投影";return;}
-        if(client.player.isUsingItem()){status="等待物品使用结束";return;}
+        if(context.sources().isEmpty()){status=PrinterReason.of(PrinterReason.Id.NO_PROJECTION,"等待启用投影");return;}
+        if(client.player.isUsingItem()){status=PrinterReason.of(PrinterReason.Id.USING_ITEM,"等待物品使用结束");return;}
         try{
             actions.diagnostics.begin();
             var settings=settings();pacing.begin(ticks,settings.interval,settings.perTick,settings.cooldown,settings.breakInterval,settings.breakPerTick);
@@ -138,9 +142,9 @@ final class PrinterEngine implements AutoCloseable {
             if(!budget.hasTime(System.nanoTime()))actions.diagnostics.budgetStops++;
             if(ticks%20==0)pacing.expire();
             if(settings.containerFill&&settings.print&&waiting==null&&queue.size()==0&&!controller.inventoryTransfers().inFlight()
-                &&budget.hasTime(System.nanoTime())&&containers.startNext(ticks))status=containers.reason();
+                &&budget.hasTime(System.nanoTime())&&containers.startNext(ticks))status=containers.typedReason();
             var containerMissing=containers.takeMissing();if(!containerMissing.isEmpty())recordMissing(containerMissing.getItem());
-        }catch(RuntimeException e){pause(e.getMessage()==null?"打印异常，已暂停":e.getMessage());BetterLitematicaClient.LOGGER.error("Printer paused",e);}finally{sampler=null;actions.diagnostics.finish(settings(),queued(),actions.reason());}
+        }catch(RuntimeException e){pause(e);BetterLitematicaClient.LOGGER.error("Printer paused",e);}finally{sampler=null;actions.diagnostics.finish(settings(),queued(),actions.reason());}
     }
     private void collect(){
         for(var it=searches.iterator();it.hasNext();){var future=it.next();if(!future.isDone())continue;it.remove();if(future.isCancelled())continue;var result=future.join();if(result.generation()!=generation)continue;
@@ -225,23 +229,32 @@ final class PrinterEngine implements AutoCloseable {
         };
     }
     /** True means an owned wait/quota/time boundary; false lets the caller refill an empty queue. */
+    private void deferred(PrinterQueue.Job job,PrinterReason reason,boolean material){status=reason;deferredJob=job;deferredReason=reason;deferredMissing=material;deferredUntil=ticks+20;}
+    private PrinterReason idleReason(PrinterSettings settings){
+        if(!PrinterReach.intersectsBuildHeight(client.player.getEyePos(),range(settings),settings.shape,client.world.getBottomY(),client.world.getTopY()))return PrinterReason.of(PrinterReason.Id.BUILD_HEIGHT,"超出建造高度");
+        if(lastUnknown>0)return PrinterReason.of(PrinterReason.Id.LOADING,"等待加载");
+        // A briefly empty queue must not erase a measured cause while that same job awaits retry.
+        if(progressPercent()!=100&&deferredJob!=null&&ticks<=deferredUntil&&(!deferredMissing||!missing.isEmpty())&&valid(deferredJob))return deferredReason;
+        deferredJob=null;deferredReason=PrinterReason.NONE;
+        return missing.isEmpty()?PrinterReason.of(PrinterReason.Id.NO_WORK,"等待可施工位置"):PrinterReason.of(PrinterReason.Id.MISSING,"等待材料");
+    }
     private boolean consume(PrinterWorkBudget budget){
         if(!pacing.canRun(false))return true;var s=settings();
         while(pacing.canRun(false)&&budget.attempt(System.nanoTime())){
             boolean resuming=waiting!=null;int held=PrinterActions.heldMaterial(client.player.getMainHandStack());var job=resuming?waiting:queue.pollBatch(held);waiting=null;
-            if(job==null){status=!PrinterReach.intersectsBuildHeight(client.player.getEyePos(),range(s),s.shape,client.world.getBottomY(),client.world.getTopY())?"超出建造高度":lastUnknown>0?"等待加载":missing.isEmpty()?"等待可施工位置":"等待材料";return false;}
+            if(job==null){status=idleReason(s);return false;}
             actions.diagnostics.attempts++;
             if(!valid(job)){actions.diagnostics.stale++;if(resuming)actions.reset();continue;}
             if(!actions.inProgress(job)&&pacing.cooling(job.position()))continue;
-            if(s.safeObserver&&Block.getStateFromRawId(job.expected()).isOf(Blocks.OBSERVER)&&!PrinterRules.observerReady(BlockPos.fromLong(job.position()),p->{var sample=sampler.apply(new Vec3i(p.getX(),p.getY(),p.getZ()));return sample==null?null:sample.inside()?sample.state():Blocks.AIR.getDefaultState();},p->WorldChunks.loaded(client.world,p)?client.world.getBlockState(p):null)){status="等待侦测器前方完成";pacing.defer(job.position(),1);continue;}
+            if(s.safeObserver&&Block.getStateFromRawId(job.expected()).isOf(Blocks.OBSERVER)&&!PrinterRules.observerReady(BlockPos.fromLong(job.position()),p->{var sample=sampler.apply(new Vec3i(p.getX(),p.getY(),p.getZ()));return sample==null?null:sample.inside()?sample.state():Blocks.AIR.getDefaultState();},p->WorldChunks.loaded(client.world,p)?client.world.getBlockState(p):null)){deferred(job,PrinterReason.of(PrinterReason.Id.OBSERVER,"等待侦测器前方完成"),false);pacing.defer(job.position(),1);continue;}
             boolean breaking=actions.needsBreak(job);if(!pacing.canDispatch(job.position(),breaking)){if(resuming||actions.owns(job)){waiting=job;break;}queue.offer(job,actions.material(job,s));continue;}
             var outcome=actions.execute(job,s,ticks);actions.diagnostics.outcome(outcome,actions.dispatched());
             if(actions.dispatched()){pacing.dispatched(job.position(),actions.breakDispatched());if(outcome==PrinterActions.Outcome.SENT||outcome==PrinterActions.Outcome.WAIT)operations++;}
             if(s.highlights&&(actions.dispatched()||outcome==PrinterActions.Outcome.UNSUPPORTED)){var kind=outcome==PrinterActions.Outcome.UNSUPPORTED?ActionHighlights.Kind.FAILED:switch(job.kind()){case BREAK,BEDROCK->ActionHighlights.Kind.BREAK;case ADJUST->ActionHighlights.Kind.ADJUST;default->ActionHighlights.Kind.PLACE;};highlights.add(job.position(),kind,System.nanoTime(),HighlightFades.duration(kind,s.highlightMillis*1_000_000L));}
-            if(outcome==PrinterActions.Outcome.WAIT){waiting=job;status=actions.reason();break;}
-            if(outcome==PrinterActions.Outcome.SENT){status="打印中";}
-            else if(outcome==PrinterActions.Outcome.MISSING){recordMissing(actions.missing());status=actions.reason();if(resuming)actions.reset();pacing.defer(job.position(),20);}
-            else if(outcome==PrinterActions.Outcome.UNSUPPORTED||outcome==PrinterActions.Outcome.RETRY){status=actions.reason();if(resuming)actions.reset();pacing.defer(job.position(),outcome==PrinterActions.Outcome.RETRY?1:20);}
+            if(outcome==PrinterActions.Outcome.WAIT){waiting=job;status=actions.typedReason();break;}
+            if(outcome==PrinterActions.Outcome.SENT){deferredJob=null;status=PrinterReason.RUNNING;}
+            else if(outcome==PrinterActions.Outcome.MISSING){recordMissing(actions.missing());deferred(job,actions.typedReason(),true);if(resuming)actions.reset();pacing.defer(job.position(),20);}
+            else if(outcome==PrinterActions.Outcome.UNSUPPORTED||outcome==PrinterActions.Outcome.RETRY){deferred(job,actions.typedReason(),false);if(resuming)actions.reset();pacing.defer(job.position(),outcome==PrinterActions.Outcome.RETRY?1:20);}
         }
         return true;
     }

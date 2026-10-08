@@ -49,6 +49,22 @@ def prepareResources = tasks.register('prepareAdapterResources', Sync) {
 }
 sourceSets.main.java.setSrcDirs([javaOutput])
 sourceSets.main.resources.setSrcDirs([resourceOutput])
+
+// The temporary player-experience review owns its checks; other game targets remain untouched.
+if (target.overlays.contains('review-1.20.1')) {
+    sourceSets.test.java.srcDir(rootProject.file('versions/review-1.20.1/src/test/java'))
+    // These review checks are executable Java programs, not JUnit test methods.
+    tasks.named('test', Test) { failOnNoDiscoveredTests = false }
+    def verifySettings = tasks.register('verifySettings', JavaExec) {
+        group = 'verification'
+        description = 'Checks complete setting help, explicit control bindings and typed printer reasons.'
+        dependsOn tasks.named('testClasses')
+        classpath = sourceSets.test.runtimeClasspath
+        mainClass = 'dev.betterlitematica.fabric.SettingsIntegrityCheck'
+        args rootProject.file('versions/review-1.20.1/src/main/java/dev/betterlitematica/fabric').absolutePath
+    }
+    tasks.named('check') { dependsOn verifySettings }
+}
 tasks.named('compileJava') { dependsOn prepareJava }
 tasks.named('processResources') { dependsOn prepareResources }
 def widener = roots.collect { new File(it, 'resources/betterlitematica.accesswidener') }.findAll { it.isFile() }.last()

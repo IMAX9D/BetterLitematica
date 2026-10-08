@@ -8,7 +8,7 @@ import net.minecraft.registry.Registries;
 final class RegistryListScreen extends MenuScreen {
     enum Kind {BLOCK,ITEM,FLUID}
     private final List<OverlayList.Row> candidates;private final Set<String> selected;
-    private boolean discardConfirmed;private final Set<String> initial;
+    private net.minecraft.client.gui.widget.ButtonWidget exit;private boolean discardConfirmed;private final Set<String> initial;
     private final Consumer<List<String>> save;private OverlayList list;private String query="";
     RegistryListScreen(Screen parent,ProjectionController controller,String title,Kind kind,List<String> values,Consumer<List<String>> save){
         super(title,"名称、ID、全拼或首字母",parent,controller,true);this.save=save;selected=new LinkedHashSet<>(values);initial=Set.copyOf(values);
@@ -22,9 +22,11 @@ final class RegistryListScreen extends MenuScreen {
     @Override protected void buildMenu(){
         var field=fieldAt("搜索",query,left,0,innerWidth,128);field.setChangedListener(v->{query=v;rows();});
         list=new OverlayList(left,innerWidth,Math.max(80,bodyBottom-bodyTop-54),id->{if(!selected.remove(id))selected.add(id);discardConfirmed=false;rows();});addBody(list,46);rows();
-        fixedAction("保存",0,90,()->{save.accept(List.copyOf(selected));super.close();});fixed(discardConfirmed?"确认放弃":"放弃更改",98,90,this::close);
+        fixedAction("保存",0,90,()->{save.accept(List.copyOf(selected));super.close();});exit=fixed(exitLabel(),innerWidth-88,88,this::close);
     }
     private void rows(){if(list!=null)list.rows(candidates.stream().filter(r->SearchText.matches(r.id()+" "+r.name(),query)).sorted(Comparator.comparingInt(r->SearchText.rank(r.name(),r.id(),query))).map(r->new OverlayList.Row(r.id(),r.name()+" · "+r.id(),selected.contains(r.id()))).toList(),null);}
-    @Override public boolean keyPressed(int key,int scan,int modifiers){if((key==257||key==335)&&getFocused() instanceof net.minecraft.client.gui.widget.TextFieldWidget){save.accept(List.copyOf(selected));super.close();return true;}return super.keyPressed(key,scan,modifiers);}
+    @Override public boolean keyPressed(int key,int scan,int modifiers){if((key==257||key==335)&&getFocused() instanceof net.minecraft.client.gui.widget.TextFieldWidget){return true;}return super.keyPressed(key,scan,modifiers);}
+    private String exitLabel(){return discardConfirmed?"确认放弃":selected.equals(initial)?"返回":"放弃";}
+    @Override protected void updateMenu(){if(exit!=null)exit.setMessage(net.minecraft.text.Text.literal(exitLabel()));}
     @Override public void close(){if(!selected.equals(initial)&&!discardConfirmed){discardConfirmed=true;refresh();return;}super.close();}
 }

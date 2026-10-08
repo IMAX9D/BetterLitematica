@@ -18,6 +18,8 @@ abstract class MenuScreen extends Screen {
     private final List<Item> body=new ArrayList<>();private final List<ClickableWidget> footer=new ArrayList<>();
     private final List<ClickableWidget> navigation=new ArrayList<>();
     private final Map<ClickableWidget,String> hints=new IdentityHashMap<>();
+    private final Map<ClickableWidget,SettingId> settingIds=new IdentityHashMap<>();
+    private final Set<ClickableWidget> settingActions=Collections.newSetFromMap(new IdentityHashMap<>());
     private final LinkedHashMap<String,UiMotion> buttonMotions=new LinkedHashMap<>(64,.75f,true);
     private final List<Caption> captions=new ArrayList<>();private int contentHeight,scroll;private boolean building;
     private static java.lang.ref.WeakReference<MenuScreen> departed=new java.lang.ref.WeakReference<>(null);
@@ -38,18 +40,32 @@ abstract class MenuScreen extends Screen {
         int cursor=previousFocus==null?0:((OverlayTextField)previousFocus.widget).getCursor(),anchor=previousFocus==null?0:((OverlayTextField)previousFocus.widget).selectionAnchor();
         setFocused(null);
         width=UiViewport.WIDTH;height=UiViewport.HEIGHT;
-        building=true;clearChildren();body.clear();footer.clear();navigation.clear();captions.clear();hints.clear();fieldMotion.clear();contentHeight=0;
+        building=true;clearChildren();body.clear();footer.clear();navigation.clear();captions.clear();hints.clear();settingIds.clear();settingActions.clear();fieldMotion.clear();contentHeight=0;
         innerWidth=Math.max(160,Math.min(width-48,wide?680:440));left=(width-innerWidth)/2;
         int panelHeight=Math.min(height-20,preferredHeight());panelTop=(height-panelHeight)/2;panelBottom=panelTop+panelHeight;
         bodyTop=panelTop+(description.isEmpty()?40:58);bodyBottom=panelBottom-56;
         buildMenu();describeSettings();back=showBack()?fixed(backLabel(),innerWidth-76,76,this::close):null;building=false;position();
         if(previousFocus!=null)for(var item:body)if(item.y==previousFocus.y&&item.widget.getX()==previousFocus.widget.getX()&&item.widget instanceof OverlayTextField field&&field.getMessage().equals(previousFocus.widget.getMessage())){field.setSelectionStart(Math.min(cursor,field.getText().length()));field.setSelectionEnd(Math.min(anchor,field.getText().length()));setFocused(field);break;}
     }
-    record SettingControl(String label,String hint){}
-    java.util.List<SettingControl> settingControls(){return body.stream().filter(i->i.widget instanceof TextFieldWidget||i.widget instanceof MenuButton b&&(b.look==Look.STANDARD||b.look==Look.PRIMARY||b.look==Look.ACCENT)).map(i->{String label=i.widget.getMessage().getString().split("：",2)[0];return new SettingControl(label,hints.getOrDefault(i.widget,""));}).distinct().toList();}
-    void focusSetting(String label){for(var i:body)if(i.widget.getMessage().getString().split("：",2)[0].equals(label)){focusControl(i.widget);break;}}
-    protected void describeSettings(){for(var i:body){String label=i.widget.getMessage().getString().split("：",2)[0];String description=SettingHelp.text(label);if(!description.isEmpty()){String extra=hints.getOrDefault(i.widget,"");hints.put(i.widget,description+(extra.isEmpty()||extra.equals(description)?"":" "+extra));}}}
-    protected void enableSetting(String label,boolean enabled){for(var i:body)if(i.widget.getMessage().getString().split("：",2)[0].equals(label)){i.widget.active=enabled;if(i.widget instanceof TextFieldWidget field)field.setEditable(enabled);}}
+    record SettingControl(SettingId id,String label,String hint){}
+    java.util.List<SettingControl> settingControls(){
+        validateSettings();var result=new LinkedHashMap<SettingId,SettingControl>();
+        for(var item:body){var id=settingIds.get(item.widget);if(id!=null){var help=SettingHelp.require(id);result.putIfAbsent(id,new SettingControl(id,help.label(),hints.getOrDefault(item.widget,help.description())));}}
+        return List.copyOf(result.values());
+    }
+    void focusSetting(SettingId id){for(var item:body)if(settingIds.get(item.widget)==id){focusControl(item.widget);return;}throw new IllegalStateException("设置位置不存在："+id);}
+    protected boolean isSettingsPage(){return false;}
+    protected final <T extends ClickableWidget> T setting(SettingId id,T control){SettingHelp.require(id);settingIds.put(control,Objects.requireNonNull(id));return control;}
+    /** Explicitly distinguishes operations (such as clearing a queue) from editable settings. */
+    protected final <T extends ClickableWidget> T settingAction(T control){settingActions.add(control);return control;}
+    final void validateSettings(){
+        for(var id:settingIds.values())SettingHelp.require(id);
+        if(!isSettingsPage())return;
+        for(var item:body){var widget=item.widget;boolean editable=widget instanceof TextFieldWidget||widget instanceof ColorSwatch||widget instanceof MenuButton b&&(b.look==Look.STANDARD||b.look==Look.PRIMARY||b.look==Look.ACCENT);
+            if(editable&&!settingIds.containsKey(widget)&&!settingActions.contains(widget))throw new IllegalStateException("设置缺少稳定标识："+getClass().getSimpleName()+" / "+widget.getMessage().getString());}
+    }
+    protected void describeSettings(){validateSettings();for(var item:body){var id=settingIds.get(item.widget);if(id!=null){String description=SettingHelp.require(id).description(),extra=hints.getOrDefault(item.widget,"");hints.put(item.widget,description+(extra.isEmpty()||extra.equals(description)?"":" "+extra));}}}
+    protected void enableSetting(SettingId id,boolean enabled){for(var item:body)if(settingIds.get(item.widget)==id){item.widget.active=enabled;if(item.widget instanceof TextFieldWidget field)field.setEditable(enabled);}}
     protected abstract void buildMenu();
     protected boolean showBack(){return true;}
     protected String backLabel(){return parent==null?"返回游戏":"返回";}

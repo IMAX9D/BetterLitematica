@@ -1,5 +1,5 @@
 Data source: https://github.com/mozillazg/pinyin-data
-Derived BMP table; first reading, tones removed.
+Derived BMP table; all readings, tones removed; umlaut u represented as v.
 
 The MIT License (MIT)
 
