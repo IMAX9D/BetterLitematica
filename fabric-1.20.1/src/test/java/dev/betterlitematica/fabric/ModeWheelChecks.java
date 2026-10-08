@@ -51,8 +51,9 @@ public final class ModeWheelChecks {
         }
         in=new Input();in.open();in.update(false,false,true);in.state.reset();in.screen=null;
         check(!in.state.claimed()&&in.state.owned()==null&&!in.update(false,false,true).open(),"Binding reset clears retained ownership");in.open();in.release();
-        for(int bits=0;bits<16;bits++)for(var mode:WheelModes.values()){
+        for(int bits=0;bits<32;bits++)for(var mode:WheelModes.values()){
             var original=new PrinterSettings();original.print=(bits&1)!=0;original.breakWrong=original.breakExtra=original.breakState=(bits&2)!=0;original.fluid=(bits&4)!=0;original.fill=(bits&8)!=0;
+            original.bedrock=(bits&16)!=0;
             original.highlightRange=31;original.highlightLimit=731;original.placeColor=0x11223344;original.interval=7;original.cooldown=13;original.skip.add("minecraft:diamond_block");
             var json=original.snapshot();json.addProperty("futurePreference",83);original=PrinterSettings.read(json);var before=original.snapshot();var next=WheelModes.toggled(original,mode);
             check(before.equals(original.snapshot()),"Mode switching cannot mutate settings source");check(next!=original&&next.skip!=original.skip,"Mode draft owns its mutable lists");
@@ -61,6 +62,28 @@ public final class ModeWheelChecks {
             check(next.highlightRange==31&&next.highlightLimit==731&&next.placeColor==0x11223344&&next.interval==7&&next.cooldown==13&&next.skip.equals(original.skip),"Unrelated preferences survive mode changes");
             check(next.snapshot().get("futurePreference").getAsInt()==83,"Unknown future preferences survive mode changes");
             check(WheelModes.toggled(next,mode).snapshot().equals(before),"Toggling a uniform mode twice restores the complete settings");
+        }
+        int known=dev.betterlitematica.core.PrinterDiscovery.KNOWN;
+        var combinationPage=new dev.betterlitematica.core.PrinterDiscovery.Page(1,new long[]{1,2,3,4,5},new int[]{2,3,0,0,3},new int[]{0,4,5,0,6},
+            new int[]{known|dev.betterlitematica.core.PrinterDiscovery.ACTUAL_AIR|dev.betterlitematica.core.PrinterDiscovery.REPLACEABLE,known,
+                known|dev.betterlitematica.core.PrinterDiscovery.FLUID|dev.betterlitematica.core.PrinterDiscovery.FLUID_SOURCE,
+                known|dev.betterlitematica.core.PrinterDiscovery.ACTUAL_AIR|dev.betterlitematica.core.PrinterDiscovery.REPLACEABLE,
+                known|dev.betterlitematica.core.PrinterDiscovery.BEDROCK},new int[]{1,1,4,2,1|8},new int[]{-1,-1,7,7,-1});
+        for(int bits=0;bits<32;bits++){
+            var selected=new PrinterSettings();selected.print=false;selected.breakWrong=selected.breakExtra=selected.breakState=false;selected.fluid=selected.fill=selected.bedrock=false;
+            var modes=new WheelModes[]{WheelModes.PRINT,WheelModes.MINE,WheelModes.DRAIN,WheelModes.FILL,WheelModes.BEDROCK};
+            for(int i=0;i<modes.length;i++)if((bits&(1<<i))!=0)selected=WheelModes.toggled(selected,modes[i]);
+            var policy=new dev.betterlitematica.core.PrinterDiscovery.Policy(selected.print,selected.fill,selected.fluid,selected.bedrock,selected.breakWrong,selected.breakExtra,selected.breakState,selected.flowing);
+            var found=new java.util.HashMap<Long,dev.betterlitematica.core.PrinterQueue.Kind>();
+            for(var job:dev.betterlitematica.core.PrinterDiscovery.search(combinationPage,policy).jobs())check(found.put(job.position(),job.kind())==null,"Combined modes do not queue two destructive jobs for one obstacle");
+            var expected=new java.util.HashMap<Long,dev.betterlitematica.core.PrinterQueue.Kind>();
+            if((bits&1)!=0)expected.put(1L,dev.betterlitematica.core.PrinterQueue.Kind.PLACE);
+            if((bits&2)!=0)expected.put(2L,dev.betterlitematica.core.PrinterQueue.Kind.BREAK);
+            if((bits&4)!=0)expected.put(3L,dev.betterlitematica.core.PrinterQueue.Kind.FLUID);
+            if((bits&8)!=0)expected.put(4L,dev.betterlitematica.core.PrinterQueue.Kind.FILL);
+            if((bits&16)!=0)expected.put(5L,dev.betterlitematica.core.PrinterQueue.Kind.BEDROCK);
+            else if((bits&2)!=0)expected.put(5L,dev.betterlitematica.core.PrinterQueue.Kind.BREAK);
+            check(found.equals(expected),"Every independent wheel combination reaches its actual discovery behavior, including bedrock without print");
         }
         for(int bits=1;bits<7;bits++){
             var source=new PrinterSettings();source.breakWrong=(bits&1)!=0;source.breakExtra=(bits&2)!=0;source.breakState=(bits&4)!=0;

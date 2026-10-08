@@ -14,7 +14,7 @@ final class ModeWheelScreen extends MenuScreen {
     static final double CX=300,CY=200,INNER=54,OUTER=132;
 
     private static final int CARD_X=452,CARD_RIGHT=590,CARD_TOP=130;
-    private static final WheelModes[] MODES={WheelModes.PRINT,WheelModes.MINE,WheelModes.DRAIN,WheelModes.FILL};
+    private static final WheelModes[] MODES=WheelModes.values();
     private static final WheelRenderMode[] RENDER_MODES=WheelRenderMode.values();
     private enum Page { MAIN,MODES,RENDER }
     private final ClickableWidget surface=new WheelSurface();private final long epoch;
@@ -25,7 +25,7 @@ final class ModeWheelScreen extends MenuScreen {
     private OverlayTextField firstField,secondField;
     private ButtonWidget firstPlayer,secondPlayer;
     private long transition=System.nanoTime();
-    private final UiMotion[] modeMotion=motions(4),mainMotion=motions(4),renderMotion=motions(9);
+    private final UiMotion[] modeMotion=motions(MODES.length),mainMotion=motions(4),renderMotion=motions(9);
     private final UiMotion centerMotion=new UiMotion();
     private static UiMotion[] motions(int count){var result=new UiMotion[count];for(int i=0;i<count;i++)result[i]=new UiMotion();return result;}
     ModeWheelScreen(ProjectionController controller){super("快捷操作","",null,controller,true);epoch=controller.sessionEpoch();}

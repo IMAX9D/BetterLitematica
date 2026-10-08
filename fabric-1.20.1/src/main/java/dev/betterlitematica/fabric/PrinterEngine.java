@@ -67,7 +67,7 @@ final class PrinterEngine implements AutoCloseable {
         next.revision=settings().revision+1;controller.options().printer=next;fillState=fill;pause("设置已更改");clearWork();context=state==State.STOPPED?null:current();controller.saveOptions();
     }
     void toggle(){if(running())pause("已暂停");else start();}
-    void cycle(){var s=PrinterSettings.read(settings().snapshot());int mode=s.print?0:s.fill?1:2;s.print=mode==2;s.fill=mode==0;s.fluid=mode==1;s.bedrock=false;configure(s);}
+    void cycle(){var s=PrinterSettings.read(settings().snapshot());int mode=s.print?0:s.fill?1:2;s.print=mode==2;s.fill=mode==0;s.fluid=mode==1;configure(s);}
     void supplyOpened(int sync,net.minecraft.screen.ScreenHandlerType<?> type){try{containers.opened(sync,type);actions.supplyOpened(sync,type);}catch(RuntimeException e){pause(e.getMessage());}}
     void containerOpening(net.minecraft.screen.ScreenHandlerType<?> type){containers.opening(type);}
     void supplyInventory(int sync){actions.supplyInventory(sync);}

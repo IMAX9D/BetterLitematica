@@ -42,10 +42,9 @@ final class ProjectionScreen extends MenuScreen {
         tile(Kind.PRINTER,"打印机",right,tw,1,0,()->client.setScreen(new PrinterScreen(this,controller)),false);
         tile(Kind.SELECTION,"选区与保存",right,tw,0,1,()->client.setScreen(new SelectionScreen(this,controller)),false);
         tile(Kind.PASTE,"创造粘贴",right,tw,1,1,()->client.setScreen(new CreativeScreen(this,controller)),false);
-        tile(Kind.LAYERS,"破基岩",right,tw,0,2,()->client.setScreen(new BedrockScreen(this,controller)),false);
-        tile(Kind.TASKS,"任务管理",right,tw,1,2,()->client.setScreen(new TaskScreen(this,controller)),false);
-        tile(Kind.VERSIONS,"项目版本",right,tw,0,3,()->client.setScreen(new ProjectScreen(this,controller)),false);
-        tile(Kind.SETTINGS,"设置与快捷键",right,tw,1,3,()->client.setScreen(new OptionsScreen(this,controller)),false);
+        tile(Kind.TASKS,"任务管理",right,tw,0,2,()->client.setScreen(new TaskScreen(this,controller)),false);
+        tile(Kind.VERSIONS,"项目版本",right,tw,1,2,()->client.setScreen(new ProjectScreen(this,controller)),false);
+        tile(Kind.SETTINGS,"设置与快捷键",right,tw,0,3,()->client.setScreen(new OptionsScreen(this,controller)),false);
         if(controller.hasDraftRecovery())tile(Kind.RESTORE,"恢复编辑",right,tw,0,4,()->client.setScreen(new DraftRecoveryScreen(this,controller)),true);
         snapshot=snapshot();
     }

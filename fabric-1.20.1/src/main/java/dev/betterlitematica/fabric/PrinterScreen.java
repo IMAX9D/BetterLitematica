@@ -37,23 +37,27 @@ final class PrinterScreen extends MenuScreen {
         fixed("放弃更改",224,80,this::discard);updateMenu();
     }
     private void workPage(){
-        toggle("打印",0,56,()->draft.print,v->draft.print=v);
-        cycleScope("范围",1,56,()->draft.printScope,v->draft.printScope=v);
-        toggle("填充",0,82,()->draft.fill,v->draft.fill=v);
-        cycleScope("范围",1,82,()->draft.fillScope,v->draft.fillScope=v);
-        toggle("排水",0,108,()->draft.fluid,v->draft.fluid=v);
-        cycleScope("范围",1,108,()->draft.fluidScope,v->draft.fluidScope=v);
-        inputAt("填充方块",draft.fillState,cellX(0,2),138,cellWidth(2)-76,256,v->draft.fillState=v);
-        directionButton=buttonAt("方向",cellX(0,2)+cellWidth(2)-68,152,68,()->{read();var state=PrinterRules.cycleDirection(PrinterEngine.checkedFill(draft));draft.fillState=stateName(state);rawInputs.put("填充方块",draft.fillState);refresh();},false,false);updateDirection();
-        number("距离（0 自动）",Double.toString(draft.range),1,2,138,v->draft.range=Double.parseDouble(v));
-        number("批次间隔 / tick",draft.interval,0,3,186,v->draft.interval=v);
-        number("每 tick 上限",draft.perTick,1,3,186,v->draft.perTick=v);
-        number("位置冷却 / tick",draft.cooldown,2,3,186,v->draft.cooldown=v);
+        var modes=new WheelModes[]{WheelModes.PRINT,WheelModes.MINE,WheelModes.FILL,WheelModes.DRAIN,WheelModes.BEDROCK};
+        for(int i=0;i<modes.length;i++){
+            var mode=modes[i];int x=cellX(i,modes.length),w=cellWidth(modes.length);boolean enabled=mode.enabled(draft);
+            var control=buttonAt(mode.label()+"："+(mode.mixed(draft)?"部分":enabled?"开":"关"),x,56,w-(mode==WheelModes.BEDROCK?26:0),()->{read();draft=WheelModes.toggled(draft,mode);refresh();},true,enabled);
+            if(mode.mixed(draft)){var active=new ArrayList<String>();if(draft.breakWrong)active.add("错误方块");if(draft.breakExtra)active.add("多余方块");if(draft.breakState)active.add("错误状态");hint(control,String.join(" · ",active));}
+            if(mode==WheelModes.BEDROCK)iconAt(dev.betterlitematica.runtime.UiGlyphArt.Kind.TUNE,"破基岩设置",x+w-20,56,20,()->{read();client.setScreen(new BedrockScreen(this,controller));},true,Look.GHOST,0);
+        }
+        cycleScope("打印范围",0,3,88,()->draft.printScope,v->draft.printScope=v);
+        cycleScope("填充范围",1,3,88,()->draft.fillScope,v->draft.fillScope=v);
+        cycleScope("排流体范围",2,3,88,()->draft.fluidScope,v->draft.fluidScope=v);
+        inputAt("填充方块",draft.fillState,cellX(0,2),122,cellWidth(2)-76,256,v->draft.fillState=v);
+        directionButton=buttonAt("方向",cellX(0,2)+cellWidth(2)-68,136,68,()->{read();var state=PrinterRules.cycleDirection(PrinterEngine.checkedFill(draft));draft.fillState=stateName(state);rawInputs.put("填充方块",draft.fillState);refresh();},false,false);updateDirection();
+        number("距离（0 自动）",Double.toString(draft.range),1,2,122,v->draft.range=Double.parseDouble(v));
+        number("批次间隔 / tick",draft.interval,0,3,172,v->draft.interval=v);
+        number("每 tick 上限",draft.perTick,1,3,172,v->draft.perTick=v);
+        number("位置冷却 / tick",draft.cooldown,2,3,172,v->draft.cooldown=v);
         hint(fields.get("批次间隔 / tick"),"0–1：每 tick；2：每 2 tick");
         hint(fields.get("每 tick 上限"),"0：按时间预算执行");
         hint(fields.get("位置冷却 / tick"),"同一位置再次尝试前的等待时间");
-        toggle("状态 HUD",0,236,()->draft.hud,v->draft.hud=v);
-        toggle("缺料 HUD",1,236,()->draft.missingHud,v->draft.missingHud=v);
+        toggle("状态 HUD",0,222,()->draft.hud,v->draft.hud=v);
+        toggle("缺料 HUD",1,222,()->draft.missingHud,v->draft.missingHud=v);
     }
     private void settingsPage(){
         buttonAt("范围形状："+switch(draft.shape){case SPHERE->"球形";case OCTAHEDRON->"八面体";case CUBE->"立方体";},cellX(0,2),56,cellWidth(2),()->{read();draft.shape=PrinterRange.Shape.values()[(draft.shape.ordinal()+1)%3];refresh();},true,false);
@@ -82,9 +86,6 @@ final class PrinterScreen extends MenuScreen {
         toggle("破冰放水",0,56,()->draft.iceWater,v->draft.iceWater=v);toggle("珊瑚替代",1,56,()->draft.coralSubstitute,v->draft.coralSubstitute=v);toggle("侦测器顺序检查",0,82,()->draft.safeObserver,v->draft.safeObserver=v);
         toggle("容器填充",1,82,()->draft.containerFill,v->draft.containerFill=v);
         buttonAt("补给："+draft.supply.label(),cellX(0,2),118,cellWidth(2),()->{read();draft.supply=PrinterSupply.Source.values()[(draft.supply.ordinal()+1)%PrinterSupply.Source.values().length];refresh();},true,false);
-        int x=cellX(1,2),width=cellWidth(2);
-        buttonAt("破基岩："+(draft.bedrock?"开":"关"),x,118,width-28,()->{read();draft.bedrock=!draft.bedrock;refresh();},true,draft.bedrock);
-        iconAt(dev.betterlitematica.runtime.UiGlyphArt.Kind.TUNE,"破基岩设置",x+width-20,118,20,()->{read();client.setScreen(new BedrockScreen(this,controller));},true,Look.GHOST,0);
     }
     private void highlightPage(){
         toggle("施工高亮",0,56,()->draft.highlights,v->draft.highlights=v);toggle("高亮置顶",1,56,()->draft.highlightOnTop,v->draft.highlightOnTop=v);
@@ -127,7 +128,10 @@ final class PrinterScreen extends MenuScreen {
     }
     private static List<String> list(String text){return new ArrayList<>(Arrays.stream(text.split("[,，\\s]+",-1)).filter(s->!s.isBlank()).toList());}
     private void toggle(String name,int column,int y,BooleanSupplier get,Consumer<Boolean> set){buttonAt(name+"："+(get.getAsBoolean()?"开":"关"),cellX(column,2),y,cellWidth(2),()->{read();set.accept(!get.getAsBoolean());refresh();},true,get.getAsBoolean());}
-    private void cycleScope(String name,int column,int y,Supplier<PrinterSettings.Scope> get,Consumer<PrinterSettings.Scope> set){buttonAt(name+"："+switch(get.get()){case PROJECTION->"投影";case SELECTION->"选区";case BELOW->"选区内 · 玩家下方";case ABOVE->"选区内 · 玩家上方";},cellX(column,2),y,cellWidth(2),()->{read();set.accept(PrinterSettings.Scope.values()[(get.get().ordinal()+1)%4]);refresh();},true,false);}
+    private void cycleScope(String name,int column,int columns,int y,Supplier<PrinterSettings.Scope> get,Consumer<PrinterSettings.Scope> set){
+        var scope=get.get();var button=buttonAt(name+"："+switch(scope){case PROJECTION->"投影";case SELECTION->"选区";case BELOW->"选区 · 下方";case ABOVE->"选区 · 上方";},cellX(column,columns),y,cellWidth(columns),()->{read();set.accept(PrinterSettings.Scope.values()[(get.get().ordinal()+1)%4]);refresh();},true,false);
+        if(scope==PrinterSettings.Scope.BELOW||scope==PrinterSettings.Scope.ABOVE)hint(button,scope==PrinterSettings.Scope.BELOW?"选区内 · 玩家下方":"选区内 · 玩家上方");
+    }
     private void input(String label,String value,int column,int columns,int y,int max,Consumer<String> read){inputAt(label,value,cellX(column,columns),y,cellWidth(columns),max,read);}
     private void inputAt(String label,String value,int x,int y,int width,int max,Consumer<String> read){TextFieldWidget field=fieldAt(label,rawInputs.getOrDefault(label,value),x,y,width,max);fields.put(label,field);field.setChangedListener(v->{rawInputs.put(label,v);error="";invalidField=null;if(label.equals("填充方块"))updateDirection();});readers.add(()->{try{read.accept(field.getText().trim());}catch(RuntimeException e){focusInvalidField(field);if(e instanceof NumberFormatException)throw new IllegalArgumentException(label+"：请输入有效数值");throw e;}});}
     private void number(String label,int value,int column,int columns,int y,IntConsumer read){number(label,Integer.toString(value),column,columns,y,v->read.accept(Integer.parseInt(v)));}
