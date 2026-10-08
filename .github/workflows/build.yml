@@ -23,7 +23,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: matrix
-        run: python3 -c 'import json; print("versions=" + json.dumps([t["minecraft"] for t in json.load(open("targets.json"))["targets"]]))' >> "$GITHUB_OUTPUT"
+        env:
+          BUILD_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          targets = json.load(open("targets.json"))["targets"]
+          if os.environ["BUILD_BRANCH"].startswith("review/"):
+              targets = [t for t in targets if "-review." in t.get("artifactVersion", "")]
+              if not targets:
+                  raise SystemExit("Review branch must declare its review target")
+          print("versions=" + json.dumps([t["minecraft"] for t in targets]))
+          PY
   build:
     needs: targets
     runs-on: ubuntu-latest

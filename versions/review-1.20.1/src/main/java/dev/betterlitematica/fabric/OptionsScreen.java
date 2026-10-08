@@ -6,6 +6,7 @@ import org.lwjgl.glfw.GLFW;
 import java.util.*;
 
 final class OptionsScreen extends MenuScreen {
+    OptionsScreen page(int value){tab=value;return this;}
     private TextFieldWidget chord,search;private String selected="menu",query="";private int tab;private boolean recording;private OverlayList list;
     private final Map<String,String> drafts=new HashMap<>();private final LinkedHashSet<String> pressed=new LinkedHashSet<>();
     private net.minecraft.client.gui.widget.ButtonWidget cancelRecord;
@@ -18,6 +19,7 @@ final class OptionsScreen extends MenuScreen {
     private void rows(){if(list!=null)list.rows(controller.options().keys.keySet().stream().filter(k->(InputBindings.label(k)+k).toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT))).map(k->new OverlayList.Row(k,InputBindings.label(k),!controller.options().keys.get(k).isEmpty())).toList(),selected);}
     @Override protected void buildMenu(){
         chord=null;search=null;cancelRecord=null;
+        ghostAt("搜索全部设置",left+innerWidth-120,28,120,()->client.setScreen(new SettingsSearchScreen(this,controller)),true);
         tabs[0]=tab("交互设置",0,3,0,()->selectTab(0),tab==0);tabs[1]=tab("显示",1,3,0,()->selectTab(1),tab==1);tabs[2]=tab("快捷键",2,3,0,()->selectTab(2),tab==2);var s=controller.options();
         if(tab==1){DisplayScreen.buildControls(this,controller,2,()->client.setScreen(new LayerScreen(this,controller)),this::save);}
         else if(tab==0){

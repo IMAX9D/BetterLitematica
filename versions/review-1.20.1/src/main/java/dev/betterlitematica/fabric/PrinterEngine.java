@@ -22,6 +22,24 @@ final class PrinterEngine implements AutoCloseable {
     private final ArrayDeque<CompletableFuture<PrinterDiscovery.Result>> searches=new ArrayDeque<>();
     private final PrinterPacing pacing=new PrinterPacing();
     private final LinkedHashMap<Item,Integer> missing=new LinkedHashMap<>();
+    private final Map<Item,Integer> missingAge=new HashMap<>();private long feedbackRound;
+    record Missing(Item item,int required){}
+    List<Missing> missingMaterials(){return missing.keySet().stream().map(item->new Missing(item,nearby.materialNeeds().getOrDefault(item,0))).toList();}
+    int progressPercent(){if(!settings().print&&!mining(settings()))return -1;int compared=nearby.compared();return compared==0?-1:(int)Math.min(100,100L*nearby.matched()/compared);}
+    MaterialStock stock(){return actions.stock();}
+    private void recordMissing(Item item){if(item==null||item==net.minecraft.item.Items.AIR)return;if(missing.size()>=128&&!missing.containsKey(item)){Item first=missing.keySet().iterator().next();missing.remove(first);missingAge.remove(first);}missing.put(item,ticks);missingAge.put(item,0);}
+    private void refreshMissing(){
+        stock().refresh(ticks,settings().supply);
+        if(nearby.rounds()==feedbackRound)return;feedbackRound=nearby.rounds();
+        for(var it=missing.keySet().iterator();it.hasNext();){Item item=it.next();
+            // Revalidate only recorded failures. A cooling placement must not make a
+            // genuine shortage blink off between attempts. Two successful sweeps retire it.
+            boolean stillNeeded=nearby.materialNeeds().containsKey(item);
+            boolean failed=stillNeeded&&stock().available(item)==0;
+            int age=failed?0:missingAge.getOrDefault(item,0)+1;missingAge.put(item,age);
+            if(age>=2){it.remove();missingAge.remove(item);}
+        }
+    }
     private final ActionHighlights highlights=new ActionHighlights(256);
     private ThreadPoolExecutor workers;private int workerCount;
     private State state=State.STOPPED;private Context context;private long generation;private boolean startupBurst,coldBurstUsed;
@@ -36,12 +54,12 @@ final class PrinterEngine implements AutoCloseable {
     boolean ownsBreaking(){return running()&&actions.breaking()&&client.currentScreen==null&&client.isWindowFocused();}
     long operations(){return operations;}int queued(){return queue.size()+(waiting==null?0:1);}
     String status(){return status;}
-    String progress(){return lastCompared==0?"":lastMatched+" / "+lastCompared+(lastUnknown>0?" · 待加载 "+lastUnknown:"");}
+    String progress(){return nearby.compared()==0?"":nearby.matched()+" / "+nearby.compared()+(nearby.snapshot().unknown()>0?" · 待加载 "+nearby.snapshot().unknown():"");}
     List<String> hud(){
         if(state==State.STOPPED||!settings().hud)return List.of();var lines=new ArrayList<String>();lines.add("打印机 · "+(context==null?0:context.sources().size())+" 个投影 · "+status+" · 操作 "+operations);
         if(settings().missingHud)missing.entrySet().stream().limit(4).forEach(e->lines.add("缺少 "+e.getKey().getName().getString()));return lines;
     }
-    NearbyBuildHud.Snapshot nearbyHud(){return nearby.snapshot();}
+    NearbyBuildHud.Snapshot nearbyHud(){return settings().missingHud?nearby.snapshot():NearbyBuildHud.Snapshot.EMPTY;}
     private PrinterSettings settings(){return controller.options().printer;}
     private Context current(){return new Context(client.world,controller.printerSources(),controller.layerRange(),controller.selection(),settings().revision);}
     static boolean mining(PrinterSettings s){return s.breakWrong||s.breakExtra||s.breakState;}
@@ -68,7 +86,9 @@ final class PrinterEngine implements AutoCloseable {
         next.revision=settings().revision+1;controller.options().printer=next;fillState=fill;pause("设置已更改");clearWork();context=state==State.STOPPED?null:current();controller.saveOptions();
     }
     void toggle(){if(running())pause("已暂停");else start();}
-    void cycle(){var s=PrinterSettings.read(settings().snapshot());int mode=s.print?0:s.fill?1:2;s.print=mode==2;s.fill=mode==0;s.fluid=mode==1;configure(s);}
+    void cycle(){var s=PrinterSettings.read(settings().snapshot());var modes=WheelModes.values();int current=-1;for(int i=0;i<modes.length;i++)if(modes[i].enabled(s)){current=i;break;}s.print=s.fill=s.fluid=s.bedrock=s.breakWrong=s.breakExtra=s.breakState=false;configure(WheelModes.toggled(s,modes[(current+1)%modes.length]));announceModes();}
+    void allModesOff(){var s=PrinterSettings.read(settings().snapshot());s.print=s.fill=s.fluid=s.bedrock=s.breakWrong=s.breakExtra=s.breakState=false;configure(s);stop();controller.bedrock().pause();announceModes();}
+    void announceModes(){if(client.player!=null){String labels=java.util.Arrays.stream(WheelModes.values()).filter(m->m.enabled(settings())).map(WheelModes::label).collect(java.util.stream.Collectors.joining("、"));client.player.sendMessage(net.minecraft.text.Text.literal(labels.isEmpty()?"全部施工模式已关闭":"施工模式："+labels+" · 按施工开关键继续"),true);}}
     void supplyOpened(int sync,net.minecraft.screen.ScreenHandlerType<?> type){try{containers.opened(sync,type);actions.supplyOpened(sync,type);}catch(RuntimeException e){pause(e.getMessage());}}
     void containerOpening(net.minecraft.screen.ScreenHandlerType<?> type){containers.opening(type);}
     void supplyInventory(int sync){actions.supplyInventory(sync);}
@@ -81,9 +101,9 @@ final class PrinterEngine implements AutoCloseable {
     void manualSignInteraction(BlockPos pos){if(!acting())signs.manual(pos);}
     Collection<ActionHighlights.Mark> actionMarks(long now){return highlights.live(now);}
     void render(net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext context){if(settings().highlights)ProjectionOverlays.actions(client,context,highlights.live(System.nanoTime()),settings());}
-    private void clearWork(){containers.clear();generation++;for(var future:searches)future.cancel(true);searches.clear();if(workers!=null)workers.getQueue().clear();queue.clear();pacing.reset();completedRounds=0;sampler=null;missing.clear();scan=null;center=null;waiting=null;actions.diagnostics.reset();roundCompared=roundMatched=roundUnknown=lastCompared=lastMatched=lastUnknown=0;actions.reset();}
+    private void clearWork(){containers.clear();generation++;for(var future:searches)future.cancel(true);searches.clear();if(workers!=null)workers.getQueue().clear();queue.clear();pacing.reset();completedRounds=0;sampler=null;missing.clear();missingAge.clear();scan=null;center=null;waiting=null;actions.diagnostics.reset();roundCompared=roundMatched=roundUnknown=lastCompared=lastMatched=lastUnknown=0;actions.reset();}
     private void pool(){int count=settings().threads;if(workers!=null&&count==workerCount)return;if(workers!=null)workers.shutdownNow();workerCount=count;workers=new ThreadPoolExecutor(count,count,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(count),r->{Thread t=new Thread(r,"betterlitematica-printer-search");t.setDaemon(true);return t;});}
-    void tickHud(){nearby.tick();}
+    void tickHud(){nearby.tick();refreshMissing();}
     void tick(){
         ticks++;signs.tick();
         if(client.world==null||client.player==null||client.interactionManager==null){if(state!=State.STOPPED)stop();containers.tick(ticks,false);return;}
@@ -116,10 +136,10 @@ final class PrinterEngine implements AutoCloseable {
             // Spend the shared deadline on ready work first; prefetch only spare/blocked time.
             if(waiting!=null||queue.size()<512||!pacing.canRun(false))snapshot(budget,false);
             if(!budget.hasTime(System.nanoTime()))actions.diagnostics.budgetStops++;
-            if(ticks%20==0){missing.entrySet().removeIf(e->ticks-e.getValue()>60);pacing.expire();}
+            if(ticks%20==0)pacing.expire();
             if(settings.containerFill&&settings.print&&waiting==null&&queue.size()==0&&!controller.inventoryTransfers().inFlight()
                 &&budget.hasTime(System.nanoTime())&&containers.startNext(ticks))status=containers.reason();
-            var containerMissing=containers.takeMissing();if(!containerMissing.isEmpty()){if(missing.size()>=128)missing.remove(missing.keySet().iterator().next());missing.put(containerMissing.getItem(),ticks);}
+            var containerMissing=containers.takeMissing();if(!containerMissing.isEmpty())recordMissing(containerMissing.getItem());
         }catch(RuntimeException e){pause(e.getMessage()==null?"打印异常，已暂停":e.getMessage());BetterLitematicaClient.LOGGER.error("Printer paused",e);}finally{sampler=null;actions.diagnostics.finish(settings(),queued(),actions.reason());}
     }
     private void collect(){
@@ -220,7 +240,7 @@ final class PrinterEngine implements AutoCloseable {
             if(s.highlights&&(actions.dispatched()||outcome==PrinterActions.Outcome.UNSUPPORTED)){var kind=outcome==PrinterActions.Outcome.UNSUPPORTED?ActionHighlights.Kind.FAILED:switch(job.kind()){case BREAK,BEDROCK->ActionHighlights.Kind.BREAK;case ADJUST->ActionHighlights.Kind.ADJUST;default->ActionHighlights.Kind.PLACE;};highlights.add(job.position(),kind,System.nanoTime(),HighlightFades.duration(kind,s.highlightMillis*1_000_000L));}
             if(outcome==PrinterActions.Outcome.WAIT){waiting=job;status=actions.reason();break;}
             if(outcome==PrinterActions.Outcome.SENT){status="打印中";}
-            else if(outcome==PrinterActions.Outcome.MISSING){if(actions.missing()!=null){if(missing.size()>=128)missing.remove(missing.keySet().iterator().next());missing.put(actions.missing(),ticks);}status=actions.reason();if(resuming)actions.reset();pacing.defer(job.position(),20);}
+            else if(outcome==PrinterActions.Outcome.MISSING){recordMissing(actions.missing());status=actions.reason();if(resuming)actions.reset();pacing.defer(job.position(),20);}
             else if(outcome==PrinterActions.Outcome.UNSUPPORTED||outcome==PrinterActions.Outcome.RETRY){status=actions.reason();if(resuming)actions.reset();pacing.defer(job.position(),outcome==PrinterActions.Outcome.RETRY?1:20);}
         }
         return true;

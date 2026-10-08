@@ -12,6 +12,8 @@ import java.util.function.*;
 final class PrinterScreen extends MenuScreen {
     private final long sessionEpoch;
     private PrinterSettings draft;
+    private boolean discardConfirmed;
+    PrinterScreen page(int value){tab=value;return this;}
     private int tab;private String error="",notice="";
     private final List<Runnable> readers=new ArrayList<>();
     private final Map<String,TextFieldWidget> fields=new LinkedHashMap<>();
@@ -21,21 +23,22 @@ final class PrinterScreen extends MenuScreen {
         super("打印机","",parent,controller,true);sessionEpoch=controller.sessionEpoch();
         draft=PrinterSettings.read(controller.options().printer.snapshot());
     }
-    @Override protected String backLabel(){return "保存并返回";}
+    @Override protected boolean showBack(){return false;}
     @Override protected void buildMenu(){
         readers.clear();fields.clear();
         addBody(new OverlayLabel(left,innerWidth,"启用投影 · "+controller.printerPlacements().size()),0);
+        ghostAt("搜索设置",left+innerWidth-240,0,82,()->{read();client.setScreen(new SettingsSearchScreen(this,controller));},true);
         String[] tabs={"施工","通用","策略","过滤","性能","高亮"};
         for(int i=0;i<tabs.length;i++){int next=i;tabAt(tabs[i],cellX(i,tabs.length),26,cellWidth(tabs.length),()->{read();tab=next;refresh();},tab==i);}
         if(tab==0)workPage();else if(tab==1)settingsPage();else if(tab==2)strategyPage();else if(tab==3)filtersPage();else if(tab==4)performancePage();else highlightPage();
         work=fixed("开始",0,72,()->{
             var engine=controller.printer();
             if(engine.running()){engine.pause("已暂停");return;}
-            try{save();engine.start();client.setScreen(null);}catch(RuntimeException e){error=e.getMessage();throw e;}
+            try{read();if(!draft.snapshot().equals(controller.options().printer.snapshot()))throw new IllegalArgumentException("请先保存设置，再开始施工");engine.start();client.setScreen(null);}catch(RuntimeException e){error=e.getMessage();throw e;}
         });
         stop=fixed("停止",80,64,()->{controller.printer().stop();notice="已停止";});
-        fixed("保存",152,64,()->{save();notice="设置已应用";});
-        fixed("放弃更改",224,80,this::discard);updateMenu();
+        fixedAction("保存并返回",152,104,this::commit);
+        fixed(discardConfirmed?"确认放弃":"放弃更改",264,88,this::discard);dependencies();updateMenu();
     }
     private void workPage(){
         ghostAt("破基岩设置与独立队列",left+innerWidth-150,0,150,()->{read();client.setScreen(new BedrockScreen(this,controller));},true);
@@ -43,6 +46,7 @@ final class PrinterScreen extends MenuScreen {
         for(int i=0;i<modes.length;i++){
             var mode=modes[i];int x=cellX(i,modes.length),w=cellWidth(modes.length);boolean enabled=mode.enabled(draft);
             var control=buttonAt(mode.label()+"："+(mode.mixed(draft)?"部分":enabled?"开":"关"),x,56,w,()->{read();draft=WheelModes.toggled(draft,mode);refresh();},true,enabled);
+            hint(control,"切换"+mode.label()+"模式；保存后按施工开关键执行。");
             if(mode.mixed(draft)){var active=new ArrayList<String>();if(draft.breakWrong)active.add("错误方块");if(draft.breakExtra)active.add("多余方块");if(draft.breakState)active.add("错误状态");hint(control,String.join(" · ",active));}
 
         }
@@ -60,8 +64,7 @@ final class PrinterScreen extends MenuScreen {
         hint(fields.get("位置冷却 / tick"),"同一位置再次尝试前的等待时间");
         toggle("状态 HUD",0,222,()->draft.hud,v->draft.hud=v);
         toggle("周围待建 HUD",1,222,()->draft.missingHud,v->draft.missingHud=v);
-        caption("周围待建开启后持续更新；包含缺失与状态错误，不扣背包。",left,250,innerWidth);
-        caption("破基岩模式由打印机执行；独立目标队列在破基岩设置中管理。",left,272,innerWidth);
+
     }
     private void settingsPage(){
         buttonAt("范围形状："+switch(draft.shape){case SPHERE->"球形";case OCTAHEDRON->"八面体";case CUBE->"立方体";},cellX(0,2),56,cellWidth(2),()->{read();draft.shape=PrinterRange.Shape.values()[(draft.shape.ordinal()+1)%3];refresh();},true,false);
@@ -125,27 +128,44 @@ final class PrinterScreen extends MenuScreen {
         hint(fields.get("工作预算 / ms"),"每 tick 的搜索与施工时间预算");
     }
     private void filtersPage(){
-        input("跳过方块",String.join(",",draft.skip),0,1,56,8192,v->draft.skip=list(v));
-        input("可替换方块",String.join(",",draft.replaceable),0,1,106,8192,v->draft.replaceable=list(v));
-        input("清理流体",String.join(",",draft.fluids),0,1,156,8192,v->draft.fluids=list(v));
-        input("堆肥材料",String.join(",",draft.compostItems),0,1,206,8192,v->draft.compostItems=list(v));
+        listInput("跳过方块",draft.skip,56,RegistryListScreen.Kind.BLOCK,v->draft.skip=v);
+        listInput("可替换方块",draft.replaceable,106,RegistryListScreen.Kind.BLOCK,v->draft.replaceable=v);
+        listInput("清理流体",draft.fluids,156,RegistryListScreen.Kind.FLUID,v->draft.fluids=v);
+        listInput("堆肥材料",draft.compostItems,206,RegistryListScreen.Kind.ITEM,v->draft.compostItems=v);
+    }
+    private void listInput(String label,List<String> values,int y,RegistryListScreen.Kind kind,Consumer<List<String>> set){
+        inputAt(label,String.join(",",values),left,y,innerWidth-80,8192,v->set.accept(list(v)));
+        var choose=buttonAt("选择",left+innerWidth-72,y+14,72,()->{read();client.setScreen(new RegistryListScreen(this,controller,label,kind,list(fields.get(label).getText()),v->{set.accept(new ArrayList<>(v));rawInputs.put(label,String.join(",",v));discardConfirmed=false;}));},true,false);
+        choose.active=switch(label){case "跳过方块"->draft.print;case "可替换方块"->draft.replace;case "清理流体"->draft.fluid;case "堆肥材料"->draft.composter&&draft.print;default->true;};hint(choose,"搜索并选择"+label+"；支持名称、ID 和拼音。");
     }
     private static List<String> list(String text){return new ArrayList<>(Arrays.stream(text.split("[,，\\s]+",-1)).filter(s->!s.isBlank()).toList());}
-    private void toggle(String name,int column,int y,BooleanSupplier get,Consumer<Boolean> set){buttonAt(name+"："+(get.getAsBoolean()?"开":"关"),cellX(column,2),y,cellWidth(2),()->{read();set.accept(!get.getAsBoolean());refresh();},true,get.getAsBoolean());}
+    private void toggle(String name,int column,int y,BooleanSupplier get,Consumer<Boolean> set){buttonAt(name+"："+(get.getAsBoolean()?"开":"关"),cellX(column,2),y,cellWidth(2),()->{read();discardConfirmed=false;set.accept(!get.getAsBoolean());refresh();},true,get.getAsBoolean());}
     private void cycleScope(String name,int column,int columns,int y,Supplier<PrinterSettings.Scope> get,Consumer<PrinterSettings.Scope> set){
         var scope=get.get();var button=buttonAt(name+"："+switch(scope){case PROJECTION->"投影";case SELECTION->"选区";case BELOW->"选区 · 下方";case ABOVE->"选区 · 上方";},cellX(column,columns),y,cellWidth(columns),()->{read();set.accept(PrinterSettings.Scope.values()[(get.get().ordinal()+1)%4]);refresh();},true,false);
         if(scope==PrinterSettings.Scope.BELOW||scope==PrinterSettings.Scope.ABOVE)hint(button,scope==PrinterSettings.Scope.BELOW?"选区内 · 玩家下方":"选区内 · 玩家上方");
     }
     private void input(String label,String value,int column,int columns,int y,int max,Consumer<String> read){inputAt(label,value,cellX(column,columns),y,cellWidth(columns),max,read);}
-    private void inputAt(String label,String value,int x,int y,int width,int max,Consumer<String> read){TextFieldWidget field=fieldAt(label,rawInputs.getOrDefault(label,value),x,y,width,max);fields.put(label,field);field.setChangedListener(v->{rawInputs.put(label,v);error="";notice="";invalidField=null;if(label.equals("填充方块"))updateDirection();});readers.add(()->{try{read.accept(field.getText().trim());}catch(RuntimeException e){focusInvalidField(field);if(e instanceof NumberFormatException)throw new IllegalArgumentException(label+"：请输入有效数值");throw e;}});}
+    private void inputAt(String label,String value,int x,int y,int width,int max,Consumer<String> read){TextFieldWidget field=fieldAt(label,rawInputs.getOrDefault(label,value),x,y,width,max);fields.put(label,field);field.setChangedListener(v->{rawInputs.put(label,v);discardConfirmed=false;error="";notice="";invalidField=null;if(label.equals("填充方块"))updateDirection();});readers.add(()->{try{read.accept(field.getText().trim());}catch(RuntimeException e){focusInvalidField(field);if(e instanceof NumberFormatException)throw new IllegalArgumentException(label+"：请输入有效数值");throw e;}});}
     private void number(String label,int value,int column,int columns,int y,IntConsumer read){number(label,Integer.toString(value),column,columns,y,v->read.accept(Integer.parseInt(v)));}
     private void number(String label,String value,int column,int columns,int y,Consumer<String> read){input(label,value,column,columns,y,10,read);}
     private void focusInvalidField(TextFieldWidget field){invalidField=field;focusControl(field);}
     private void focusInvalidField(){for(var field:fields.entrySet()){String label=field.getKey().split("[ /（]",2)[0];if(error.startsWith(label)||label.equals("批次间隔")&&error.startsWith("间隔")||label.equals("时长")&&error.startsWith("高亮时长")){focusInvalidField(field.getValue());break;}}}
     private void read(){invalidField=null;try{for(var reader:readers)reader.run();draft.validate();error="";}catch(RuntimeException e){error=Objects.toString(e.getMessage(),"设置无效");focusInvalidField();throw new IllegalArgumentException(error);}}
     private void save(){if(sessionEpoch!=controller.sessionEpoch())throw new IllegalStateException("世界已切换");read();try{controller.printer().configure(PrinterSettings.read(draft.snapshot()));}catch(RuntimeException e){error=Objects.toString(e.getMessage(),"设置无效");focusInvalidField();throw e;}}
-    private void discard(){if(sessionEpoch!=controller.sessionEpoch()){client.setScreen(null);return;}super.close();}
-    @Override public void close(){if(sessionEpoch!=controller.sessionEpoch()){client.setScreen(null);return;}runAction(()->{save();super.close();});}
+    private void commit(){save();super.close();}
+    private void discard(){close();}
+    @Override public void close(){if(sessionEpoch!=controller.sessionEpoch()){client.setScreen(null);return;}boolean dirty=!rawInputs.isEmpty()||!draft.snapshot().equals(controller.options().printer.snapshot());if(dirty&&!discardConfirmed){discardConfirmed=true;notice="再次返回将放弃未保存的更改";refresh();return;}super.close();}
+    @Override public boolean keyPressed(int key,int scan,int modifiers){if((key==257||key==335)&&getFocused() instanceof TextFieldWidget){runAction(this::commit);return true;}return super.keyPressed(key,scan,modifiers);}
+    private void dependencies(){
+        if(!draft.highlights)for(String name:List.of("高亮置顶","样式","时长 / ms","高亮范围 / 格","高亮上限","放置颜色","调节颜色","破坏颜色","失败颜色"))enableSetting(name,false);
+        if(!draft.hud)enableSetting("周围待建 HUD",false);
+        if(!draft.replace)enableSetting("可替换方块",false);
+        if(!draft.composter)enableSetting("堆肥材料",false);
+        if(!draft.fluid){enableSetting("清理流体",false);enableSetting("清理流水",false);enableSetting("排流体范围",false);}
+        if(!draft.fill)enableSetting("填充范围",false);
+        if(!draft.fill&&!draft.fluid){enableSetting("填充方块",false);enableSetting("方向",false);}
+        if(!draft.print)for(String name:List.of("原木去皮","音符盒调音","作物催熟","堆肥","容器填充","珊瑚替代","破冰放水","侦测器顺序检查","跳过含水方块","潜行放置","重力方块支撑检查","悬空放置","跳过方块"))enableSetting(name,false);
+    }
     @Override protected void runAction(Runnable action){try{error="";notice="";action.run();}catch(RuntimeException e){error=Objects.toString(e.getMessage(),"操作失败");}}
     @Override protected String displayedStatus(){return statusLine();}
     @Override protected int statusColor(){return error.isEmpty()?UiTheme.MUTED:UiTheme.ERROR;}

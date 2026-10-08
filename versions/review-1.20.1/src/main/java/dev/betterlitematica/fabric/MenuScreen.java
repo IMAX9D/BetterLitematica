@@ -42,9 +42,14 @@ abstract class MenuScreen extends Screen {
         innerWidth=Math.max(160,Math.min(width-48,wide?680:440));left=(width-innerWidth)/2;
         int panelHeight=Math.min(height-20,preferredHeight());panelTop=(height-panelHeight)/2;panelBottom=panelTop+panelHeight;
         bodyTop=panelTop+(description.isEmpty()?40:58);bodyBottom=panelBottom-56;
-        buildMenu();back=showBack()?fixed(backLabel(),innerWidth-76,76,this::close):null;building=false;position();
+        buildMenu();describeSettings();back=showBack()?fixed(backLabel(),innerWidth-76,76,this::close):null;building=false;position();
         if(previousFocus!=null)for(var item:body)if(item.y==previousFocus.y&&item.widget.getX()==previousFocus.widget.getX()&&item.widget instanceof OverlayTextField field&&field.getMessage().equals(previousFocus.widget.getMessage())){field.setSelectionStart(Math.min(cursor,field.getText().length()));field.setSelectionEnd(Math.min(anchor,field.getText().length()));setFocused(field);break;}
     }
+    record SettingControl(String label,String hint){}
+    java.util.List<SettingControl> settingControls(){return body.stream().filter(i->i.widget instanceof TextFieldWidget||i.widget instanceof MenuButton b&&(b.look==Look.STANDARD||b.look==Look.PRIMARY||b.look==Look.ACCENT)).map(i->{String label=i.widget.getMessage().getString().split("：",2)[0];return new SettingControl(label,hints.getOrDefault(i.widget,""));}).distinct().toList();}
+    void focusSetting(String label){for(var i:body)if(i.widget.getMessage().getString().split("：",2)[0].equals(label)){focusControl(i.widget);break;}}
+    protected void describeSettings(){for(var i:body){String label=i.widget.getMessage().getString().split("：",2)[0];String description=SettingHelp.text(label);if(!description.isEmpty()){String extra=hints.getOrDefault(i.widget,"");hints.put(i.widget,description+(extra.isEmpty()||extra.equals(description)?"":" "+extra));}}}
+    protected void enableSetting(String label,boolean enabled){for(var i:body)if(i.widget.getMessage().getString().split("：",2)[0].equals(label)){i.widget.active=enabled;if(i.widget instanceof TextFieldWidget field)field.setEditable(enabled);}}
     protected abstract void buildMenu();
     protected boolean showBack(){return true;}
     protected String backLabel(){return parent==null?"返回游戏":"返回";}

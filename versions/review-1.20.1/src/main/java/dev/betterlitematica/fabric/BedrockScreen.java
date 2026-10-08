@@ -15,6 +15,8 @@ import java.util.regex.Pattern;
 final class BedrockScreen extends MenuScreen {
     private final long epoch;
     private BedrockSettings draft;
+    BedrockScreen page(int value){tab=value;return this;}
+    private boolean discardConfirmed,clearConfirmed;private long clearSince;
     private int tab,ticks;
     private String error="";
     private final List<Runnable> readers=new ArrayList<>();
@@ -33,10 +35,10 @@ final class BedrockScreen extends MenuScreen {
         String[] names={"常规","规则","方向","区域"};
         for(int i=0;i<names.length;i++){int next=i;tabAt(names[i],cellX(i,names.length),0,cellWidth(names.length),()->{read();tab=next;removing=null;refresh();},tab==i);}
         switch(tab){case 0->general();case 1->rules();case 2->directions();default->regions();}
-        fixedAction("保存并返回",0,104,this::close);fixed("放弃更改",112,96,this::discard);updateWork();
+        fixedAction("保存并返回",0,104,this::commit);fixed(discardConfirmed?"确认放弃":"放弃更改",112,96,this::discard);updateWork();
     }
     private void general(){
-        caption("打印机的破基岩模式随施工执行；以下为独立目标与区域队列。",left,24,innerWidth);
+        caption("独立破基岩队列",left,24,innerWidth);
         toggle("空手右键切换",0,48,()->draft.emptyHandToggle,value->draft.emptyHandToggle=value);
         toggle("瞬挖短等待",1,48,()->draft.shortWait,value->draft.shortWait=value);
         number("任务超时 / tick",draft.timeoutTicks,0,88,value->draft.timeoutTicks=value);
@@ -47,16 +49,17 @@ final class BedrockScreen extends MenuScreen {
             read();if(!(client.crosshairTarget instanceof BlockHitResult hit)||hit.getType()!=HitResult.Type.BLOCK)throw new IllegalStateException("没有方块目标");
             var pos=hit.getBlockPos();
             if(!controller.bedrock().accepts(pos,draft))throw new IllegalStateException("目标未加载或不符合破基岩规则");
-            save();controller.bedrock().add(pos);updateWork();
+            requireSaved();controller.bedrock().add(pos);updateWork();
         },hasTarget(),false);
-        work=buttonAt("启动独立队列",cellX(0,2),182,cellWidth(2),()->{var engine=controller.bedrock();if(!engine.enabled()){read();engine.check();save();}engine.toggle();updateWork();},true,false);
-        hint(work,"应用当前设置并启用独立队列；返回游戏后施工。");
-        clear=buttonAt("清空独立队列",cellX(1,2),182,cellWidth(2),()->{controller.bedrock().clear();updateWork();},true,false);
-        caption("启动独立队列会暂停打印；启动打印会暂停此队列，保留目标。",left,214,innerWidth);
-        caption("队列只在返回游戏后施工；保存设置不会启动施工。",left,234,innerWidth);
+        work=buttonAt("启动独立队列",cellX(0,2),182,cellWidth(2),()->{var engine=controller.bedrock();if(!engine.enabled()){read();if(!draft.snapshot().equals(engine.settings().snapshot()))throw new IllegalArgumentException("请先保存设置，再启动独立队列");engine.check();}engine.toggle();updateWork();},true,false);
+        hint(work,"启动或暂停独立队列；启动会暂停打印机并保留目标，返回游戏后施工。");
+        hint(aim,"把准星指向的允许方块加入独立队列。");
+        clear=buttonAt("清空独立队列",cellX(1,2),182,cellWidth(2),()->{if(!clearConfirmed){clearConfirmed=true;clearSince=System.nanoTime();clear.setMessage(Text.literal("确认清空队列"));return;}controller.bedrock().clear();clearConfirmed=false;clear.setMessage(Text.literal("清空独立队列"));updateWork();},true,false);
+        hint(clear,"清空所有独立队列目标；需要再次点击确认。");
     }
     private void rules(){
-        input("允许方块",String.join(", ",draft.whitelist),left,38,innerWidth,8192,value->draft.whitelist=blocks(value));
+        input("允许方块",String.join(", ",draft.whitelist),left,38,innerWidth-80,8192,value->draft.whitelist=blocks(value));
+        buttonAt("选择",left+innerWidth-72,52,72,()->{read();client.setScreen(new RegistryListScreen(this,controller,"允许方块",RegistryListScreen.Kind.BLOCK,draft.whitelist,v->{draft.whitelist=new ArrayList<>(v);rawInputs.put("允许方块",String.join(",",v));}));},true,false);
         hint(fields.get("允许方块"),"minecraft:bedrock, minecraft:end_portal_frame");
         input("排除 Y 层",draft.excludedY.stream().map(Object::toString).collect(java.util.stream.Collectors.joining(", ")),left,96,innerWidth,4096,value->draft.excludedY=floors(value));
         hint(fields.get("排除 Y 层"),"-64, 0, 120–127");
@@ -71,7 +74,8 @@ final class BedrockScreen extends MenuScreen {
     }
     private void direction(BedrockSettings.Face direction,EnumSet<BedrockSettings.Face> choices,int x,int y,int width){
         boolean selected=choices.contains(direction);
-        buttonAt(direction.label(),x,y,width,()->{read();if(!choices.remove(direction))choices.add(direction);refresh();},!selected||choices.size()>1,selected);
+        String name=(choices==draft.breakDirections?"破坏向":"活塞朝")+direction.label();
+        var control=buttonAt(name+"："+(selected?"开":"关"),x,y,width,()->{read();discardConfirmed=false;if(!choices.remove(direction))choices.add(direction);refresh();},!selected||choices.size()>1,selected);hint(control,"切换"+name+"；同组至少保留一个方向。");
     }
     private void regions(){
         boolean selected=!controller.selection().boxes().isEmpty();
@@ -97,7 +101,7 @@ final class BedrockScreen extends MenuScreen {
             iconAt(Kind.TRASH,confirming?"再次点击移除":"移除区域",right,184,24,()->{
                 if(confirming){
                     if(controller.bedrock().regions().stream().noneMatch(r->r.id().equals(current.id()))){removing=null;refresh();return;}
-                    save();controller.bedrock().removeRegion(current.id());draft=controller.bedrock().settings().copy();removing=null;
+                    requireSaved();controller.bedrock().removeRegion(current.id());draft=controller.bedrock().settings().copy();removing=null;
                 }
                 else{removing=current.id();removingSince=System.nanoTime();}refresh();
             },true,confirming?Look.STANDARD:Look.GHOST,confirming?UiTheme.ERROR:0);
@@ -105,7 +109,7 @@ final class BedrockScreen extends MenuScreen {
         buttonAt("选区工具",right+32,184,rightWidth-32,()->{read();client.setScreen(new SelectionScreen(this,controller));},true,false);
     }
     private void addSelection(boolean persistent){
-        read();preflightSelection(persistent);save();var before=new HashSet<UUID>();for(var region:controller.bedrock().regions())before.add(region.id());
+        read();preflightSelection(persistent);requireSaved();var before=new HashSet<UUID>();for(var region:controller.bedrock().regions())before.add(region.id());
         controller.bedrock().addSelection(persistent);draft=controller.bedrock().settings().copy();
         selectedRegion=controller.bedrock().regions().stream().filter(region->!before.contains(region.id())).map(BedrockSettings.Region::id).findFirst().orElse(selectedRegion);refresh();
     }
@@ -124,7 +128,7 @@ final class BedrockScreen extends MenuScreen {
     private void number(String label,int value,int column,int y,IntConsumer set){input(label,Integer.toString(value),cellX(column,2),y,cellWidth(2),5,raw->{try{set.accept(Integer.parseInt(raw));}catch(NumberFormatException e){throw new IllegalArgumentException(label+"：请输入整数");}});}
     private void input(String label,String value,int x,int y,int width,int limit,Consumer<String> reader){
         var field=fieldAt(label,rawInputs.getOrDefault(label,value),x,y,width,limit);fields.put(label,field);
-        field.setChangedListener(raw->{rawInputs.put(label,raw);error="";});
+        field.setChangedListener(raw->{rawInputs.put(label,raw);discardConfirmed=false;error="";});
         readers.add(()->{try{reader.accept(field.getText().trim());}catch(RuntimeException failure){setFocused(field);throw failure;}});
     }
     private static List<String> blocks(String value){
@@ -151,13 +155,16 @@ final class BedrockScreen extends MenuScreen {
         catch(RuntimeException failure){error=Objects.toString(failure.getMessage(),"设置无效");focusInvalid();throw new IllegalArgumentException(error);}
     }
     private void focusInvalid(){for(var entry:fields.entrySet())if(error.startsWith(entry.getKey().split(" /",2)[0])){setFocused(entry.getValue());break;}}
+    private void requireSaved(){if(!draft.snapshot().equals(controller.bedrock().settings().snapshot()))throw new IllegalArgumentException("请先保存设置，再修改队列或区域");}
     private void save(){
         if(epoch!=controller.sessionEpoch())throw new IllegalStateException("世界已切换");
         var current=controller.bedrock().settings();draft.regions=new ArrayList<>(current.regions);read();var next=draft.copy();
         if(!next.snapshot().equals(current.snapshot()))controller.bedrock().configure(next);
     }
-    private void discard(){if(epoch!=controller.sessionEpoch()){client.setScreen(null);return;}super.close();}
-    @Override public void close(){if(epoch!=controller.sessionEpoch()){client.setScreen(null);return;}runAction(()->{save();super.close();});}
+    private void commit(){save();super.close();}
+    private void discard(){close();}
+    @Override public void close(){if(epoch!=controller.sessionEpoch()){client.setScreen(null);return;}boolean dirty=!rawInputs.isEmpty()||!draft.snapshot().equals(controller.bedrock().settings().snapshot());if(dirty&&!discardConfirmed){discardConfirmed=true;error="再次返回将放弃未保存的更改";refresh();return;}super.close();}
+    @Override public boolean keyPressed(int key,int scan,int modifiers){if((key==257||key==335)&&getFocused() instanceof TextFieldWidget){runAction(this::commit);return true;}return super.keyPressed(key,scan,modifiers);}
     @Override protected void runAction(Runnable action){
         if(epoch!=controller.sessionEpoch()){client.setScreen(null);return;}
         try{error="";action.run();}catch(RuntimeException failure){error=Objects.toString(failure.getMessage(),"操作失败");focusInvalid();}
@@ -168,6 +175,7 @@ final class BedrockScreen extends MenuScreen {
     private void updateWork(){if(work!=null)work.setMessage(Text.literal(controller.bedrock().enabled()?"暂停独立队列":"启动独立队列"));if(clear!=null)clear.active=controller.bedrock().queued()>0;if(aim!=null)aim.active=hasTarget();}
     @Override protected void updateMenu(){
         updateWork();
+        if(clearConfirmed&&System.nanoTime()-clearSince>3_000_000_000L){clearConfirmed=false;if(clear!=null)clear.setMessage(Text.literal("清空独立队列"));}
         if(removing!=null&&System.nanoTime()-removingSince>3_000_000_000L){removing=null;if(tab==3)refresh();return;}
         if(tab==3&&++ticks%10==0&&!shownRegions.equals(controller.bedrock().regions()))refresh();
     }

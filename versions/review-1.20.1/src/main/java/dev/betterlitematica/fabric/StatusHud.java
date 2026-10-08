@@ -6,7 +6,12 @@ import dev.betterlitematica.runtime.UiGlyphArt;
 /** Bounded presentation snapshots; ordinary status uses symbols, not instructional sentences. */
 final class StatusHud {
     private long epoch=Long.MIN_VALUE,nextSnapshot;
-    private String detail="";
+    private String detail="",badgeLabel="打印中",candidateReason="",blockedReason="";
+    private long reasonSince;private int percent=-1;
+    private java.util.List<PrinterEngine.Missing> missing=java.util.List.of();
+    private NearbyBuildHud.Snapshot nearby=NearbyBuildHud.Snapshot.EMPTY;
+    private java.util.List<NearbyBuildHud.Entry> displayEntries=java.util.List.of();
+    private java.util.Set<net.minecraft.item.Item> unavailable=java.util.Set.of();
     private PrinterEngine.State printerState=PrinterEngine.State.STOPPED;
     private boolean printerVisible,error;
     private long motionEpoch=Long.MIN_VALUE;
@@ -32,12 +37,21 @@ final class StatusHud {
         String projection=controller.hud();
         error=!controller.actionError().isEmpty();
         detail=projection.matches("投影 \\d+ · 仅预览附近区域")||projection.equals("投影已隐藏")?"":projection;
-        String status=printer.status();
+        String status=printer.status();percent=printer.progressPercent();
+        missing=visible?printer.missingMaterials():java.util.List.of();nearby=printer.nearbyHud();
+        var unavailableNow=new java.util.HashSet<net.minecraft.item.Item>();for(var e:nearby.entries())if(!e.icon().isEmpty()&&printer.stock().available(e.icon().getItem())==0)unavailableNow.add(e.icon().getItem());unavailable=java.util.Set.copyOf(unavailableNow);
+        var missingItems=new java.util.HashSet<net.minecraft.item.Item>();for(var entry:missing)missingItems.add(entry.item());
+        displayEntries=nearby.entries().stream().filter(e->e.icon().isEmpty()||!missingItems.contains(e.icon().getItem())).sorted(java.util.Comparator.comparingInt(e->!e.icon().isEmpty()&&unavailable.contains(e.icon().getItem())?0:1)).toList();
+        String reason=visible?reason(status,!missing.isEmpty()):"";
+        if(visible&&status.equals("等待可施工位置")&&percent>=0&&percent<100&&reason.isEmpty())reason="无施工位";
+        if(!reason.equals(candidateReason)){candidateReason=reason;reasonSince=now;blockedReason="";}
+        if(reason.isEmpty())blockedReason="";else if(now-reasonSince>=1_000_000_000L)blockedReason=reason;
+        badgeLabel=!blockedReason.isEmpty()?blockedReason:"打印中"+(percent<0?"":" · "+percent+"%");
         if(detail.isEmpty()&&printerVisible)detail=switch(status){
             case "打印中","已暂停","已停止","等待可施工位置"->"";
-            case "等待加载"->"待加载";
-            case "等待材料"->"等待材料";
-            default->status;
+            case "等待加载"->"";
+            case "等待材料"->"";
+            default->!reason.isEmpty()?"":status;
         };
 
     }
@@ -51,11 +65,11 @@ final class StatusHud {
         if(motionEpoch!=controller.sessionEpoch()){
             motionEpoch=controller.sessionEpoch();printerMotion=new UiMotion();nearbyMotion=new HudExpansion();selectedPage=0;
         }
-        double expansion=printerMotion.hover(printerBadge&&currentState==PrinterEngine.State.RUNNING);
+        double expansion=printerMotion.hover(printerBadge&&(currentState==PrinterEngine.State.RUNNING||!blockedReason.isEmpty()));
         if(projectionBadge||printerBadge){
             double diameter=24,tx=x;ui.prepareStatusBadges(diameter);
             if(projectionBadge){ui.statusBadge(controller.projectionRenderingEnabled()?StatusBadgeArt.Kind.EYE_OPEN:StatusBadgeArt.Kind.EYE_CLOSED,tx,y,diameter);tx+=diameter+HudLayout.GAP;}
-            if(printerBadge)drawPrinterBadge(ui,tx,y,diameter,expansion,currentState==PrinterEngine.State.PAUSED,missingStatus(controller.printer().status())?"缺料":"打印中");
+            if(printerBadge)drawPrinterBadge(ui,tx,y,diameter,expansion,currentState==PrinterEngine.State.PAUSED,badgeLabel,!blockedReason.isEmpty(),currentState==PrinterEngine.State.RUNNING?percent:-1);
             y+=diameter+HudLayout.GAP;
         }
         if(!detail.isEmpty()){
@@ -68,44 +82,74 @@ final class StatusHud {
             if(!errorTail.isEmpty())ui.text(errorTail,x+18,ty+(row-line)/2+line+1,width-24,UiTheme.ERROR);
             y+=height+HudLayout.GAP;
         }
-        drawNearby(ui,controller.printer().nearbyHud(),layout,x,y,toolTop);
+        drawNearby(ui,nearby,layout,x,y,toolTop);
+    }
+
+    static String reason(String status,boolean missing){
+        if(status.contains("高度"))return "超出高度";
+        if(status.contains("加载"))return "待加载";
+        if(status.contains("未确认")||status.contains("未获确认")||status.contains("等待")&&status.contains("确认")||status.contains("延迟"))return "延迟过大";
+        if(status.contains("背包已满"))return "背包已满";
+        if(status.contains("未提供")||status.contains("不兼容"))return "补给失败";
+        if(status.contains("补给")||status.contains("远程库存")||status.contains("潜影盒"))return "补给中";
+        if(missingStatus(status)||missing&&status.equals("等待可施工位置"))return "缺料";
+        if(status.equals("等待启用投影"))return "无投影";
+        if(status.contains("等待返回游戏"))return "等待返回";
+        if(status.contains("放置面"))return "无放置面";
+        if(status.contains("侦测器"))return "等前方";
+        if(status.contains("使用结束"))return "使用物品";
+        if(status.contains("换手"))return "等待换手";
+        if(status.contains("不可达"))return "不可达";
+        return "";
     }
 
     private void drawNearby(IndependentUi ui,NearbyBuildHud.Snapshot snapshot,HudLayout layout,double x,double y,double toolTop){
         viewport=layout.viewport();
-        var entries=snapshot.entries();long now=System.nanoTime();double line=ui.lineHeight();
-        double cellWidth=Math.max(30,(ui.measure("9999")+6)),rowHeight=25+line,width=cellWidth*4+12,header=12+line;
-        // Overflow is paged only by an explicit wheel gesture while the mode wheel is open.
+        var entries=displayEntries;
+        long now=System.nanoTime();double line=ui.lineHeight();
+        double cellWidth=Math.max(32,ui.measure("9999")+6),rowHeight=25+line,width=cellWidth*4+12,header=12+line;
+        if(!missing.isEmpty())width=Math.max(width,180);
+        cellWidth=(width-12)/4;
         double bottom=Math.min(layout.bottom()-30,toolTop-HudLayout.GAP);
-        int maxRows=Math.max(1,(int)((bottom-y-header-line*3-16)/rowHeight));
-        int pageSize=maxRows*4,pages=Math.max(1,(entries.size()+pageSize-1)/pageSize);
+        int missingRows=Math.min(6,Math.min(missing.size(),Math.max(1,(int)((bottom-y-header-24)/(line+8)))));
+        double missingHeight=missingRows*(line+8)+(missing.size()>missingRows?line+4:0);
+        int maxRows=Math.max(0,(int)((bottom-y-header-missingHeight-line*3-16)/rowHeight));
+        int pageSize=Math.max(4,maxRows*4),pages=Math.max(1,(entries.size()+pageSize-1)/pageSize);
         pageCount=pages;selectedPage=Math.min(selectedPage,pages-1);
         int page=selectedPage,start=page*pageSize;
-        int shown=Math.min(pageSize,entries.size()-start),rows=HudExpansion.rows(shown);
-        boolean present=!entries.isEmpty()||snapshot.scanning()||snapshot.unknown()>0;
+        int shown=maxRows==0?0:Math.min(pageSize,entries.size()-start),rows=HudExpansion.rows(shown);
+        boolean present=!entries.isEmpty()||!missing.isEmpty()||snapshot.scanning()||snapshot.unknown()>0;
         String hint=snapshot.unknown()>0?"待加载":snapshot.scanning()?"刷新中":"";
-        boolean repairs=entries.stream().anyMatch(e->e.wrongState()+e.wrongBlock()>0);
-        double footer=(pages>1?line*2+6:0)+(repairs?line+3:0);
-        double target=present?header+rows*rowHeight+6+footer:0;
+        double footer=(pages>1?line+4:0);
+        double target=present?header+missingHeight+rows*rowHeight+6+footer:0;
         double height=nearbyMotion.height(target,now);
         cardX=x;cardY=y;cardWidth=width;cardHeight=height;
         if(height<1)return;
-        HudLayout.card(ui,x,y,width,height);
-        ui.clip(x+1,y+1,x+width-1,y+height-1);
-        ui.text("周围待建",x+7,y+6,70,UiTheme.SECONDARY);
-        if(!hint.isEmpty())ui.text(hint,x+78,y+6,width-85,UiTheme.WARNING);
+        HudLayout.card(ui,x,y,width,height);ui.clip(x+1,y+1,x+width-1,y+height-1);
+        ui.text(missing.isEmpty()?"周围待建":"缺 "+missing.size()+" 种",x+7,y+6,width-64,missing.isEmpty()?UiTheme.SECONDARY:UiTheme.ERROR);
+        if(!hint.isEmpty())ui.text(hint,x+width-52,y+6,45,UiTheme.WARNING);
+        for(int i=0;i<missingRows;i++){
+            var entry=missing.get(i);double cy=y+header+i*(line+8);
+            ui.roundRect(x+6,cy,x+width-6,cy+line+6,4,UiMotion.alpha(UiTheme.ERROR,.09));
+            ui.item(new net.minecraft.item.ItemStack(entry.item()),x+8,cy+1,line+4);
+            String need=entry.required()>0?"需 "+HudNumbers.compact(entry.required()):"取料失败";
+            double countWidth=ui.measure(need)+4;
+            ui.text(entry.item().getName().getString(),x+line+17,cy+3,width-line-countWidth-32,UiTheme.ERROR);
+            ui.text(need,x+width-countWidth-9,cy+3,countWidth,UiTheme.SECONDARY);
+        }
+        if(missing.size()>missingRows)ui.text("还有 "+(missing.size()-missingRows)+" 种",x+8,y+header+missingRows*(line+8),width-16,UiTheme.ERROR);
         for(int i=0;i<shown;i++){
-            var entry=entries.get(start+i);double cx=x+6+i%4*cellWidth,cy=y+header+i/4*rowHeight;
+            var entry=entries.get(start+i);double cx=x+6+i%4*cellWidth,cy=y+header+missingHeight+i/4*rowHeight;
             ui.roundRect(cx,cy,cx+cellWidth-2,cy+rowHeight-3,5,UiMotion.alpha(UiTheme.BORDER,.28));
             if(entry.icon().isEmpty())ui.text(entry.block().getName().getString(),cx+2,cy+5,cellWidth-6,UiTheme.SECONDARY);
             else ui.item(entry.icon(),cx+(cellWidth-22)/2,cy+2,20);
-            if(entry.wrongState()+entry.wrongBlock()>0)ui.roundFrame(cx,cy,cx+cellWidth-2,cy+rowHeight-3,5,UiTheme.WARNING);
-            String count=HudNumbers.compact(entry.count());
-            ui.text(count,cx+(cellWidth-2-ui.measure(count))/2,cy+23,cellWidth-4,UiTheme.TEXT);
+            boolean absent=!entry.icon().isEmpty()&&unavailable.contains(entry.icon().getItem());
+            if(absent||entry.wrongState()+entry.wrongBlock()>0)ui.roundFrame(cx,cy,cx+cellWidth-2,cy+rowHeight-3,5,absent?UiTheme.ERROR:UiTheme.WARNING);
+            String count=HudNumbers.compact(entry.count());ui.text(count,cx+(cellWidth-2-ui.measure(count))/2,cy+23,cellWidth-4,absent?UiTheme.ERROR:UiTheme.TEXT);
         }
-        double footY=y+header+rows*rowHeight;
-        if(repairs){ui.text("橙框：含错误方块或状态",x+7,footY,width-14,UiTheme.WARNING);footY+=line+3;}
-        if(pages>1){ui.text((page+1)+" / "+pages+" · "+entries.size()+" 类",x+7,footY,width-14,UiTheme.SECONDARY);ui.text("轮盘中悬停滚轮翻页",x+7,footY+line+2,width-14,UiTheme.MUTED);}
+        double footY=y+header+missingHeight+rows*rowHeight;
+
+        if(pages>1){ui.text((page+1)+" / "+pages+" · "+entries.size()+" 类",x+7,footY,width-14,UiTheme.SECONDARY);}
         ui.unclip();
     }
 
@@ -116,17 +160,21 @@ final class StatusHud {
         drawPrinterBadge(ui,x,y,diameter,expansion,paused,"打印中");
     }
     static void drawPrinterBadge(IndependentUi ui,double x,double y,double diameter,double expansion,boolean paused,String label){
+        drawPrinterBadge(ui,x,y,diameter,expansion,paused,label,label.equals("缺料"),-1);
+    }
+    static void drawPrinterBadge(IndependentUi ui,double x,double y,double diameter,double expansion,boolean paused,String label,boolean blocked,int percent){
         double progress=UiMotion.clamp(expansion),radius=diameter/2;
         ui.prepareText(label);
         double width=diameter+(ui.measure(label)+10)*progress;
         int surface=UiTheme.DARK?0xee1f2027:0xe3f6f9fc;
         int border=UiTheme.DARK?0x1effffff:0x3a8191a7;
         int idle=paused?UiTheme.WARNING:UiTheme.DARK?0xff82868f:0xff8993a1;
-        int icon=UiMotion.mix(idle,label.equals("缺料")?UiTheme.WARNING:UiTheme.DARK?0xff6ed69c:0xff0ab463,progress);
+        int icon=UiMotion.mix(idle,blocked?UiTheme.WARNING:UiTheme.DARK?0xff6ed69c:0xff0ab463,progress);
         ui.shadow(x,y,x+width,y+diameter,radius);
         ui.roundRect(x,y,x+width,y+diameter,radius,surface);
         ui.roundFrame(x,y,x+width,y+diameter,radius,border);
         ui.glyph(UiGlyphArt.Kind.PRINTER,x+5,y+5,diameter-10,icon);
+        if(percent>=0&&progress>0){ui.sector(x+radius,y+radius,radius-2.5,radius-1,-Math.PI/2,Math.PI*1.5,UiMotion.alpha(icon,.15));if(percent>0)ui.sector(x+radius,y+radius,radius-2.5,radius-1,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.min(100,percent)/100,icon);}
         if(progress>0){
             ui.clip(x+diameter,y,x+width-5,y+diameter);
             ui.rawText(label,x+diameter+1,y+(diameter-ui.lineHeight())/2,UiMotion.alpha(UiTheme.TEXT,progress));
