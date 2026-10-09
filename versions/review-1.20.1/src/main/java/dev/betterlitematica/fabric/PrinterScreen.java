@@ -47,13 +47,14 @@ final class PrinterScreen extends MenuScreen {
         for(int i=0;i<modes.length;i++){
             var mode=modes[i];int x=cellX(i,modes.length),w=cellWidth(modes.length);boolean enabled=mode.enabled(draft);
             var control=setting(switch(mode){case PRINT->SettingId.PRINTER_PRINT;case MINE->SettingId.PRINTER_MINE;case FILL->SettingId.PRINTER_FILL;case DRAIN->SettingId.PRINTER_DRAIN;case BEDROCK->SettingId.PRINTER_BEDROCK;},buttonAt(mode.label()+"："+(mode.mixed(draft)?"部分":enabled?"开":"关"),x,56,w,()->{read();draft=WheelModes.toggled(draft,mode);refresh();},true,enabled));
-            hint(control,"切换"+mode.label()+"模式；可直接保存并开始施工。");
+            hint(control,mode==WheelModes.BEDROCK?SettingHelp.text(SettingId.PRINTER_BEDROCK):"切换"+mode.label()+"模式；可直接保存并开始施工。");
             if(mode.mixed(draft)){var active=new ArrayList<String>();if(draft.breakWrong)active.add("错误方块");if(draft.breakExtra)active.add("多余方块");if(draft.breakState)active.add("错误状态");hint(control,String.join(" · ",active));}
 
         }
-        cycleScope(SettingId.PRINTER_PRINT_SCOPE,"打印范围",0,3,88,()->draft.printScope,v->draft.printScope=v);
-        cycleScope(SettingId.PRINTER_FILL_SCOPE,"填充范围",1,3,88,()->draft.fillScope,v->draft.fillScope=v);
-        cycleScope(SettingId.PRINTER_FLUID_SCOPE,"排流体范围",2,3,88,()->draft.fluidScope,v->draft.fluidScope=v);
+        cycleScope(SettingId.PRINTER_PRINT_SCOPE,"打印范围",0,4,88,()->draft.printScope,v->draft.printScope=v);
+        cycleScope(SettingId.PRINTER_FILL_SCOPE,"填充范围",1,4,88,()->draft.fillScope,v->draft.fillScope=v);
+        cycleScope(SettingId.PRINTER_FLUID_SCOPE,"排流体范围",2,4,88,()->draft.fluidScope,v->draft.fluidScope=v);
+        cycleScope(SettingId.PRINTER_BEDROCK_SCOPE,"破基岩范围",3,4,88,()->draft.bedrockScope,v->draft.bedrockScope=v);
         inputAt(SettingId.PRINTER_FILL_STATE,"填充方块",draft.fillState,cellX(0,2),122,cellWidth(2)-76,256,v->draft.fillState=v);
         directionButton=setting(SettingId.PRINTER_FILL_DIRECTION,buttonAt("方向",cellX(0,2)+cellWidth(2)-68,136,68,()->{read();var state=PrinterRules.cycleDirection(PrinterEngine.checkedFill(draft));draft.fillState=stateName(state);rawInputs.put("填充方块",draft.fillState);refresh();},false,false));updateDirection();
         number(SettingId.PRINTER_RANGE,"距离（0 自动）",Double.toString(draft.range),1,2,122,v->draft.range=Double.parseDouble(v));
@@ -165,6 +166,7 @@ final class PrinterScreen extends MenuScreen {
         if(!draft.replace)enableSetting(SettingId.PRINTER_REPLACEABLE,false);
         if(!draft.composter)enableSetting(SettingId.PRINTER_COMPOST_ITEMS,false);
         if(!draft.fluid){enableSetting(SettingId.PRINTER_FLUIDS,false);enableSetting(SettingId.PRINTER_FLOWING,false);enableSetting(SettingId.PRINTER_FLUID_SCOPE,false);}
+        if(!draft.bedrock)enableSetting(SettingId.PRINTER_BEDROCK_SCOPE,false);
         if(!draft.fill)enableSetting(SettingId.PRINTER_FILL_SCOPE,false);
         if(!draft.fill&&!draft.fluid){enableSetting(SettingId.PRINTER_FILL_STATE,false);enableSetting(SettingId.PRINTER_FILL_DIRECTION,false);}
         if(!draft.print)for(var id:List.of(SettingId.PRINTER_STRIP_LOGS,SettingId.PRINTER_NOTE_TUNING,SettingId.PRINTER_BONEMEAL,SettingId.PRINTER_COMPOSTER,SettingId.PRINTER_CONTAINER_FILL,SettingId.PRINTER_CORAL,SettingId.PRINTER_ICE_WATER,SettingId.PRINTER_SAFE_OBSERVER,SettingId.PRINTER_SKIP_WATERLOGGED,SettingId.PRINTER_FORCE_SNEAK,SettingId.PRINTER_FALLING_CHECK,SettingId.PRINTER_AIR_PLACE,SettingId.PRINTER_SKIP))enableSetting(id,false);
@@ -172,6 +174,6 @@ final class PrinterScreen extends MenuScreen {
     @Override protected void runAction(Runnable action){try{error="";notice="";action.run();}catch(RuntimeException e){error=Objects.toString(e.getMessage(),"操作失败");}}
     @Override protected String displayedStatus(){return statusLine();}
     @Override protected int statusColor(){return error.isEmpty()?UiTheme.MUTED:UiTheme.ERROR;}
-    @Override protected void updateMenu(){if(work==null)return;if(invalidField!=null){if(fields.containsValue(invalidField))setFocused(invalidField);invalidField=null;}var engine=controller.printer();if(exit!=null)exit.setMessage(Text.literal(exitLabel()));work.setMessage(Text.literal(engine.running()?"暂停":dirty()?"保存并开始":engine.state()==PrinterEngine.State.PAUSED?"继续":"开始"));work.active=engine.running()||!controller.printerPlacements().isEmpty();stop.active=engine.state()!=PrinterEngine.State.STOPPED;}
+    @Override protected void updateMenu(){if(work==null)return;if(invalidField!=null){if(fields.containsValue(invalidField))setFocused(invalidField);invalidField=null;}var engine=controller.printer();if(exit!=null)exit.setMessage(Text.literal(exitLabel()));work.setMessage(Text.literal(engine.running()?"暂停":dirty()?"保存并开始":engine.state()==PrinterEngine.State.PAUSED?"继续":"开始"));work.active=engine.running()||engine.hasWorkArea(draft);stop.active=engine.state()!=PrinterEngine.State.STOPPED;}
     @Override protected String statusLine(){return !error.isEmpty()?error:!notice.isEmpty()?notice:controller.printer().status();}
 }

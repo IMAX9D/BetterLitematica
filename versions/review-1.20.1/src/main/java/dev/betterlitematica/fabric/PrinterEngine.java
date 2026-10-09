@@ -64,11 +64,14 @@ final class PrinterEngine implements AutoCloseable {
     private PrinterSettings settings(){return controller.options().printer;}
     private Context current(){return new Context(client.world,controller.printerSources(),controller.layerRange(),controller.selection(),settings().revision);}
     static boolean mining(PrinterSettings s){return s.breakWrong||s.breakExtra||s.breakState;}
+    private boolean selectionBedrock(PrinterSettings s){return s.bedrock&&s.bedrockScope!=PrinterSettings.Scope.PROJECTION&&!controller.selection().boxes().isEmpty();}
+    boolean hasWorkArea(PrinterSettings s){return !controller.printerPlacements().isEmpty()||selectionBedrock(s);}
     void start(){
         if(controller.editor().active()||controller.editor().busy())throw new IllegalStateException("请先暂停投影编辑");
         if(client.world==null||client.player==null||client.interactionManager==null)throw new IllegalStateException("请先进入世界");
         if(client.player.isSpectator())throw new IllegalStateException("旁观模式不能施工");
-        if(controller.printerPlacements().isEmpty())throw new IllegalStateException("请先启用投影");
+        if(settings().bedrock&&settings().bedrockScope!=PrinterSettings.Scope.PROJECTION&&controller.selection().boxes().isEmpty())throw new IllegalStateException("请先创建破基岩选区，或将破基岩范围改为投影");
+        if(!hasWorkArea(settings()))throw new IllegalStateException("请先启用投影");
         if(controller.worldWriteBusy())throw new IllegalStateException("请先结束创造粘贴或填充任务");
         settings().validate();if(!settings().print&&!mining(settings())&&!settings().fill&&!settings().fluid&&!settings().bedrock)throw new IllegalStateException("请选择工作模式");
         fillState=checkedFill(settings());
@@ -123,7 +126,7 @@ final class PrinterEngine implements AutoCloseable {
         try{if(actions.supplyTick(ticks)){status=actions.typedReason();return;}}catch(RuntimeException e){pause(e);return;}
         if(client.currentScreen!=null){pause(PrinterReason.of(PrinterReason.Id.RETURN_TO_GAME,"等待返回游戏"));return;}
         if(client.player.isSpectator()||client.player.isDead()||controller.worldWriteBusy()){pause("已暂停");return;}
-        if(context.sources().isEmpty()){status=PrinterReason.of(PrinterReason.Id.NO_PROJECTION,"等待启用投影");return;}
+        if(context.sources().isEmpty()&&!selectionBedrock(settings())){status=PrinterReason.of(PrinterReason.Id.NO_PROJECTION,"等待启用投影");return;}
         if(client.player.isUsingItem()){status=PrinterReason.of(PrinterReason.Id.USING_ITEM,"等待物品使用结束");return;}
         try{
             actions.diagnostics.begin();
@@ -189,10 +192,11 @@ final class PrinterEngine implements AutoCloseable {
         while(scan.hasNext()&&n<512&&visited++<2048&&budget.hasTime(System.nanoTime())&&System.nanoTime()-started<1_000_000L){
             var at=scan.next();if(at==null)continue;var pos=new BlockPos(at.x(),at.y(),at.z());if(s.shape==PrinterRange.Shape.SPHERE&&PrinterReach.distanceSquared(eye,pos)>rangeSquared||client.world.isOutOfHeightLimit(pos)||!client.world.getWorldBorder().contains(pos))continue;
             var sample=sampler.apply(at);boolean in=sample!=null&&sample.inside();int scope=0;
-            if((s.print||mining(s))&&scope(at,s.printScope,in)&&in)scope|=1;if(s.fill&&scope(at,s.fillScope,in))scope|=2;if(s.fluid&&scope(at,s.fluidScope,in))scope|=4;if(s.bedrock&&in&&controller.layerRange().contains(at))scope|=8;
+            if((s.print||mining(s))&&scope(at,s.printScope,in)&&in)scope|=1;if(s.fill&&scope(at,s.fillScope,in))scope|=2;if(s.fluid&&scope(at,s.fluidScope,in))scope|=4;if(s.bedrock&&scope(at,s.bedrockScope,in))scope|=8;
             if(scope==0)continue;int i=n++;positions[i]=pos.asLong();scopes[i]=scope;fill[i]=fillId;
-            if(!WorldChunks.loaded(client.world,pos)||sample!=null&&in&&sample.state()==null){flags[i]=0;continue;}
-            BlockState current=client.world.getBlockState(pos),wanted=in?sample.state():Blocks.AIR.getDefaultState();if(wanted==null)continue;
+            boolean needsProjection=(scope&1)!=0||((scope&8)!=0&&s.bedrockScope==PrinterSettings.Scope.PROJECTION);
+            if(!WorldChunks.loaded(client.world,pos)||needsProjection&&sample!=null&&in&&sample.state()==null){flags[i]=0;continue;}
+            BlockState current=client.world.getBlockState(pos),wanted=in&&sample.state()!=null?sample.state():Blocks.AIR.getDefaultState();
             if(s.containerFill&&s.print&&(scope&1)!=0&&!PrinterRules.filtered(wanted,s.skip)
                 &&!(s.skipWaterlogged&&wanted.contains(net.minecraft.state.property.Properties.WATERLOGGED)&&wanted.get(net.minecraft.state.property.Properties.WATERLOGGED)))containers.observe(pos,wanted,current,ticks);
             actual[i]=Block.getRawIdFromState(current);expected[i]=Block.getRawIdFromState(wanted);
@@ -202,12 +206,12 @@ final class PrinterEngine implements AutoCloseable {
             if(current.getBlock()==wanted.getBlock())f|=PrinterDiscovery.SAME_BLOCK;
             if(PrinterRules.adjustable(current,wanted,s))f|=PrinterDiscovery.ADJUSTABLE;
             if(s.fluid){var fluid=current.getFluidState();if(!fluid.isEmpty()&&PrinterRules.fluidMatches(Registries.FLUID.getId(fluid.getFluid()).toString(),s.fluids))f|=PrinterDiscovery.FLUID;if(fluid.isStill())f|=PrinterDiscovery.FLUID_SOURCE;}
-            if(s.bedrock&&current!=wanted&&controller.bedrock().accepts(pos))f|=PrinterDiscovery.BEDROCK;
+            if(s.bedrock&&(s.bedrockScope!=PrinterSettings.Scope.PROJECTION||current!=wanted)&&controller.bedrock().accepts(pos))f|=PrinterDiscovery.BEDROCK;
             if(PrinterRules.filtered(wanted,s.skip)||s.skipWaterlogged&&wanted.contains(net.minecraft.state.property.Properties.WATERLOGGED)&&wanted.get(net.minecraft.state.property.Properties.WATERLOGGED))f|=PrinterDiscovery.SKIP;
             if(s.coralSubstitute&&actions.waitingCoral(pos,current,wanted,ticks))f|=PrinterDiscovery.SKIP;
             flags[i]=f;
         }
-        if(n==0){finishRound();return true;}
+        if(n==0){finishRound();if(waiting==null&&queue.size()==0&&searches.isEmpty())status=idleReason(s);return true;}
         var page=new PrinterDiscovery.Page(generation,Arrays.copyOf(positions,n),Arrays.copyOf(expected,n),Arrays.copyOf(actual,n),Arrays.copyOf(flags,n),Arrays.copyOf(scopes,n),Arrays.copyOf(fill,n));
         var policy=new PrinterDiscovery.Policy(s.print,s.fill,s.fluid,s.bedrock,s.breakWrong,s.breakExtra,s.breakState,s.flowing);
         if(urgent){accept(PrinterDiscovery.search(page,policy));finishRound();}
@@ -225,7 +229,7 @@ final class PrinterEngine implements AutoCloseable {
             case PLACE,ADJUST->s.print&&scope(at,s.printScope,in)&&sample!=null&&sample.state()!=null&&Block.getRawIdFromState(sample.state())==job.expected();
             case FILL->s.fill&&scope(at,s.fillScope,in);
             case FLUID->s.fluid&&scope(at,s.fluidScope,in);
-            case BEDROCK->s.bedrock&&in&&controller.layerRange().contains(at);
+            case BEDROCK->s.bedrock&&scope(at,s.bedrockScope,in);
         };
     }
     /** True means an owned wait/quota/time boundary; false lets the caller refill an empty queue. */

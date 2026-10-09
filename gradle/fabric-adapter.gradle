@@ -63,7 +63,13 @@ if (target.overlays.contains('review-1.20.1')) {
         mainClass = 'dev.betterlitematica.fabric.SettingsIntegrityCheck'
         args rootProject.file('versions/review-1.20.1/src/main/java/dev/betterlitematica/fabric').absolutePath
     }
-    tasks.named('check') { dependsOn verifySettings }
+    def verifyPlacementStroke = tasks.register('verifyPlacementStroke', JavaExec) {
+        group = 'verification'
+        dependsOn tasks.named('testClasses')
+        classpath = sourceSets.test.runtimeClasspath
+        mainClass = 'dev.betterlitematica.fabric.PlacementStrokeCheck'
+    }
+    tasks.named('check') { dependsOn verifySettings, verifyPlacementStroke }
 }
 tasks.named('compileJava') { dependsOn prepareJava }
 tasks.named('processResources') { dependsOn prepareResources }

@@ -57,6 +57,8 @@ public final class BetterLitematicaClient implements ClientModInitializer {
     static int wheelKeyCode(){return activeController==null?GLFW.GLFW_KEY_TAB:ModeWheelInput.bindingCode(activeController.options().keys.getOrDefault("wheel","TAB"));}
     static BuildingInteractions interactions;
     public static boolean useProjection(){return interactions!=null&&interactions.use();}
+    public static boolean attackProjection(){return interactions!=null&&interactions.attack();}
+    public static boolean preserveProjectionBlocks(){return interactions!=null&&interactions.claimsAttack();}
     public static boolean pickProjection(){return interactions!=null&&interactions.pick();}
     public static boolean scrollTool(double amount){return interactions!=null&&interactions.scroll(amount);}
     public static boolean preservePrinterBreaking(){return interactions!=null&&interactions.preservePrinterBreaking();}
@@ -83,7 +85,7 @@ public final class BetterLitematicaClient implements ClientModInitializer {
         }));
         IndependentUi ui=IndependentUi.INSTANCE;ProjectionInformation information=new ProjectionInformation();ToolHud toolHud=new ToolHud();statusHud=new StatusHud();final int[] informationTick={0};ClientTickEvents.END_CLIENT_TICK.register(mc->{if(++informationTick[0]%4==0)information.update(mc,controller);});
         ClientLifecycleEvents.CLIENT_STOPPING.register(mc->{modeWheelInput.clear();controller.close();ui.close();EntityOverlayMask.close();});
-        WorldRenderEvents.START.register(context->EntityOverlayMask.reset());
+        WorldRenderEvents.START.register(context->{EntityOverlayMask.reset();interactions.frame();});
         WorldRenderEvents.BEFORE_ENTITIES.register(context->EntityOverlayMask.before(client,controller.entityOverlayMaskNeeded(context)));
         WorldRenderEvents.AFTER_ENTITIES.register(context->EntityOverlayMask.after(client));
         WorldRenderEvents.END.register(context->EntityOverlayMask.reset());

@@ -10,10 +10,11 @@ final class SettingHelp {
         put(SettingId.PRINTER_MINE,"挖掘","清理错误方块、多余方块或错误状态。");
         put(SettingId.PRINTER_FILL,"填充","用指定填充方块填充所选范围。");
         put(SettingId.PRINTER_DRAIN,"排流体","使用填充方块清理选定流体。");
-        put(SettingId.PRINTER_BEDROCK,"破基岩","允许打印机对投影内的基岩障碍执行破除。");
+        put(SettingId.PRINTER_BEDROCK,"破基岩","按破基岩范围移除基岩；选区模式无需加载投影，需生存模式、活塞、红石火把和足够快的镐。");
         put(SettingId.PRINTER_PRINT_SCOPE,"打印范围","选择按投影或选区限制打印与挖掘。");
         put(SettingId.PRINTER_FILL_SCOPE,"填充范围","选择填充作用的投影或选区范围。");
         put(SettingId.PRINTER_FLUID_SCOPE,"排流体范围","选择清理流体的投影或选区范围。");
+        put(SettingId.PRINTER_BEDROCK_SCOPE,"破基岩范围","选区：破除选区内基岩；投影：仅破除与投影不符的基岩。始终遵守距离、分层和白名单。");
         put(SettingId.PRINTER_FILL_STATE,"填充方块","输入方块 ID 和状态，用于填充与排流体。");
         put(SettingId.PRINTER_FILL_DIRECTION,"方向","循环填充方块的可用方向。");
         put(SettingId.PRINTER_RANGE,"距离（0 自动）","限制施工距离；0 使用当前可交互距离。");
@@ -74,7 +75,7 @@ final class SettingHelp {
         put(SettingId.OPTIONS_TOOL,"选区工具","启用选区工具的点击与编辑操作。");
         put(SettingId.OPTIONS_TOOL_SETTINGS,"工具设置","打开工具物品和选区操作设置。");
         put(SettingId.OPTIONS_EASY_PLACE,"简单放置","用投影选择材料与放置状态。");
-        put(SettingId.OPTIONS_HOLD,"按住连续","简单放置开启时，按住使用键连续尝试。");
+        put(SettingId.OPTIONS_HOLD,"按住连续","简单放置开启时，按住左键或右键扫过投影连续放置；新位置立即尝试，同一位置短暂等待确认。");
         put(SettingId.OPTIONS_RESTRICTION,"放置限制","阻止在不符合投影的位置放置。");
         put(SettingId.OPTIONS_PICK,"投影拾取","允许拾取投影对应的物品。");
         put(SettingId.OPTIONS_ACCURATE,"精确放置","选择服务器支持的精确放置协议。");
