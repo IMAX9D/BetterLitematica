@@ -1,5 +1,4 @@
 package dev.betterlitematica.fabric;
-
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -21,7 +20,6 @@ import net.minecraft.world.phys.Vec3;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.*;
 import java.util.function.Predicate;
-
 /** One owned vanilla container session; source discovery never scans a whole schematic. */
 final class PrinterContainers {
     private static final int MAX_QUEUED=512,MAX_CACHE=256,MAX_BYTES=8*1024*1024;
@@ -40,12 +38,11 @@ final class PrinterContainers {
     private List<ItemStack> serverSlots;private ItemStack serverCursor=ItemStack.EMPTY;
     private long receipts,fullReceipt;private long[] slotReceipts;private final BitSet fulfilled=new BitSet();
     private final List<Created> creating=new ArrayList<>();private int creationTick;
-    private String reason="";private ItemStack missing=ItemStack.EMPTY;
+    private PrinterReason reason=PrinterReason.NONE;private ItemStack missing=ItemStack.EMPTY;
     private long openCount,clickCount,filledCount;
-
     PrinterContainers(Minecraft client,ProjectionController controller){this.client=client;this.controller=controller;}
     boolean acting(){return acting;}boolean active(){return target!=null;}
-    String reason(){return reason;}ItemStack missing(){return missing;}
+    String reason(){return reason.description();} PrinterReason typedReason(){return reason;}ItemStack missing(){return missing;}
     ItemStack takeMissing(){var value=missing;missing=ItemStack.EMPTY;return value;}
     long opens(){return openCount;}long clicks(){return clickCount;}long filled(){return filledCount;}
     private Predicate<ItemStack> protection(){var o=controller.options();return tools.get(o.tool,o.toolItem);}
@@ -88,10 +85,10 @@ final class PrinterContainers {
                 boolean sneaking=client.player.isShiftKeyDown();acting=true;
                 try{
                     if(sneaking){PlayerInputBridge.shift(client.player,false);PlayerInputBridge.sendShift(client.player,false);}
-                    client.gameMode.useItemOn(client.player,InteractionHand.MAIN_HAND,new BlockHitResult(hit,face,pos,false));openCount++;reason="填充容器";
+                    client.gameMode.useItemOn(client.player,InteractionHand.MAIN_HAND,new BlockHitResult(hit,face,pos,false));openCount++;reason=PrinterReason.of(PrinterReason.Id.CONTAINER,"填充容器");
                 }finally{if(sneaking){PlayerInputBridge.shift(client.player,true);PlayerInputBridge.sendShift(client.player,true);}acting=false;}
                 return true;
-            }catch(RuntimeException failure){reason=failure.getMessage();defer(key,tick+40);forget();}
+            }catch(RuntimeException failure){reason=PrinterReason.of(PrinterReason.Id.CONTAINER_BLOCKED,"容器操作中断");defer(key,tick+40);forget();}
         }return false;
     }
     void opening(MenuType<?> type){
@@ -100,9 +97,9 @@ final class PrinterContainers {
     void opened(int sync,MenuType<?> type){
         if(!active()||world!=client.level||connection!=client.getConnection()||owned!=null)return;
         if(manualRequested){forget();return;}
-        if(type!=target.screenType()||!(ClientUi.screen(client) instanceof AbstractContainerScreen<?> opened)||opened.getMenu().containerId!=sync){reason="容器已由玩家接管";forget();return;}
+        if(type!=target.screenType()||!(ClientUi.screen(client) instanceof AbstractContainerScreen<?> opened)||opened.getMenu().containerId!=sync){reason=PrinterReason.of(PrinterReason.Id.CONTAINER_BLOCKED,"容器已由玩家接管");forget();return;}
         owned=opened.getMenu();screen=opened;
-        if(owned.slots.size()!=target.items().size()+36){reason="不支持的容器槽位";forget();return;}
+        if(owned.slots.size()!=target.items().size()+36){reason=PrinterReason.of(PrinterReason.Id.CONTAINER_BLOCKED,"不支持的容器槽位");forget();return;}
         serverSlots=new ArrayList<>(Collections.nCopies(owned.slots.size(),ItemStack.EMPTY));slotReceipts=new long[owned.slots.size()];serverCursor=ItemStack.EMPTY;
         // The server handler remains open. Client-side removal only closes its detached UI inventory.
         if(returnScreen!=null)cancelled=true;
@@ -135,16 +132,16 @@ final class PrinterContainers {
         this.tick=tick;if(!active())return false;
         if(client.level!=world||client.getConnection()!=connection||client.player==null){forget();return false;}
         if(!mayWork)cancelled=true;
-        if(owned==null){if(tick-started>40){defer(target.position().asLong(),tick+40);reason="容器无法打开";forget();}return true;}
+        if(owned==null){if(tick-started>40){defer(target.position().asLong(),tick+40);reason=PrinterReason.of(PrinterReason.Id.CONTAINER_BLOCKED,"容器无法打开");forget();}return true;}
         if(!owns()){forget();return false;}
         if(ClientUi.screen(client)!=null){cancelled=true;}
-        if(!contents){if(tick-started>60)reveal("容器未同步");return true;}
+        if(!contents){if(tick-started>60)reveal(PrinterReason.of(PrinterReason.Id.CONFIRM_TIMEOUT,"容器未同步"));return true;}
         if(!creating.isEmpty()){
             boolean received=true;for(var entry:creating)if(slotReceipts[entry.slot()]<=entry.since()||!ItemStack.matches(serverSlots.get(entry.slot()),entry.stack())){received=false;break;}
-            if(!received){if(tick-creationTick>60)reveal("创造取物未获确认");return true;}creating.clear();
+            if(!received){if(tick-creationTick>60)reveal(PrinterReason.of(PrinterReason.Id.CONFIRM_TIMEOUT,"创造取物未获确认"));return true;}creating.clear();
         }
         if(batch!=null){
-            if(!acknowledged){if(tick-batch.tick()>60)reveal("容器操作未获确认");return true;}
+            if(!acknowledged){if(tick-batch.tick()>60)reveal(PrinterReason.of(PrinterReason.Id.CONFIRM_TIMEOUT,"容器操作未获确认"));return true;}
             batch=null;acknowledged=false;
         }
         if(cancelled){release(false);return true;}
@@ -153,11 +150,11 @@ final class PrinterContainers {
         try{
             var remaining=new ArrayList<ItemStack>(target.items());for(int i=fulfilled.nextSetBit(0);i>=0;i=fulfilled.nextSetBit(i+1))remaining.set(i,ItemStack.EMPTY);
             var plan=ContainerFillPlan.plan(owned,client.player,remaining,controller.options().protectedHotbar,protection(),64);
-            if(!plan.clicks().isEmpty()){send(plan);reason="填充容器";return true;}
-            if(plan.complete()){rememberSatisfied(serverSlots);if(fulfilled.cardinality()==target.items().size()){done(target);filledCount++;release(true);}else reveal("容器内容未确认");return true;}
+            if(!plan.clicks().isEmpty()){send(plan);reason=PrinterReason.of(PrinterReason.Id.CONTAINER,"填充容器");return true;}
+            if(plan.complete()){rememberSatisfied(serverSlots);if(fulfilled.cardinality()==target.items().size()){done(target);filledCount++;release(true);}else reveal(PrinterReason.of(PrinterReason.Id.CONFIRM_TIMEOUT,"容器内容未确认"));return true;}
             missing=plan.missing();if(!missing.isEmpty()&&client.player.isCreative()&&createMaterials(remaining))return true;
-            reason=!plan.blocked().isEmpty()?plan.blocked():missing.isEmpty()?"容器无法填充":"缺少"+missing.getHoverName().getString();release(false);return true;
-        }catch(RuntimeException failure){reveal(failure.getMessage()==null?"容器操作中断":failure.getMessage());return true;}
+            reason=!plan.blocked().isEmpty()?PrinterReason.of(PrinterReason.Id.CONTAINER_BLOCKED,plan.blocked()):missing.isEmpty()?PrinterReason.of(PrinterReason.Id.CONTAINER_BLOCKED,"容器无法填充"):PrinterReason.of(PrinterReason.Id.MISSING,"缺少"+missing.getHoverName().getString());release(false);return true;
+        }catch(RuntimeException failure){reveal(PrinterReason.of(PrinterReason.Id.CONTAINER_BLOCKED,"容器操作中断"));return true;}
     }
     private boolean createMaterials(List<ItemStack> remaining){
         var inv=client.player.getInventory();var protection=protection();
@@ -207,13 +204,13 @@ final class PrinterContainers {
     private void release(boolean success){
         if(!active())return;if(!success)defer(target.position().asLong(),tick+40);
         if(owns()&&(!contents||batch!=null||!creating.isEmpty())){cancelled=true;return;}
-        if(owns()&&(!serverCursor.isEmpty()||!owned.getCarried().isEmpty())){reveal("请先处理光标物品");return;}
+        if(owns()&&(!serverCursor.isEmpty()||!owned.getCarried().isEmpty())){reveal(PrinterReason.of(PrinterReason.Id.CONTAINER_BLOCKED,"请先处理光标物品"));return;}
         if(owns()){
             client.getConnection().send(new ServerboundContainerClosePacket(owned.containerId));owned.removed(client.player);client.player.containerMenu=client.player.inventoryMenu;
             if(ClientUi.screen(client)==screen)ClientUi.setScreen(client,returnScreen);
         }forget();
     }
-    private void reveal(String message){
+    private void reveal(PrinterReason message){
         reason=message;if(active())defer(target.position().asLong(),tick+100);
         cancelled=true;if(owns()&&ClientUi.screen(client)!=null&&ClientUi.screen(client)!=screen)return;
         if(owns()&&ClientUi.screen(client)==null&&screen!=null)ClientUi.setScreen(client,screen);
@@ -222,7 +219,7 @@ final class PrinterContainers {
     private void forget(){target=null;world=null;connection=null;owned=null;screen=null;returnScreen=null;manualRequested=false;batch=null;serverSlots=null;slotReceipts=null;contents=false;acknowledged=false;cancelled=false;fulfilled.clear();creating.clear();}
     void pause(){cancelled=true;}
     void manualRequest(){if(active()&&!acting){manualRequested=true;cancelled=true;}}
-    void manual(){if(!acting&&active()){reason="容器已由玩家接管";if(!owns()||ClientUi.screen(client) instanceof AbstractContainerScreen<?> visible&&visible.getMenu()==owned)forget();else cancelled=true;}}
+    void manual(){if(!acting&&active()){reason=PrinterReason.of(PrinterReason.Id.CONTAINER_BLOCKED,"容器已由玩家接管");if(!owns()||ClientUi.screen(client) instanceof AbstractContainerScreen<?> visible&&visible.getMenu()==owned)forget();else cancelled=true;}}
     void clear(){queue.clear();completed.clear();retry.clear();cache.clear();cacheBytes=0;missing=ItemStack.EMPTY;cancelled=true;}
     void changed(BlockPos pos,BlockState state){var block=completed.get(pos.asLong());if(block!=null&&block!=state.getBlock())completed.remove(pos.asLong());}
 }

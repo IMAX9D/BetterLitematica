@@ -6,7 +6,6 @@ import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.slot.SlotActionType;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.function.Predicate;
-
 /** Real bag transfers await receipts. Integrated creative picking follows vanilla's local pick flow. */
 final class InventoryTransfers {
     enum Result {READY,WAIT,MISSING}
@@ -46,6 +45,7 @@ final class InventoryTransfers {
     Result equipContainerForPrinter(ItemStack wanted,int tick){
         var exact=wanted.copy();return equip(stack->matchesStack(stack,exact),null,tick,true,exact,true);
     }
+    Result equipForPrinter(Item item,int tick,int reservedSlots){return equip(stack->stack.isOf(item),item,tick,true,null,false,reservedSlots);}
     boolean usableForPrinter(ItemStack stack){var s=options.get();return !toolProtection.get(s.tool,s.toolItem).test(stack);}
     static boolean matchesStack(ItemStack actual,ItemStack wanted){return wanted.isEmpty()?actual.isEmpty():!actual.isEmpty()&&ItemStack.areItemsAndComponentsEqual(actual,wanted);}
     static boolean canCreate(boolean creative,boolean localCreative,Item item,ItemStack exact){
@@ -84,7 +84,8 @@ final class InventoryTransfers {
     private Result equip(Predicate<ItemStack> matches,Item creativeItem,int tick,boolean retainMaterials,ItemStack exact){
         return equip(matches,creativeItem,tick,retainMaterials,exact,false);
     }
-    private Result equip(Predicate<ItemStack> matches,Item creativeItem,int tick,boolean retainMaterials,ItemStack exact,boolean container){
+    private Result equip(Predicate<ItemStack> matches,Item creativeItem,int tick,boolean retainMaterials,ItemStack exact,boolean container){return equip(matches,creativeItem,tick,retainMaterials,exact,container,0);}
+    private Result equip(Predicate<ItemStack> matches,Item creativeItem,int tick,boolean retainMaterials,ItemStack exact,boolean container,int reservedSlots){
         var player=client.player;var inv=player.getInventory();
         if(pending!=null){
             if(InventoryReceipts.containerStamp()<=containerStamp&&!confirmed(tick,startedTick,echo,stamp,InventoryReceipts.stamp(slot),pending.test(inv.getStack(slot)))){if(tick-startedTick>100)throw new IllegalStateException("换手未确认，请打开容器后重试");return Result.WAIT;}
@@ -98,7 +99,7 @@ final class InventoryTransfers {
         int source=find(inv,material);
         if(source<0&&!canCreateMaterial(player.isCreative(),creativePick,creativeItem,exact,protection))return Result.MISSING;
         if(source>=0&&source<9){if(!reconcileCreative(inv,source,creativePick))return Result.MISSING;inv.selectedSlot=source;client.interactionManager.syncSelectedSlot();return Result.READY;}
-        int destination=retainMaterials?InventoryPolicy.printerDestinationWithProtection(inv,settings.protectedHotbar,protection):InventoryPolicy.destinationWithProtection(inv,settings.protectedHotbar,protection);
+        int destination=retainMaterials?InventoryPolicy.printerDestinationWithProtection(inv,settings.protectedHotbar|reservedSlots,protection):InventoryPolicy.destinationWithProtection(inv,settings.protectedHotbar|reservedSlots,protection);
         if(retainMaterials&&creativePick){
             var picked=source>=9?inv.getStack(source):exact!=null?exact:new ItemStack(creativeItem);
             if(!client.getNetworkHandler().hasFeature(picked.getItem().getRequiredFeatures()))return Result.MISSING;

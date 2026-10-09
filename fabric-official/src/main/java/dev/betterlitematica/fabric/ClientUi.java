@@ -4,6 +4,7 @@ import net.minecraft.client.gui.screens.Screen;
 /** Small boundary for the client GUI/camera ownership change in 26.2. */
 public final class ClientUi {
  private ClientUi(){}
+ public static void message(Minecraft client,net.minecraft.network.chat.Component text,boolean overlay){if(overlay)client.gui.setOverlayMessage(text,false);else client.player.sendSystemMessage(text);}
  public static void subtitles(Minecraft client){client.gui.extractDeferredSubtitles();}
  public static Screen screen(Minecraft client){return client.screen;}
  public static void setScreen(Minecraft client,Screen screen){client.setScreen(screen);}

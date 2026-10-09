@@ -1,5 +1,4 @@
 package dev.betterlitematica.fabric;
-
 import com.mojang.brigadier.arguments.*;
 import dev.betterlitematica.core.LayerRange;
 import net.fabricmc.api.ClientModInitializer;
@@ -15,10 +14,12 @@ import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.*;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.*;
-
 public final class BetterLitematicaClient implements ClientModInitializer {
     private static volatile ProjectionController activeController;
     private static ModeWheelInput modeWheelInput;
+    private static StatusHud statusHud;
+    public static boolean constructionOwnsInput(){var c=activeController;return c!=null&&(c.printer().running()||c.bedrock().enabled()||NativeMiner.acting()||AccuratePlacement.activeAction());}
+    static boolean scrollNearby(double x,double y,double amount){return statusHud!=null&&statusHud.scroll(x,y,amount);}
     public static boolean wheelKey(long window,int key,int scan,int action){boolean consumed=modeWheelInput!=null&&modeWheelInput.key(window,key,scan,action);if(consumed&&interactions!=null)interactions.suspendInput();return consumed;}
     public static boolean wheelMouse(long window,int button,int action){return modeWheelInput!=null&&modeWheelInput.mouse(window,button,action);}
     public static boolean wheelBlocksWorldInput(){return modeWheelInput!=null&&modeWheelInput.blocksWorldInput();}
@@ -54,6 +55,8 @@ public final class BetterLitematicaClient implements ClientModInitializer {
     static int wheelKeyCode(){return activeController==null?GLFW.GLFW_KEY_TAB:ModeWheelInput.bindingCode(activeController.options().keys.getOrDefault("wheel","TAB"));}
     static BuildingInteractions interactions;
     public static boolean useProjection(){return interactions!=null&&interactions.use();}
+    public static boolean attackProjection(){return interactions!=null&&interactions.attack();}
+    public static boolean preserveProjectionBlocks(){return interactions!=null&&interactions.claimsAttack();}
     public static boolean pickProjection(){return interactions!=null&&interactions.pick();}
     public static boolean scrollTool(double amount){return interactions!=null&&interactions.scroll(amount);}
     public static boolean preservePrinterBreaking(){return interactions!=null&&interactions.preservePrinterBreaking();}
@@ -67,7 +70,7 @@ public final class BetterLitematicaClient implements ClientModInitializer {
         interactions=new BuildingInteractions(client,controller);
         ClientTickEvents.START_CLIENT_TICK.register(mc->{modeWheelInput.tick();menuOpen.tick(mc.world,mc.getNetworkHandler(),mc.currentScreen);});
         // Shortcut transitions are captured by inputEvent, including taps between ticks.
-        ClientTickEvents.END_CLIENT_TICK.register(mc->{controller.tick();interactions.tick();if(!controller.printer().running())PrinterColdWarmup.step(mc);controller.printer().tickHud();controller.bedrock().tick();if(!controller.bedrock().enabled())controller.printer().tick();});
+        ClientTickEvents.END_CLIENT_TICK.register(mc->{controller.tick();CompatibilityNotice.tick(mc);interactions.tick();if(!controller.printer().running())PrinterColdWarmup.step(mc);controller.printer().tickHud();controller.bedrock().tick();if(!controller.bedrock().enabled())controller.printer().tick();});
         net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player,world,hand,pos,direction)->{
             if(world==client.world&&controller.bedrock().attack(pos))return net.minecraft.util.ActionResult.FAIL;
             if(world==client.world&&interactions.blockClick(true,new net.minecraft.util.hit.BlockHitResult(net.minecraft.util.math.Vec3d.ofCenter(pos),direction,pos,false)))return net.minecraft.util.ActionResult.FAIL;return net.minecraft.util.ActionResult.PASS;
@@ -78,9 +81,9 @@ public final class BetterLitematicaClient implements ClientModInitializer {
             if(mc.getNetworkHandler()!=null&&mc.getNetworkHandler()!=handler)return;
             modeWheelInput.clear();menuOpen.clear();controller.disconnect();EntityOverlayMask.close();
         }));
-        IndependentUi ui=IndependentUi.INSTANCE;ProjectionInformation information=new ProjectionInformation();ToolHud toolHud=new ToolHud();StatusHud statusHud=new StatusHud();final int[] informationTick={0};ClientTickEvents.END_CLIENT_TICK.register(mc->{if(++informationTick[0]%4==0)information.update(mc,controller);});
+        IndependentUi ui=IndependentUi.INSTANCE;ProjectionInformation information=new ProjectionInformation();ToolHud toolHud=new ToolHud();statusHud=new StatusHud();final int[] informationTick={0};ClientTickEvents.END_CLIENT_TICK.register(mc->{if(++informationTick[0]%4==0)information.update(mc,controller);});
         ClientLifecycleEvents.CLIENT_STOPPING.register(mc->{modeWheelInput.clear();controller.close();ui.close();EntityOverlayMask.close();});
-        WorldRenderEvents.START.register(context->EntityOverlayMask.reset());
+        WorldRenderEvents.START.register(context->{EntityOverlayMask.reset();interactions.frame();});
         WorldRenderEvents.BEFORE_ENTITIES.register(context->EntityOverlayMask.before(client,controller.entityOverlayMaskNeeded(context)));
         WorldRenderEvents.AFTER_ENTITIES.register(context->EntityOverlayMask.after(client));
         WorldRenderEvents.END.register(context->EntityOverlayMask.reset());

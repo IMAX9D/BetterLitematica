@@ -1,5 +1,4 @@
 package dev.betterlitematica.fabric;
-
 import java.util.*;
 import dev.betterlitematica.core.Vec3i;
 import net.minecraft.client.Minecraft;
@@ -8,7 +7,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CommandBlock;
 import net.minecraft.world.level.block.state.BlockState;
-
 /** Manual and region work share the same exclusive transaction used by the printer. */
 final class BedrockController {
     private static final int MAX_QUEUE=4096;
@@ -25,11 +23,12 @@ final class BedrockController {
     private String status="已停止";
     BedrockController(Minecraft client,ProjectionController controller){this.client=client;this.controller=controller;miner=new NativeMiner(client,controller.inventoryTransfers(),this::settings);}
     BedrockSettings settings(){return controller.options().bedrock;}
-    void configure(BedrockSettings settings){settings.validate();clear();controller.options().bedrock=settings;controller.saveOptions();}
+    void configure(BedrockSettings settings){settings.validate();pause();generation++;cooling.clear();controller.options().bedrock=settings;controller.saveOptions();}
     boolean enabled(){return enabled;}
     String status(){return status;}
     int queued(){return queue.size()+(current==null?0:1);}
-    void toggle(){if(enabled){enabled=false;miner.reset();if(current!=null)queue.add(current);current=null;status="已暂停";}else{miner.check();controller.printer().pause("已暂停");enabled=true;status="等待目标";}client.player.sendOverlayMessage(net.minecraft.network.chat.Component.literal(enabled?"破基岩：已启用":"破基岩：已暂停"));}
+    void toggle(){if(enabled){pause();}else{miner.arm();controller.printer().pause("已暂停");enabled=true;status="等待目标";}client.player.sendOverlayMessage(net.minecraft.network.chat.Component.literal(enabled?"破基岩：已启用":"破基岩：已暂停"));}
+    void pause(){enabled=false;miner.reset();if(current!=null)queue.add(current);current=null;status="已暂停";}
     void check(){miner.check();}
     void clear(){miner.reset();queue.clear();cooling.clear();current=null;generation++;status="已停止";enabled=false;}
     void disconnect(){clear();temporary.clear();scan=0;}
@@ -55,7 +54,8 @@ final class BedrockController {
     }
     void tick(){
         ticks++;if(client.level==null||client.player==null){disconnect();return;}if(!enabled)return;
-        if(ClientUi.screen(client)!=null||!client.isWindowActive()||client.player.isDeadOrDying()||controller.worldWriteBusy()){miner.reset();if(current!=null)queue.add(current);current=null;enabled=false;status="已暂停";return;}
+        if(ClientUi.screen(client)!=null){if(current!=null||miner.active()){miner.reset();if(current!=null)queue.add(current);current=null;}status="等待返回游戏";return;}
+        if(!client.isWindowActive()||client.player.isDeadOrDying()||controller.worldWriteBusy()){miner.reset();if(current!=null)queue.add(current);current=null;enabled=false;status="已暂停";return;}
         scanRegions();
         try{if(NativeMiner.recoverSuspended(ticks)){status="回收上次施工材料";return;}}catch(RuntimeException failure){status=failure.getMessage();enabled=false;miner.reset();return;}
         if(current==null){current=queue.stream().filter(this::near).min(Comparator.comparingDouble(p->p.distToCenterSqr(client.player.position()))).orElse(null);if(current==null){status="等待附近目标";return;}queue.remove(current);generation++;}

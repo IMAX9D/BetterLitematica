@@ -8,12 +8,13 @@ public final class OptionalMixins implements IMixinConfigPlugin {
     public String getRefMapperConfig(){return null;}
     public boolean shouldApplyMixin(String target,String mixin){
         var loader=FabricLoader.getInstance();
+        // Optional targets can arrive in JVM internal or binary class-name form.
+        target=target.replace('/','.');
         if(mixin.endsWith(".ExternalMinerMixin"))return loader.isModLoaded(target.startsWith("me.z7087.")?"blockminer":"bedrockminer");
         if(mixin.contains(".compat.")){
             if(target.startsWith("fi.dy.masa.litematica."))return loader.isModLoaded("litematica");
             if(target.startsWith("fi.dy.masa.tweakeroo."))return loader.isModLoaded("tweakeroo");
             if(target.startsWith("me.aleksilassila.litematica.printer."))return loader.isModLoaded("litematica-printer");
-            if(target.startsWith("com.tom.storagemod."))return loader.isModLoaded("toms_storage");
             return false;
         }
         return true;

@@ -149,6 +149,7 @@ public final class AccuratePlacement {
         Scope scope=active.get();if(scope==null)return base;if(!context.getBlockPos().equals(scope.target))return null;
         return valid(context,decode(scope.mode,base,scope.target,scope.wire.getPos().x,context.getHorizontalPlayerFacing()));
     }
+    static boolean activeAction(){return active.get()!=null;}
     private static <T>T scoped(Scope value,Supplier<T> action){Scope previous=active.get();active.set(value);try{return action.get();}finally{if(previous==null)active.remove();else active.set(previous);}}
     static boolean requiresLocal(boolean integrated,Mode mode,BlockPos target,BlockHitResult wire){return integrated&&(mode==Mode.V2||mode==Mode.V3)&&wire.getPos().x-target.getX()>=2;}
     static boolean localCapacity(boolean integrated,Mode mode,BlockPos target,BlockHitResult wire,PendingSlots<?,?> slots,long now){return !requiresLocal(integrated,mode,target,wire)||slots.available(now);}

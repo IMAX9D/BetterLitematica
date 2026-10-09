@@ -1,5 +1,4 @@
 package dev.betterlitematica.fabric;
-
 import dev.betterlitematica.core.BlockDisplayFilter;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -7,7 +6,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 import java.util.*;
-
 /** A placement-bound draft whose candidates come from the complete source histogram. */
 final class BlockDisplayFilterScreen extends MenuScreen {
     private final UUID id;
@@ -64,11 +62,11 @@ final class BlockDisplayFilterScreen extends MenuScreen {
         search.setChangedListener(text->{query=text;String normalized=text.strip().toLowerCase(Locale.ROOT);terms=normalized.isEmpty()?new String[0]:normalized.split("\\s+");refilter(true);});
         save=fixedAction("保存",innerWidth-168,84,this::save);
     }
-    private boolean matches(BlockFilterGrid.Entry e){if(terms.length==0)return true;String value=e.id()+" "+e.name().toLowerCase(Locale.ROOT);for(String part:terms)if(!value.contains(part))return false;return true;}
+    private boolean matches(BlockFilterGrid.Entry e){if(terms.length==0)return true;String value=e.id()+" "+e.name();for(String part:terms)if(!SearchText.matches(value,part))return false;return true;}
     /** Ordering is fixed when the view changes (search, mode, scope) so ticking a block never moves cards under the pointer. */
     private void refilter(boolean reset){
         if(grid==null)return;
-        if(reset)grid.rows(candidates.stream().filter(this::matches).filter(e->!selectedOnly||selected.contains(e.id())).sorted(Comparator.comparing(e->!selected.contains(e.id()))).toList(),true);
+        if(reset)grid.rows(candidates.stream().filter(this::matches).filter(e->!selectedOnly||selected.contains(e.id())).sorted(Comparator.comparingInt((BlockFilterGrid.Entry e)->SearchText.rank(e.name(),e.id(),query)).thenComparing(e->!selected.contains(e.id()))).toList(),true);
         grid.active=!off()&&source!=null;
         count.setMessage(Text.literal(off()?"":"已选 "+candidates.stream().filter(e->selected.contains(e.id())).count()));
         selectResults.active=!off()&&candidates.stream().anyMatch(e->matches(e)&&!selected.contains(e.id()));clear.active=!off()&&!selected.isEmpty();error="";
@@ -83,6 +81,6 @@ final class BlockDisplayFilterScreen extends MenuScreen {
         discardArmed=true;refresh();
     }
     @Override protected void updateMenu(){if(syncSource())refilter(true);if(controller.placement(id)==null){error="投影已移除";if(grid!=null)grid.active=false;if(save!=null)save.active=false;if(selectResults!=null)selectResults.active=false;if(clear!=null)clear.active=false;}}
-    @Override public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput){int key=keyInput.key(),scan=keyInput.scancode(),modifiers=keyInput.modifiers();if(getFocused()==grid&&grid!=null&&grid.keyPressed(keyInput))return true;return super.keyPressed(keyInput);}
+    @Override public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput){int key=keyInput.key(),scan=keyInput.scancode(),modifiers=keyInput.modifiers();if((key==257||key==335)&&getFocused() instanceof net.minecraft.client.gui.widget.TextFieldWidget){runAction(this::save);return true;}if(getFocused()==grid&&grid!=null&&grid.keyPressed(keyInput))return true;return super.keyPressed(keyInput);}
     @Override public boolean mouseReleased(net.minecraft.client.gui.Click click){double x=click.x(),y=click.y();int button=click.button();boolean owned=grid!=null&&grid.mouseReleased(new net.minecraft.client.gui.Click(0,0,click.buttonInfo()));return super.mouseReleased(click)||owned;}
 }

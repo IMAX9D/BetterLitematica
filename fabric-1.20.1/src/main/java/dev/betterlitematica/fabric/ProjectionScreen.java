@@ -10,7 +10,7 @@ final class ProjectionScreen extends MenuScreen {
     private java.util.UUID removing;private long removingSince;
 
     ProjectionScreen(ProjectionController c){super("BetterLitematica","",null,c,true);}
-    @Override protected int preferredHeight(){return Math.max(controller.hasDraftRecovery()?326:306,130+ROW*Math.max(Math.min(controller.placements().size(),8),6));}
+    @Override protected int preferredHeight(){return Math.max(306,130+ROW*Math.max(Math.min(controller.placements().size(),8),6));}
 
     @Override protected int scrollRight(){return left+LIST;}
     @Override protected int scrollTop(){return bodyTop+ROW;}
@@ -45,7 +45,7 @@ final class ProjectionScreen extends MenuScreen {
         tile(Kind.TASKS,"任务管理",right,tw,0,2,()->client.setScreen(new TaskScreen(this,controller)),false);
         tile(Kind.VERSIONS,"项目版本",right,tw,1,2,()->client.setScreen(new ProjectScreen(this,controller)),false);
         tile(Kind.SETTINGS,"设置与快捷键",right,tw,0,3,()->client.setScreen(new OptionsScreen(this,controller)),false);
-        if(controller.hasDraftRecovery())tile(Kind.RESTORE,"恢复编辑",right,tw,0,4,()->client.setScreen(new DraftRecoveryScreen(this,controller)),true);
+        if(controller.hasDraftRecovery())tile(Kind.RESTORE,"恢复编辑",right,tw,1,3,()->client.setScreen(new DraftRecoveryScreen(this,controller)),true);
         snapshot=snapshot();
     }
 

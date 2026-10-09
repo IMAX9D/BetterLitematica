@@ -1,21 +1,16 @@
 package dev.betterlitematica.fabric;
-
 import dev.betterlitematica.runtime.UiGlyphArt.Kind;
-
 /** Hub: loaded projections on the left, a launcher of tools on the right. Only the list scrolls. */
 final class ProjectionScreen extends MenuScreen {
     private static final int LIST=300,GUTTER=24,ROW=26,TILE=34,TILE_STEP=40;
     private int ticks;
     private String snapshot="";
     private java.util.UUID removing;private long removingSince;
-
     ProjectionScreen(ProjectionController c){super("BetterLitematica","",null,c,true);}
-    @Override protected int preferredHeight(){return Math.max(controller.hasDraftRecovery()?326:306,130+ROW*Math.max(Math.min(controller.placements().size(),8),6));}
-
+    @Override protected int preferredHeight(){return Math.max(306,130+ROW*Math.max(Math.min(controller.placements().size(),8),6));}
     @Override protected int scrollRight(){return left+LIST;}
     @Override protected int scrollTop(){return bodyTop+ROW;}
     @Override protected boolean scrolls(int x,int y){return x<scrollRight()&&y>=ROW;}
-
     @Override protected void buildMenu(){
         int right=left+LIST+GUTTER,rightWidth=innerWidth-LIST-GUTTER;
         var entries=controller.placements();
@@ -45,20 +40,17 @@ final class ProjectionScreen extends MenuScreen {
         tile(Kind.TASKS,"任务管理",right,tw,0,2,()->ClientUi.setScreen(minecraft,new TaskScreen(this,controller)),false);
         tile(Kind.VERSIONS,"项目版本",right,tw,1,2,()->ClientUi.setScreen(minecraft,new ProjectScreen(this,controller)),false);
         tile(Kind.SETTINGS,"设置与快捷键",right,tw,0,3,()->ClientUi.setScreen(minecraft,new OptionsScreen(this,controller)),false);
-        if(controller.hasDraftRecovery())tile(Kind.RESTORE,"恢复编辑",right,tw,0,4,()->ClientUi.setScreen(minecraft,new DraftRecoveryScreen(this,controller)),true);
+        if(controller.hasDraftRecovery())tile(Kind.RESTORE,"恢复编辑",right,tw,1,3,()->ClientUi.setScreen(minecraft,new DraftRecoveryScreen(this,controller)),true);
         snapshot=snapshot();
     }
-
     private void tile(Kind glyph,String label,int x,int w,int column,int row,Runnable action,boolean emphasis){
         tileAt(glyph,label,x+column*(w+8),ROW+row*TILE_STEP,w,TILE,action,emphasis);
     }
-
     private String snapshot(){
         var state=new StringBuilder().append(controller.selectedId()).append(controller.hasDraftRecovery());
         for(var entry:controller.placements())state.append(entry).append(controller.entryStatus(entry.id()));
         return state.toString();
     }
-
     @Override protected void updateMenu(){
         if(removing!=null&&System.nanoTime()-removingSince>3_000_000_000L){removing=null;refresh();return;}
         if(++ticks%10==0&&!snapshot.equals(snapshot()))refresh();

@@ -13,3 +13,4 @@ accessible field net/minecraft/client/texture/AbstractTexture sampler Lnet/minec
 accessible method net/minecraft/client/render/RenderLayer <init> (Ljava/lang/String;Lnet/minecraft/client/render/RenderSetup;)V
 accessible field net/minecraft/client/render/OutlineVertexConsumerProvider plainDrawer Lnet/minecraft/client/render/VertexConsumerProvider$Immediate;
 accessible field net/minecraft/client/render/VertexConsumerProvider$Immediate allocator Lnet/minecraft/client/util/BufferAllocator;
+accessible method net/minecraft/client/world/ClientWorld getPendingUpdateManager ()Lnet/minecraft/client/network/PendingUpdateManager;

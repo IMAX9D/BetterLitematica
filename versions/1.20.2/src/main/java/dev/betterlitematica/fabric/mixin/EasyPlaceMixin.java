@@ -10,9 +10,9 @@ abstract class EasyPlaceMixin {
     @Inject(method="doItemUse",at=@At("HEAD"),cancellable=true)
     private void betterlitematica$use(CallbackInfo callback){if(BetterLitematicaClient.wheelBlocksWorldInput()||BetterLitematicaClient.toolBlocksWorld()||BetterLitematicaClient.editUse()){callback.cancel();return;}BetterLitematicaClient.manualPrinterInteraction();if(BetterLitematicaClient.useProjection())callback.cancel();}
     @Inject(method="doAttack",at=@At("HEAD"),cancellable=true)
-    private void betterlitematica$attack(CallbackInfoReturnable<Boolean> callback){if(BetterLitematicaClient.wheelBlocksWorldInput()||BetterLitematicaClient.toolBlocksWorld()||BetterLitematicaClient.editAttack()){callback.setReturnValue(false);return;}BetterLitematicaClient.manualPrinterInteraction();}
+    private void betterlitematica$attack(CallbackInfoReturnable<Boolean> callback){if(BetterLitematicaClient.wheelBlocksWorldInput()||BetterLitematicaClient.toolBlocksWorld()||BetterLitematicaClient.editAttack()){callback.setReturnValue(false);return;}BetterLitematicaClient.manualPrinterInteraction();if(BetterLitematicaClient.attackProjection())callback.setReturnValue(false);}
     @Inject(method="handleBlockBreaking",at=@At("HEAD"),cancellable=true)
-    private void betterlitematica$breaking(boolean breaking,CallbackInfo callback){if(breaking&&BetterLitematicaClient.wheelBlocksWorldInput()||BetterLitematicaClient.toolBlocksWorld()||BetterLitematicaClient.editActive()||BetterLitematicaClient.preservePrinterBreaking())callback.cancel();}
+    private void betterlitematica$breaking(boolean breaking,CallbackInfo callback){if(breaking&&BetterLitematicaClient.wheelBlocksWorldInput()||BetterLitematicaClient.toolBlocksWorld()||BetterLitematicaClient.editActive()||BetterLitematicaClient.preservePrinterBreaking()||breaking&&BetterLitematicaClient.preserveProjectionBlocks())callback.cancel();}
     @Inject(method="openGameMenu",at=@At("HEAD"),cancellable=true)
     private void betterlitematica$editMenu(boolean pauseOnly,CallbackInfo callback){if(BetterLitematicaClient.editEscape())callback.cancel();}
 }

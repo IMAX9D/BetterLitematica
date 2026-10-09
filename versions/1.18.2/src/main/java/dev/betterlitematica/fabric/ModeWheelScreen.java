@@ -1,5 +1,4 @@
 package dev.betterlitematica.fabric;
-
 import dev.betterlitematica.core.UiViewport;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.gui.widget.*;
@@ -8,11 +7,9 @@ import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.client.gui.screen.narration.NarrationPart;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
-
 /** Held overlay with independent work modes and a separate render-layer wheel. */
 final class ModeWheelScreen extends MenuScreen {
     static final double CX=300,CY=200,INNER=54,OUTER=132;
-
     private static final int CARD_X=452,CARD_RIGHT=590,CARD_TOP=130;
     private static final WheelModes[] MODES=WheelModes.values();
     private static final WheelRenderMode[] RENDER_MODES=WheelRenderMode.values();
@@ -37,8 +34,6 @@ final class ModeWheelScreen extends MenuScreen {
             firstPlayer=playerButton(firstField);
             if(mode==WheelRenderMode.RANGE){secondField=input("结束层",secondText,211,v->{secondText=v;applyInput(false);});secondPlayer=playerButton(secondField);}
         }
-
-
     }
     private OverlayTextField input(String label,String value,int y,java.util.function.Consumer<String> changed){var field=new OverlayTextField(CARD_X+16,y,CARD_RIGHT-CARD_X-96,label);field.setMaxLength(12);field.setText(value);field.setChangedListener(changed);addBody(field,y-bodyTop);return field;}
     private ButtonWidget playerButton(OverlayTextField field){return buttonAt("移到玩家",CARD_RIGHT-68,field.getY()-bodyTop,58,()->{editingRetained=true;setFocused(field);field.setText(Integer.toString(client.player.getBlockY()));applyInput(true);},true,false);}
@@ -72,7 +67,6 @@ final class ModeWheelScreen extends MenuScreen {
     @Override public boolean mouseClicked(double x,double y,int button){
         if(button!=GLFW.GLFW_MOUSE_BUTTON_LEFT)return true;var v=view();double px=v.inputX(x),py=v.inputY(y);
         for(var field:new OverlayTextField[]{firstField,secondField})if(field!=null&&field.mouseClicked(px,py,button)){editingRetained=true;setFocused(field);return true;}
-
         for(var control:new ButtonWidget[]{firstPlayer,secondPlayer})if(control!=null&&control.mouseClicked(px,py,button))return true;
         setFocused(null);if(Math.hypot(px-centerX(),py-CY)<INNER-5){if(page!=Page.MAIN){show(Page.MAIN);centerMotion.press();}return true;}
         int count=page==Page.MAIN?4:page==Page.MODES?MODES.length:RENDER_MODES.length+2,selected=sectorAt(px,py,count,centerX());if(selected<0)return true;
@@ -80,6 +74,7 @@ final class ModeWheelScreen extends MenuScreen {
         if(page==Page.RENDER){if(selected<RENDER_MODES.length){renderMotion[selected].press();selectRender(RENDER_MODES[selected]);}else if(controller.wheelRenderMode().editable()){renderMotion[selected].press();shift(selected==RENDER_MODES.length?-1:1);}return true;}
         modeMotion[selected].press();try{MODES[selected].toggle(controller);error="";}catch(RuntimeException failure){error=message(failure);}return true;
     }
+    @Override public boolean mouseScrolled(double x,double y,double amount){return BetterLitematicaClient.scrollNearby(x,y,amount)||super.mouseScrolled(x,y,amount);}
     @Override public boolean mouseReleased(double x,double y,int button){var v=view();for(var field:new OverlayTextField[]{firstField,secondField})if(field!=null)field.mouseReleased(v.inputX(x),v.inputY(y),button);return true;}
     @Override public boolean mouseDragged(double x,double y,int button,double dx,double dy){var v=view();if(getFocused() instanceof OverlayTextField field)field.mouseDragged(v.inputX(x),v.inputY(y),button,v.deltaX(dx),v.deltaY(dy));return true;}
     @Override public boolean keyPressed(int key,int scan,int modifiers){
@@ -134,7 +129,6 @@ final class ModeWheelScreen extends MenuScreen {
     }
     private final class WheelSurface extends ClickableWidget {
     public int getX(){return x;} public int getY(){return y;} public void setX(int value){x=value;} public void setY(int value){y=value;}
-
         WheelSurface(){super(0,0,600,400,new net.minecraft.text.LiteralText("快捷操作"));}
         @Override public void renderButton(MatrixStack legacyMatrices,int x,int y,float delta){LegacyGuiContext context=new LegacyGuiContext(legacyMatrices);drawWheel(IndependentUi.INSTANCE,context,x,y,delta);}
         @Override public void appendNarrations(NarrationMessageBuilder builder){builder.put(NarrationPart.TITLE,getMessage());}

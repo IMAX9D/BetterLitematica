@@ -13,3 +13,4 @@ accessible method net/minecraft/client/render/entity/EntityRenderer getBoundingB
 accessible field net/minecraft/client/gui/DrawContext state Lnet/minecraft/client/gui/render/state/GuiRenderState;
 accessible field net/minecraft/client/render/OutlineVertexConsumerProvider plainDrawer Lnet/minecraft/client/render/VertexConsumerProvider$Immediate;
 accessible field net/minecraft/client/render/VertexConsumerProvider$Immediate allocator Lnet/minecraft/client/util/BufferAllocator;
+accessible method net/minecraft/client/world/ClientWorld getPendingUpdateManager ()Lnet/minecraft/client/network/PendingUpdateManager;

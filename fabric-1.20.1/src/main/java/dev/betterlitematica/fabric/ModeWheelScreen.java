@@ -80,6 +80,7 @@ final class ModeWheelScreen extends MenuScreen {
         if(page==Page.RENDER){if(selected<RENDER_MODES.length){renderMotion[selected].press();selectRender(RENDER_MODES[selected]);}else if(controller.wheelRenderMode().editable()){renderMotion[selected].press();shift(selected==RENDER_MODES.length?-1:1);}return true;}
         modeMotion[selected].press();try{MODES[selected].toggle(controller);error="";}catch(RuntimeException failure){error=message(failure);}return true;
     }
+    @Override public boolean mouseScrolled(double x,double y,double amount){return BetterLitematicaClient.scrollNearby(x,y,amount)||super.mouseScrolled(x,y,amount);}
     @Override public boolean mouseReleased(double x,double y,int button){var v=view();for(var field:new OverlayTextField[]{firstField,secondField})if(field!=null)field.mouseReleased(v.inputX(x),v.inputY(y),button);return true;}
     @Override public boolean mouseDragged(double x,double y,int button,double dx,double dy){var v=view();if(getFocused() instanceof OverlayTextField field)field.mouseDragged(v.inputX(x),v.inputY(y),button,v.deltaX(dx),v.deltaY(dy));return true;}
     @Override public boolean keyPressed(int key,int scan,int modifiers){

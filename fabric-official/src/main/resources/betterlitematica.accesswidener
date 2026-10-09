@@ -9,3 +9,4 @@ accessible field net/minecraft/client/renderer/rendertype/RenderType state Lnet/
 accessible field net/minecraft/client/renderer/rendertype/RenderType name Ljava/lang/String;
 accessible field net/minecraft/client/renderer/rendertype/RenderSetup textures Ljava/util/Map;
 accessible class net/minecraft/client/renderer/rendertype/RenderSetup$TextureBinding
+accessible method net/minecraft/client/multiplayer/ClientLevel getBlockStatePredictionHandler ()Lnet/minecraft/client/multiplayer/prediction/BlockStatePredictionHandler;

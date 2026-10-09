@@ -30,9 +30,9 @@ jobs:
           import json, os
           targets = json.load(open("targets.json"))["targets"]
           if os.environ["BUILD_BRANCH"].startswith("review/"):
-              targets = [t for t in targets if "-review." in t.get("artifactVersion", "")]
-              if not targets:
-                  raise SystemExit("Review branch must declare its review target")
+              review_targets = [t for t in targets if "-review." in t.get("artifactVersion", "")]
+              if review_targets:
+                  targets = review_targets
           print("versions=" + json.dumps([t["minecraft"] for t in targets]))
           PY
   build:

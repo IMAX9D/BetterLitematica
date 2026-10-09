@@ -1,5 +1,4 @@
 package dev.betterlitematica.fabric;
-
 import dev.betterlitematica.core.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -10,10 +9,10 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import java.util.*;
-
+import net.minecraft.world.item.Item;
 /** Read-only nearby block comparison, independent of printer attempts and inventory. */
 final class NearbyBuildHud {
-    record Entry(Block block,ItemStack icon,int count) {}
+    record Entry(Block block,ItemStack icon,int count,int wrongBlock,int wrongState) {Entry(Block block,ItemStack icon,int count){this(block,icon,count,0,0);}}
     record Snapshot(List<Entry> entries,boolean scanning,int unknown) {
         static final Snapshot EMPTY=new Snapshot(List.of(),false,0);
     }
@@ -22,19 +21,24 @@ final class NearbyBuildHud {
     private final Minecraft client;
     private final ProjectionController controller;
     private final Map<Block,Integer> counts=new HashMap<>();
+    private final Map<Block,Integer> wrongBlocks=new HashMap<>(),wrongStates=new HashMap<>();
     private Context context;
     private Cursor cursor;
     private net.minecraft.world.phys.Vec3 scanEye;
     private boolean completed;
-    private int unknown;
+    private int unknown,compared,matched;
+    private int lastCompared,lastMatched;private long rounds;
+    private final Map<Item,Integer> needs=new HashMap<>();
+    private Map<Item,Integer> materialNeeds=Map.of();
+    int compared(){return lastCompared;}int matched(){return lastMatched;}long rounds(){return rounds;}
+    Map<Item,Integer> materialNeeds(){return materialNeeds;}
     private Snapshot snapshot=Snapshot.EMPTY;
     NearbyBuildHud(Minecraft client,ProjectionController controller){this.client=client;this.controller=controller;}
     Snapshot snapshot(){return snapshot;}
-    void clear(){context=null;cursor=null;counts.clear();unknown=0;completed=false;snapshot=Snapshot.EMPTY;}
-
+    void clear(){context=null;cursor=null;counts.clear();wrongBlocks.clear();wrongStates.clear();unknown=0;compared=matched=lastCompared=lastMatched=0;needs.clear();materialNeeds=Map.of();completed=false;snapshot=Snapshot.EMPTY;}
     void tick(){
         var s=controller.options().printer;
-        if(client.level==null||client.player==null||client.gameMode==null||!s.hud||!s.missingHud||!controller.projectionRenderingEnabled()){clear();return;}
+        if(client.level==null||client.player==null||client.gameMode==null||!s.hud||(!s.missingHud&&controller.printer().state()==PrinterEngine.State.STOPPED)){clear();return;}
         var sources=controller.printerSources();if(sources.isEmpty()){clear();return;}
         var eye=client.player.getEyePosition();var center=new Vec3i((int)Math.round(eye.x),(int)Math.round(eye.y),(int)Math.round(eye.z));
         double reach=s.range==0?client.player.blockInteractionRange():Math.min(s.range,client.player.blockInteractionRange());
@@ -42,7 +46,7 @@ final class NearbyBuildHud {
         if(!next.equals(context)){clear();context=next;}
         if(cursor==null){
             scanEye=eye;
-            cursor=new Cursor(center,(int)Math.ceil(reach+1.5));counts.clear();unknown=0;
+            cursor=new Cursor(center,(int)Math.ceil(reach+1.5));counts.clear();wrongBlocks.clear();wrongStates.clear();unknown=compared=matched=0;needs.clear();
         }
         var sample=controller.printerSampler();long started=System.nanoTime();int visited=0;
         while(cursor.hasNext()&&visited++<8192&&System.nanoTime()-started<2_000_000L){
@@ -52,13 +56,16 @@ final class NearbyBuildHud {
             if(client.level.isOutsideBuildHeight(pos)||!client.level.getWorldBorder().isWithinBounds(pos)||!inScope(at,s.printScope))continue;
             var projected=sample.apply(at);if(projected==null||!projected.inside())continue;
             if(projected.state()==null||!WorldChunks.loaded(client.level,pos)){unknown++;continue;}
-            add(counts,projected.state(),client.level.getBlockState(pos));
+            var wanted=projected.state();var actual=client.level.getBlockState(pos);compared++;if(wanted.equals(actual))matched++;
+            add(counts,wanted,actual);
+            if(!wanted.equals(actual))for(var cost:BuildMaterials.forState(wanted))needs.merge(cost.item(),cost.count(),Integer::sum);
+            if(!wanted.isAir()&&!wanted.equals(actual)&&!actual.isAir())(wanted.is(actual.getBlock())?wrongStates:wrongBlocks).merge(wanted.getBlock(),1,Integer::sum);
         }
         boolean scanning=cursor.hasNext();
         // Replace complete rounds atomically; never flash an empty prefix every scan cycle.
-        if(!scanning||!completed)snapshot=new Snapshot(entries(counts),scanning,unknown);
+        if(!scanning||!completed)snapshot=new Snapshot(entries(counts).stream().map(e->new Entry(e.block(),e.icon(),e.count(),wrongBlocks.getOrDefault(e.block(),0),wrongStates.getOrDefault(e.block(),0))).toList(),scanning,unknown);
         else snapshot=new Snapshot(snapshot.entries(),true,snapshot.unknown());
-        if(!scanning){cursor=null;completed=true;}
+        if(!scanning){cursor=null;completed=true;lastCompared=compared;lastMatched=matched;materialNeeds=Map.copyOf(needs);rounds++;}
     }
     private boolean inScope(Vec3i at,PrinterSettings.Scope scope){
         if(scope==PrinterSettings.Scope.PROJECTION)return true;

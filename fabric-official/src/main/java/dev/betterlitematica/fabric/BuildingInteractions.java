@@ -1,5 +1,4 @@
 package dev.betterlitematica.fabric;
-
 import dev.betterlitematica.core.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -15,40 +14,45 @@ import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-
 /** Vanilla inventory and interaction packets only. Never edits the client/server world to fake a placement. */
 final class BuildingInteractions {
-    void editingEntered(){pendingPick=null;dragSelection=null;dragTarget=null;transfers.reset();wasUse=false;cooldown=0;}
-    boolean preservePrinterBreaking(){return controller.printer().ownsBreaking();}
+    void editingEntered(){pendingPick=null;dragSelection=null;dragTarget=null;transfers.reset();wasUse=false;stroke.clear();}
+    boolean preservePrinterBreaking(){return controller.printer().ownsBreaking()||NativeMiner.ownsBreaking();}
     void manualPrinterInteraction(){if(!controller.printer().acting()){pendingPick=null;controller.bedrock().manualInput();controller.printer().manualContainerInteraction();controller.printer().pause("已暂停");}}
     private final Minecraft client;private final ProjectionController controller;
     private final InventoryTransfers transfers;private int ticks;private net.minecraft.client.multiplayer.ClientLevel transferWorld;
     private final InputBindings bindings=new InputBindings();
     private AreaSelection dragSelection,dragLatest;private Vec3i dragOffset=Vec3i.ZERO;private SelectionTarget dragTarget;private Vec3 dragAnchor;private net.minecraft.client.multiplayer.ClientLevel dragWorld;
-    private boolean using,wasUse;private int cooldown;private long lastHint;
+    private boolean using,wasUse;private final PlacementStroke stroke=new PlacementStroke();private long lastHint;
     private Item pendingPick;private int pickExpires;
     BuildingInteractions(Minecraft client,ProjectionController controller){this.client=client;this.controller=controller;this.transfers=controller.inventoryTransfers();}
     void inputEvent(long window,int code,int action){bindings.event(client,controller.options(),window,code,action);}
     void suspendInput(){bindings.suspend();}
     void tick(){
-        ticks++;if(client.level!=transferWorld){transferWorld=client.level;transfers.clear();pendingPick=null;}String transferFailure=transfers.settle(ticks);if(transferFailure!=null)controller.action(()->{throw new IllegalStateException(transferFailure);});
+        ticks++;if(client.level!=transferWorld){transferWorld=client.level;transfers.clear();pendingPick=null;stroke.clear();}String transferFailure=transfers.settle(ticks);if(transferFailure!=null)controller.action(()->{throw new IllegalStateException(transferFailure);});
         bindings.tick(client,controller.options(),name->controller.action(()->hotkey(name)));
         controller.temporarilyHidden(!controller.editor().claimsInput()&&bindings.held("hideProjection"));
-
-        if(client.level==null||client.player==null||client.gameMode==null||ClientUi.screen(client)!=null||!client.isWindowActive()){pendingPick=null;wasUse=false;cooldown=0;return;}
+        if(client.level==null||client.player==null||client.gameMode==null||ClientUi.screen(client)!=null||!client.isWindowActive()){pendingPick=null;wasUse=false;stroke.clear();return;}
         if(pendingPick!=null){if(ticks>=pickExpires||controller.printer().running())pendingPick=null;else if(controller.action(this::continuePick)==0)pendingPick=null;}
-        if(cooldown>0)cooldown--;
         boolean use=client.options.keyUse.isDown();
-        if(enabled()&&use&&controller.options().hold&&cooldown==0)attempt();
+        if(enabled()&&(use||client.options.keyAttack.isDown())&&controller.options().hold)attempt();
         wasUse=use;
     }
-    private boolean enabled(){return !controller.editor().claimsInput()&&!using&&!controller.printer().running()&&controller.projectionRenderingEnabled()&&(controller.options().easyPlace||bindings.held("easyPlaceHold"))&&client.player!=null&&client.level!=null&&client.gameMode!=null&&ClientUi.screen(client)==null&&!hasTool()&&!client.player.isSpectator()&&!client.player.isUsingItem();}
+    private boolean enabled(){return !controller.editor().claimsInput()&&!using&&!controller.printer().running()&&!controller.bedrock().enabled()&&controller.projectionRenderingEnabled()&&(controller.options().easyPlace||bindings.held("easyPlaceHold"))&&client.player!=null&&client.level!=null&&client.gameMode!=null&&ClientUi.screen(client)==null&&client.isWindowActive()&&!hasTool()&&!client.player.isSpectator()&&!client.player.isUsingItem();}
     boolean use(){
         if(!enabled()||controller.target(client.player.blockInteractionRange())==null)return false;
-        if(cooldown==0&&(controller.options().hold||!wasUse))attempt();
+        if(controller.options().hold||!wasUse)attempt();
         return true;
     }
-    private void attempt(){cooldown=4;controller.action(this::easyPlace);}
+    /** Poll after mouse look, not only at 20 Hz; new targets never share a cooldown. */
+    void frame(){if(enabled()&&controller.options().hold&&(client.options.keyAttack.isDown()||client.options.keyUse.isDown()))attempt();}
+    boolean claimsAttack(){return enabled()&&controller.options().hold&&controller.target(client.player.blockInteractionRange())!=null;}
+    boolean attack(){if(!claimsAttack())return false;attempt();return true;}
+    private void attempt(){
+        var target=controller.target(client.player.blockInteractionRange());if(target==null)return;
+        var at=target.position();if(!stroke.allow(BlockPos.asLong(at.x(),at.y(),at.z()),ticks))return;
+        controller.action(()->easyPlace(target));
+    }
     private void hotkey(String name){if(controller.editor().active()&&!java.util.Set.of("editUndo","editRedo","menu","layerNext","layerPrevious","toolMode","toolModePrevious","toolSettings").contains(name))return;switch(name){
         case "editUndo"->controller.editor().undoInWorld(false);case "editRedo"->controller.editor().undoInWorld(true);
         case "restriction"->{controller.options().restriction=!controller.options().restriction;controller.saveOptions();}
@@ -64,10 +68,10 @@ final class BuildingInteractions {
         case "printer"->ClientUi.setScreen(client,new PrinterScreen(ClientUi.screen(client),controller));
         case "printerWork"->controller.printer().toggle();case "printerStop"->controller.printer().stop();
         case "printerMode"->controller.printer().cycle();
+        case "printerPrint"->WheelModes.PRINT.toggle(controller);case "printerMine"->WheelModes.MINE.toggle(controller);case "printerFill"->WheelModes.FILL.toggle(controller);case "printerDrain"->WheelModes.DRAIN.toggle(controller);case "printerBedrock"->WheelModes.BEDROCK.toggle(controller);case "printerAllOff"->controller.printer().allModesOff();
         case "information"->{controller.options().display.information=!controller.options().display.information;controller.saveOptions();}
         case "layerMode"->controller.cycleLayer();case "layerPlayer"->controller.layerAtPlayer();
         case "pickLast"->{manualPrinterInteraction();var target=controller.target(client.player.blockInteractionRange(),true);if(target!=null){var needs=BuildMaterials.forState(target.state());if(!needs.isEmpty())selectItem(needs.get(needs.size()-1).item());}}
-
         case "menu"->ClientUi.setScreen(client,new ProjectionScreen(controller));case "placements"->ClientUi.setScreen(client,new PlacementListScreen(new ProjectionScreen(controller),controller));
         case "materials"->ClientUi.setScreen(client,new AnalysisScreen(new ProjectionScreen(controller),controller,true));case "verifier"->ClientUi.setScreen(client,new AnalysisScreen(new ProjectionScreen(controller),controller,false));
         case "selection"->ClientUi.setScreen(client,new SelectionScreen(new ProjectionScreen(controller),controller));case "settings"->ClientUi.setScreen(client,new OptionsScreen(new ProjectionScreen(controller),controller));
@@ -80,7 +84,6 @@ final class BuildingInteractions {
         if(controller.editor().active())return true;
         if(using||controller.printer().acting())return false;
         if(controller.tool().blocksVanilla())return true;
-
         if(!first&&(controller.options().restriction||bindings.held("restrictionHold"))){var target=controller.target(client.player.blockInteractionRange());
             if(target==null)return true;BlockPos expected=new BlockPos(target.position().x(),target.position().y(),target.position().z());BlockPos placed=client.level.getBlockState(hit.getBlockPos()).canBeReplaced()?hit.getBlockPos():hit.getBlockPos().relative(hit.getDirection());
             var needs=BuildMaterials.forState(target.state());return !placed.equals(expected)||needs.isEmpty()||!client.player.getMainHandItem().is(needs.get(needs.size()-1).item());
@@ -99,8 +102,8 @@ final class BuildingInteractions {
         long now=System.nanoTime();if(now-lastHint<1_500_000_000L)return;lastHint=now;
         client.player.sendOverlayMessage(net.minecraft.network.chat.Component.literal(message));
     }
-    private void easyPlace(){
-        if(client.gameMode==null)return;double reach=client.player.blockInteractionRange();var target=controller.target(reach);if(target==null)return;
+    private void easyPlace(ProjectionController.Target target){
+        if(client.gameMode==null)return;double reach=client.player.blockInteractionRange();
         var at=target.position();BlockPos pos=new BlockPos(at.x(),at.y(),at.z());if(!WorldChunks.loaded(client.level,pos))return;
         var existing=client.level.getBlockState(pos);if(existing.equals(target.state()))return;
         boolean doubleSlab=target.state().hasProperty(BlockStateProperties.SLAB_TYPE)&&target.state().getValue(BlockStateProperties.SLAB_TYPE)==SlabType.DOUBLE;

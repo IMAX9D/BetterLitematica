@@ -12,6 +12,7 @@ public final class ProjectionWorldHooks {
     private ProjectionWorldHooks(){}
     static void install(ProjectionController controller){ProjectionWorldHooks.controller=controller;}
     public static void begin(Camera camera,RenderTickCounter ticks,Matrix4f position,Matrix4f projection){
+        if(BetterLitematicaClient.interactions!=null)BetterLitematicaClient.interactions.frame();
         EntityOverlayMask.reset();
         context=new ProjectionRenderContext(camera,ticks,new MatrixStack(),new Matrix4f(position),new Matrix4f(projection),null);
     }

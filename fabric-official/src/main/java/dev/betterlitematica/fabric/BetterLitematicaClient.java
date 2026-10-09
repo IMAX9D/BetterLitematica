@@ -1,5 +1,4 @@
 package dev.betterlitematica.fabric;
-
 import com.mojang.brigadier.arguments.*;
 import dev.betterlitematica.core.LayerRange;
 import net.fabricmc.api.ClientModInitializer;
@@ -12,15 +11,16 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.ResourceManager;
-
 import org.slf4j.*;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.*;
-
 public final class BetterLitematicaClient implements ClientModInitializer {
     private static volatile ProjectionController activeController;
     private static ModeWheelInput modeWheelInput;
     private static boolean maskNeeded;
     public static boolean entityMaskFrameNeeded(){return maskNeeded;}
+    private static StatusHud statusHud;
+    public static boolean constructionOwnsInput(){var c=activeController;return c!=null&&(c.printer().running()||c.bedrock().enabled()||NativeMiner.acting()||AccuratePlacement.activeAction());}
+    static boolean scrollNearby(double x,double y,double amount){return statusHud!=null&&statusHud.scroll(x,y,amount);}
     public static boolean wheelKey(long window,int key,int scan,int action){boolean consumed=modeWheelInput!=null&&modeWheelInput.key(window,key,scan,action);if(consumed&&interactions!=null)interactions.suspendInput();return consumed;}
     public static boolean wheelMouse(long window,int button,int action){return modeWheelInput!=null&&modeWheelInput.mouse(window,button,action);}
     public static boolean wheelBlocksWorldInput(){return modeWheelInput!=null&&modeWheelInput.blocksWorldInput();}
@@ -59,6 +59,8 @@ public final class BetterLitematicaClient implements ClientModInitializer {
     static BuildingInteractions interactions;
     public static void finishProjectionFrame(){ProjectionDraw.flush();var controller=activeController;if(controller!=null)controller.capturePreview();}
     public static boolean useProjection(){return interactions!=null&&interactions.use();}
+    public static boolean attackProjection(){return interactions!=null&&interactions.attack();}
+    public static boolean preserveProjectionBlocks(){return interactions!=null&&interactions.claimsAttack();}
     public static boolean pickProjection(){return interactions!=null&&interactions.pick();}
     public static boolean scrollTool(double amount){return interactions!=null&&interactions.scroll(amount);}
     public static boolean preservePrinterBreaking(){return interactions!=null&&interactions.preservePrinterBreaking();}
@@ -72,7 +74,7 @@ public final class BetterLitematicaClient implements ClientModInitializer {
         interactions=new BuildingInteractions(client,controller);
         ClientTickEvents.START_CLIENT_TICK.register(mc->{UiTexture.collect();modeWheelInput.tick();menuOpen.tick(mc.level,mc.getConnection(),ClientUi.screen(mc));});
         // Shortcut transitions are captured by inputEvent, including taps between ticks.
-        ClientTickEvents.END_CLIENT_TICK.register(mc->{controller.tick();interactions.tick();if(!controller.printer().running())PrinterColdWarmup.step(mc);controller.printer().tickHud();controller.bedrock().tick();if(!controller.bedrock().enabled())controller.printer().tick();});
+        ClientTickEvents.END_CLIENT_TICK.register(mc->{controller.tick();CompatibilityNotice.tick(mc);interactions.tick();if(!controller.printer().running())PrinterColdWarmup.step(mc);controller.printer().tickHud();controller.bedrock().tick();if(!controller.bedrock().enabled())controller.printer().tick();});
         net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player,world,hand,pos,direction)->{
             if(world==client.level&&controller.bedrock().attack(pos))return net.minecraft.world.InteractionResult.FAIL;
             if(world==client.level&&interactions.blockClick(true,new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(pos),direction,pos,false)))return net.minecraft.world.InteractionResult.FAIL;return net.minecraft.world.InteractionResult.PASS;
@@ -83,9 +85,9 @@ public final class BetterLitematicaClient implements ClientModInitializer {
             if(mc.getConnection()!=null&&mc.getConnection()!=handler)return;
             modeWheelInput.clear();menuOpen.clear();controller.disconnect();EntityOverlayMask.close();
         }));
-        IndependentUi ui=IndependentUi.INSTANCE;ProjectionInformation information=new ProjectionInformation();ToolHud toolHud=new ToolHud();StatusHud statusHud=new StatusHud();final int[] informationTick={0};ClientTickEvents.END_CLIENT_TICK.register(mc->{if(++informationTick[0]%4==0)information.update(mc,controller);});
+        IndependentUi ui=IndependentUi.INSTANCE;ProjectionInformation information=new ProjectionInformation();ToolHud toolHud=new ToolHud();statusHud=new StatusHud();final int[] informationTick={0};ClientTickEvents.END_CLIENT_TICK.register(mc->{if(++informationTick[0]%4==0)information.update(mc,controller);});
         ClientLifecycleEvents.CLIENT_STOPPING.register(mc->{modeWheelInput.clear();controller.close();ui.close();EntityOverlayMask.close();});
-        net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.END_EXTRACTION.register(context->{var frame=new ProjectionFrame(context);ProjectionDraw.beginFrame();maskNeeded=controller.entityOverlayMaskNeeded(frame);controller.render(frame);});
+        net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.END_EXTRACTION.register(context->{interactions.frame();var frame=new ProjectionFrame(context);ProjectionDraw.beginFrame();maskNeeded=controller.entityOverlayMaskNeeded(frame);controller.render(frame);});
         net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.AFTER_OPAQUE_TERRAIN.register(context->EntityOverlayMask.before(client,maskNeeded));
         net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.AFTER_SOLID_FEATURES.register(context->EntityOverlayMask.after(client));
         net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("betterlitematica","hud"),(context,delta)->{
