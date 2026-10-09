@@ -10,7 +10,7 @@ final class SettingHelp {
         put(SettingId.PRINTER_MINE,"挖掘","清理错误方块、多余方块或错误状态。");
         put(SettingId.PRINTER_FILL,"填充","用指定填充方块填充所选范围。");
         put(SettingId.PRINTER_DRAIN,"排流体","使用填充方块清理选定流体。");
-        put(SettingId.PRINTER_BEDROCK,"破基岩","按破基岩范围移除基岩；选区模式无需加载投影，需生存模式、活塞、红石火把和足够快的镐。");
+        put(SettingId.PRINTER_BEDROCK,"破基岩","按破基岩范围移除基岩；选区模式无需加载投影，需生存模式、活塞、红石火把和足够的实际破坏速度。");
         put(SettingId.PRINTER_PRINT_SCOPE,"打印范围","选择按投影或选区限制打印与挖掘。");
         put(SettingId.PRINTER_FILL_SCOPE,"填充范围","选择填充作用的投影或选区范围。");
         put(SettingId.PRINTER_FLUID_SCOPE,"排流体范围","选择清理流体的投影或选区范围。");
@@ -69,6 +69,7 @@ final class SettingHelp {
         put(SettingId.BEDROCK_SHORT_WAIT,"瞬挖短等待","缩短支持瞬间挖掘时的动作等待。");
         put(SettingId.BEDROCK_TIMEOUT,"任务超时 / tick","超过等待时间后停止当前目标并按重试次数处理。");
         put(SettingId.BEDROCK_RETRIES,"重试次数","设置破除失败后重新尝试当前目标的次数。");
+        put(SettingId.BEDROCK_HELD_TOOL,"手持工具兼容","使用启动时手持的物品（也可空手）尝试，不受客户端速度预测限制；适用于其他模组或高等级效果造成的速度预测差异，最终以服务器确认为准。关闭时按实际速度自动选取，不限工具类型、附魔和效果等级。");
         put(SettingId.BEDROCK_DEBUG,"调试日志","记录破基岩步骤，便于排查失败原因。");
         put(SettingId.BEDROCK_WHITELIST,"允许方块","设置独立破基岩任务接受的方块名单。");
         put(SettingId.BEDROCK_EXCLUDED_Y,"排除 Y 层","禁止在指定高度创建破基岩任务。");

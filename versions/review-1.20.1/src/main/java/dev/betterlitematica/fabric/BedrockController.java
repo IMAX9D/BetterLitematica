@@ -27,7 +27,7 @@ final class BedrockController {
     boolean enabled(){return enabled;}
     String status(){return status;}
     int queued(){return queue.size()+(current==null?0:1);}
-    void toggle(){if(enabled){pause();}else{miner.check();controller.printer().pause("已暂停");enabled=true;status="等待目标";}client.player.sendMessage(net.minecraft.text.Text.literal(enabled?"破基岩：已启用":"破基岩：已暂停"),true);}
+    void toggle(){if(enabled){pause();}else{miner.arm();controller.printer().pause("已暂停");enabled=true;status="等待目标";}client.player.sendMessage(net.minecraft.text.Text.literal(enabled?"破基岩：已启用":"破基岩：已暂停"),true);}
     void pause(){enabled=false;miner.reset();if(current!=null)queue.add(current);current=null;status="已暂停";}
     void check(){miner.check();}
     void clear(){miner.reset();queue.clear();cooling.clear();current=null;generation++;status="已停止";enabled=false;}

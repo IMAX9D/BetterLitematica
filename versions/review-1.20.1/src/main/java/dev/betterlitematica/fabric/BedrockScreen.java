@@ -39,7 +39,7 @@ final class BedrockScreen extends MenuScreen {
         fixedAction("保存并返回",0,104,this::commit);exit=fixed(exitLabel(),innerWidth-88,88,this::discard);updateWork();
     }
     private void general(){
-        caption("独立破基岩队列",left,24,innerWidth);
+        caption("破基岩设置",left,24,innerWidth);
         toggle(SettingId.BEDROCK_EMPTY_HAND,"空手右键切换",0,48,()->draft.emptyHandToggle,value->draft.emptyHandToggle=value);
         toggle(SettingId.BEDROCK_SHORT_WAIT,"瞬挖短等待",1,48,()->draft.shortWait,value->draft.shortWait=value);
         number(SettingId.BEDROCK_TIMEOUT,"任务超时 / tick",draft.timeoutTicks,0,88,value->draft.timeoutTicks=value);
@@ -52,10 +52,11 @@ final class BedrockScreen extends MenuScreen {
             if(!controller.bedrock().accepts(pos,draft))throw new IllegalStateException("目标未加载或不符合破基岩规则");
             requireSaved();controller.bedrock().add(pos);updateWork();
         },hasTarget(),false));
-        work=settingAction(buttonAt("启动独立队列",cellX(0,2),182,cellWidth(2),()->{var engine=controller.bedrock();if(!engine.enabled()){read();engine.check();save();}engine.toggle();updateWork();},true,false));
+        toggle(SettingId.BEDROCK_HELD_TOOL,"手持工具兼容",0,182,()->draft.heldTool,value->draft.heldTool=value);
+        work=settingAction(buttonAt("启动独立队列",cellX(0,2),218,cellWidth(2),()->{var engine=controller.bedrock();if(!engine.enabled()){read();engine.check();save();}engine.toggle();updateWork();},true,false));
         hint(work,"启动或暂停独立队列；启动会暂停打印机并保留目标，返回游戏后施工。");
         hint(aim,"把准星指向的允许方块加入独立队列。");
-        clear=settingAction(buttonAt("清空独立队列",cellX(1,2),182,cellWidth(2),()->{if(!clearConfirmed){clearConfirmed=true;clearSince=System.nanoTime();clear.setMessage(Text.literal("确认清空队列"));return;}controller.bedrock().clear();clearConfirmed=false;clear.setMessage(Text.literal("清空独立队列"));updateWork();},true,false));
+        clear=settingAction(buttonAt("清空独立队列",cellX(1,2),218,cellWidth(2),()->{if(!clearConfirmed){clearConfirmed=true;clearSince=System.nanoTime();clear.setMessage(Text.literal("确认清空队列"));return;}controller.bedrock().clear();clearConfirmed=false;clear.setMessage(Text.literal("清空独立队列"));updateWork();},true,false));
         hint(clear,"清空所有独立队列目标；需要再次点击确认。");
     }
     private void rules(){

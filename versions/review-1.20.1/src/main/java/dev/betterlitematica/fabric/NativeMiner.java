@@ -30,13 +30,17 @@ final class NativeMiner {
     private BedrockPlan.Layout plan;
     private long generation;
     private int phase,attempt,started,next,lastTick=Integer.MIN_VALUE,prepareIndex;
-    private boolean removed,failed,suspended;
+    private boolean removed,failed,suspended,toolArmed,heldToolMode;
+    private ItemStack armedTool=ItemStack.EMPTY;private int armedSlot;
+    private BlockPos cleanupBreaking;
+    private int cleanupStarted=-1;
     private boolean lookLocked;private float aimYaw,aimPitch;private int aimTick;
     private PrinterReason reason=PrinterReason.NONE;private PrinterReason failure=PrinterReason.NONE;
     NativeMiner(MinecraftClient client,InventoryTransfers transfers,Supplier<BedrockSettings> settings){this.client=client;this.transfers=transfers;this.settings=settings;}
     static boolean acting(){return callback;}
     public static float packetYaw(float original){return owner!=null&&owner.lookLocked&&owner.client.isOnThread()?owner.aimYaw:original;}
     public static float packetPitch(float original){return owner!=null&&owner.lookLocked&&owner.client.isOnThread()?owner.aimPitch:original;}
+    static boolean ownsBreaking(){return owner!=null&&owner.cleanupBreaking!=null;}
     static boolean busy(){return owner!=null||!parked.isEmpty();}
     /** The controller owns two instances (manual and printer); switching modes drains
      * their retained temporary structures before either starts new world writes. */
@@ -53,6 +57,12 @@ final class NativeMiner {
         if(count(Items.PISTON)<2)throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.MISSING,"破基岩需要至少 2 个普通活塞"));
         if(count(Items.REDSTONE_TORCH)<1)throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.MISSING,"缺少红石火把"));
     }
+    /** Capture before material selection changes the held slot; retain it across queued targets. */
+    void arm(){
+        check();if(suspended)return;
+        heldToolMode=settings.get().heldTool;armedSlot=client.player.getInventory().selectedSlot;armedTool=client.player.getMainHandStack().copy();toolArmed=true;
+        if(heldToolMode&&!transfers.usableForPrinter(armedTool))throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.TOOL_REQUIRED,"手持物品受选区工具保护，请换用物品或关闭选区工具"));
+    }
     void confirmed(BlockPos pos,BlockState state){
         if(target==null||world!=client.world||connection!=client.getNetworkHandler())return;
         if(pos.equals(target)){if(!state.isOf(targetState.getBlock()))removed=true;return;}
@@ -66,14 +76,14 @@ final class NativeMiner {
         }
     }
     void reset(){
-        releaseLook();
+        cancelCleanupBreaking();releaseLook();
         if(target!=null&&!placed.isEmpty()&&world==client.world&&connection==client.getNetworkHandler()){
             suspended=true;if(owner==this)owner=null;parked.add(this);callback=false;return;
         }
         discard();
     }
     private void discard(){
-        releaseLook();
+        cancelCleanupBreaking();cleanupStarted=-1;releaseLook();
         if(owner==this)owner=null;
         parked.remove(this);suspended=false;target=null;plan=null;world=null;connection=null;placed.clear();receipts.clear();lastTick=Integer.MIN_VALUE;callback=false;
     }
@@ -81,8 +91,8 @@ final class NativeMiner {
         if(!suspended)return false;
         if(world!=client.world||connection!=client.getNetworkHandler()){discard();return false;}
         if(owner!=null&&owner!=this)return true;
-        if(client.currentScreen!=null||!client.isWindowFocused()||client.player==null||client.player.isDead())return true;
-        if(client.player.currentScreenHandler!=client.player.playerScreenHandler||transfers.inFlight()){reason=PrinterReason.of(PrinterReason.Id.CONFIRMING,"等待背包操作确认");return true;}
+        if(client.currentScreen!=null||!client.isWindowFocused()||client.player==null||client.player.isDead()){cleanupStarted=tick;return true;}
+        if(client.player.currentScreenHandler!=client.player.playerScreenHandler||transfers.inFlight()){cleanupStarted=tick;reason=PrinterReason.of(PrinterReason.Id.CONFIRMING,"等待背包操作确认");return true;}
         owner=this;callback=true;reason=PrinterReason.of(PrinterReason.Id.RECOVERING,"回收上次施工材料");
         try{if(cleanup(tick)){discard();return false;}return true;}finally{callback=false;}
     }
@@ -91,13 +101,13 @@ final class NativeMiner {
         if(owner!=null&&owner!=this){reason=PrinterReason.of(PrinterReason.Id.BEDROCK_BUSY,"等待另一项破基岩任务");return false;}
         if(active()&&(world!=client.world||connection!=client.getNetworkHandler()||generation!=gen||!target.equals(pos))){reset();throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.PAUSED,"破基岩任务已变更"));}
         if(!active()){
-            check();if(!WorldChunks.loaded(client.world,pos))throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.LOADING,"等待目标区块加载"));
+            if(!toolArmed)arm();else check();if(!WorldChunks.loaded(client.world,pos))throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.LOADING,"等待目标区块加载"));
             owner=this;target=pos.toImmutable();targetState=client.world.getBlockState(pos);world=client.world;connection=client.getNetworkHandler();generation=gen;
-            phase=0;attempt=0;started=tick;next=tick;removed=false;failed=false;failure=PrinterReason.NONE;prepareIndex=0;
+            phase=0;attempt=0;started=tick;next=tick;cleanupStarted=-1;removed=false;failed=false;failure=PrinterReason.NONE;prepareIndex=0;
         }
         if(lastTick==tick)return false;lastTick=tick;
         if(client.currentScreen!=null||!client.isWindowFocused()||client.player==null||client.player.isDead()||client.player.currentScreenHandler!=client.player.playerScreenHandler){reset();throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.PAUSED,"破基岩已暂停"));}
-        if(!reachable(target)){releaseLook();reason=PrinterReason.of(PrinterReason.Id.OUT_OF_REACH,"等待靠近目标");return false;}
+        if(!reachable(target)){cleanupStarted=tick;releaseLook();reason=PrinterReason.of(PrinterReason.Id.OUT_OF_REACH,"等待靠近目标");return false;}
         if(phase==4&&tick<next)return false;
         if(tick-started>settings.get().timeoutTicks&&phase<7){releaseLook();failed=true;failure=PrinterReason.of(PrinterReason.Id.CONFIRM_TIMEOUT,"破基岩超时，服务器可能不支持此机制");phase=7;}
         callback=true;
@@ -131,7 +141,7 @@ final class NativeMiner {
                 if(state==null||!state.isOf(Blocks.PISTON)||!state.get(Properties.EXTENDED))return false;
                 if(!prepare(tick))return false;
                 if(!aim(Direction.byId(plan.breakFace()),tick))return false;
-                if(!selectTool(at(plan.piston())))throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.TOOL_REQUIRED,"需要能瞬挖活塞的工具（效率 V、急迫 II，站稳且无疲劳）"));
+                if(!selectTool(at(plan.piston())))throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.TOOL_REQUIRED,"当前实际破坏速度不足；若由其他模组提供秒破能力，可开启手持工具兼容"));
                 if(count(Items.PISTON)<1)throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.MISSING,"缺少重放活塞"));
                 // The unpower, break and replacement must reach the server in this order
                 // without a tick boundary or inventory SWAP in between.
@@ -146,13 +156,13 @@ final class NativeMiner {
             }
             if(phase==6){
                 reason=PrinterReason.of(PrinterReason.Id.CONFIRMING,"等待破除确认");
-                if(removed){phase=7;}else if(tick>=next){failed=true;failure=PrinterReason.of(PrinterReason.Id.BEDROCK_FAILED,"目标未破除");phase=7;}else return false;
+                if(removed){phase=7;}else if(tick>=next){failed=true;failure=PrinterReason.of(PrinterReason.Id.BEDROCK_FAILED,heldToolMode?"服务器未确认破除，当前手持能力或施工机制未生效":"目标未破除");phase=7;}else return false;
             }
             if(phase==7){
                 reason=PrinterReason.of(PrinterReason.Id.RECOVERING,"回收施工材料");
                 if(!cleanup(tick))return false;
                 if(removed){reset();reason=PrinterReason.of(PrinterReason.Id.BEDROCK,"破基岩完成");return true;}
-                if(failed&&attempt++<settings.get().retries){phase=0;started=tick;prepareIndex=0;plan=null;receipts.clear();failed=false;return false;}
+                if(failed&&attempt++<settings.get().retries){phase=0;started=tick;cleanupStarted=-1;prepareIndex=0;plan=null;receipts.clear();failed=false;return false;}
                 PrinterReason message=failure.isEmpty()?PrinterReason.of(PrinterReason.Id.BEDROCK_FAILED,"目标未破除"):failure;reset();throw new PrinterReason.Failure(message);
             }
             return false;
@@ -161,21 +171,38 @@ final class NativeMiner {
     private boolean prepare(int tick){
         Item[] materials={Items.PISTON,Items.REDSTONE_TORCH,Items.SLIME_BLOCK};
         while(prepareIndex<materials.length){var item=materials[prepareIndex];if(item==Items.SLIME_BLOCK&&count(item)==0){prepareIndex++;continue;}
-            var result=transfers.equipForPrinter(item,tick);if(result==InventoryTransfers.Result.MISSING)throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.MISSING,"缺少 "+item.getName().getString()));if(result==InventoryTransfers.Result.WAIT)return false;prepareIndex++;
+            var result=transfers.equipForPrinter(item,tick,heldToolMode?reservedToolSlots():0);if(result==InventoryTransfers.Result.MISSING)throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.MISSING,"缺少 "+item.getName().getString()));if(result==InventoryTransfers.Result.WAIT)return false;prepareIndex++;
         }
-        var result=transfers.equipForPrinter(stack->fastTool(stack),tick);if(result==InventoryTransfers.Result.MISSING)throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.TOOL_REQUIRED,"需要能瞬挖活塞且剩余耐久充足的工具"));
-        if(result==InventoryTransfers.Result.WAIT)return false;
+        if(heldToolMode){if(!selectHeldTool())throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.TOOL_REQUIRED,"启动时手持物品所在栏位已变化或物品已耗尽，请重新选择后启动"));}
+        else{var result=transfers.equipForPrinter(this::fastTool,tick);if(result==InventoryTransfers.Result.MISSING)throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.TOOL_REQUIRED,"未找到实际破坏速度足够的物品；模组秒破能力可使用手持工具兼容"));
+        if(result==InventoryTransfers.Result.WAIT)return false;}
         if(hotbar(Items.PISTON)<0||hotbar(Items.REDSTONE_TORCH)<0)throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.INVENTORY_FULL,"请为活塞、火把和工具留出快捷栏位置"));
         return true;
     }
     private boolean fastTool(ItemStack stack){
-        if(!transfers.usableForPrinter(stack)||!(stack.getItem() instanceof PickaxeItem)||stack.getMaxDamage()-stack.getDamage()<=5)return false;
+        if(!transfers.usableForPrinter(stack))return false;
         var inv=client.player.getInventory();var old=inv.getStack(inv.selectedSlot);
         try{inv.setStack(inv.selectedSlot,stack);return Blocks.PISTON.getDefaultState().calcBlockBreakingDelta(client.player,client.world,target)>=.7f;}
         finally{inv.setStack(inv.selectedSlot,old);}
     }
+    private int reservedToolSlots(){
+        int mask=1<<armedSlot;var inv=client.player.getInventory();
+        for(int i=0;i<9;i++)if(inv.getStack(i).isOf(Items.PISTON)||inv.getStack(i).isOf(Items.REDSTONE_TORCH)||inv.getStack(i).isOf(Items.SLIME_BLOCK))mask|=1<<i;
+        return mask;
+    }
+    private boolean selectHeldTool(){
+        var inv=client.player.getInventory();var stack=inv.getStack(armedSlot);
+        // Keep the original slot and item identity, allowing server-updated damage, energy or charge NBT.
+        if(!transfers.usableForPrinter(stack)||(armedTool.isEmpty()?!stack.isEmpty():stack.isEmpty()||stack.getItem()!=armedTool.getItem()))return false;
+        inv.selectedSlot=armedSlot;client.interactionManager.syncSelectedSlot();return true;
+    }
     private boolean selectTool(BlockPos pos){
-        var inv=client.player.getInventory();for(int i=0;i<9;i++)if(fastTool(inv.getStack(i))){inv.selectedSlot=i;client.interactionManager.syncSelectedSlot();return client.world.getBlockState(pos).calcBlockBreakingDelta(client.player,client.world,pos)>=.7f;}return false;
+        if(heldToolMode)return selectHeldTool();
+        var inv=client.player.getInventory();
+        for(int i=0;i<9;i++)if(fastTool(inv.getStack(i))){
+            inv.selectedSlot=i;client.interactionManager.syncSelectedSlot();
+            if(client.world.getBlockState(pos).calcBlockBreakingDelta(client.player,client.world,pos)>=.7f)return true;
+        }return false;
     }
     private BedrockPlan.Layout choose(){
         var source=new Vec3i(target.getX(),target.getY(),target.getZ());var options=settings.get();
@@ -237,22 +264,39 @@ final class NativeMiner {
     }
     private void instantBreak(BlockPos pos){
         var state=client.world.getBlockState(pos);if(state.isAir())return;
-        float delta=state.calcBlockBreakingDelta(client.player,client.world,pos);if(delta<.7f)throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.TOOL_REQUIRED,"挖掘速度不足，已停止破基岩"));
+        float delta=state.calcBlockBreakingDelta(client.player,client.world,pos);if(!heldToolMode&&delta<.7f)throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.TOOL_REQUIRED,"挖掘速度不足，已停止破基岩"));
         client.interactionManager.attackBlock(pos,Direction.UP);
         if(delta<1){
-            client.interactionManager.sendSequencedPacket(client.world,sequence->new PlayerActionC2SPacket(PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK,pos,Direction.UP,sequence));
-            client.interactionManager.breakBlock(pos); // Vanilla prediction only; never a completion receipt.
+            client.interactionManager.sendSequencedPacket(client.world,sequence->{
+                // Piston prediction can also alter the adjacent target through neighbor updates.
+                // Preserve its last server-confirmed state in the same vanilla acknowledgement.
+                if(target!=null&&!removed)client.world.getPendingUpdateManager().addPendingUpdate(target,targetState,client.player);
+                client.interactionManager.breakBlock(pos);
+                return new PlayerActionC2SPacket(PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK,pos,Direction.UP,sequence);
+            });
         }
     }
+    private void cancelCleanupBreaking(){
+        if(cleanupBreaking!=null&&client.interactionManager!=null)client.interactionManager.cancelBlockBreaking();
+        cleanupBreaking=null;
+    }
     private boolean cleanup(int tick){
+        if(cleanupStarted<0)cleanupStarted=tick;
+        if(!placed.isEmpty()&&tick-cleanupStarted>settings.get().timeoutTicks){
+            discard();throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.CONFIRM_TIMEOUT,"服务器未确认材料回收，已停止操作；请手动清理临时结构"));
+        }
         for(var it=placed.entrySet().iterator();it.hasNext();){var entry=it.next();var pos=entry.getKey();
-            if(!reachable(pos)){reason=PrinterReason.of(PrinterReason.Id.OUT_OF_REACH,"等待靠近以回收材料");return false;}
+            if(!reachable(pos)){cleanupStarted=tick;cancelCleanupBreaking();reason=PrinterReason.of(PrinterReason.Id.OUT_OF_REACH,"等待靠近以回收材料");return false;}
             var actual=client.world.getBlockState(pos);var receipt=receipts.get(pos);
-            if(receipt!=null&&receipt.isAir()&&actual.isAir()){it.remove();continue;}
+            if(receipt!=null&&receipt.isAir()&&actual.isAir()){cancelCleanupBreaking();it.remove();continue;}
             if(pos.equals(at(plan.piston()))&&actual.isOf(Blocks.MOVING_PISTON))return false;
             if(!samePlacement(actual,entry.getValue())){if(!actual.isAir())it.remove();return false;}
             if(!selectTool(pos))throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.TOOL_REQUIRED,"工具不足，施工材料等待手动回收"));
-            instantBreak(pos);return false;
+            if(heldToolMode&&actual.calcBlockBreakingDelta(client.player,client.world,pos)<.7f){
+                // Ordinary cleanup can take longer than the time-sensitive piston transaction.
+                if(!pos.equals(cleanupBreaking)){cancelCleanupBreaking();cleanupBreaking=pos;client.interactionManager.attackBlock(pos,Direction.UP);}
+                else client.interactionManager.updateBlockBreakingProgress(pos,Direction.UP);
+            }else{cancelCleanupBreaking();instantBreak(pos);}return false;
         }return true;
     }
     private boolean ownedState(BlockPos pos,BlockState actual){var expected=placed.get(pos);return expected!=null&&samePlacement(actual,expected);}

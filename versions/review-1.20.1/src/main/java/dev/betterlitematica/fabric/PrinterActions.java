@@ -30,7 +30,7 @@ final class PrinterActions {
     PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed){this(client,transfers,protocol,allowed,null);}
     PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed,PrinterContainers containers){this(client,transfers,protocol,allowed,containers,null,null);}
     PrinterActions(MinecraftClient client,InventoryTransfers transfers,java.util.function.Supplier<AccuratePlacement.Mode> protocol,java.util.function.BooleanSupplier allowed,PrinterContainers containers,PrinterSigns signs,ProjectionController controller){this.client=client;this.protocol=protocol;this.transfers=transfers;this.supply=new PrinterSupply(client);this.miner=new NativeMiner(client,transfers,()->controller==null?new BedrockSettings():controller.options().bedrock);this.containers=containers;this.signs=signs;this.controller=controller;}
-    void checkMiner(){miner.check();}
+    void checkMiner(){miner.arm();}
     String cleanupError(){return miner.problem();}
     boolean supplyTick(int tick){if(NativeMiner.recoverSuspended(tick)){reason=PrinterReason.of(PrinterReason.Id.RECOVERING,"回收上次施工材料");return true;}boolean work=supply.tick(tick);if(work)reason=supply.typedReason();return work;}
     void supplyOpened(int sync,net.minecraft.screen.ScreenHandlerType<?> type){supply.opened(sync,type);}

@@ -14,7 +14,7 @@ import net.minecraft.block.enums.SlabType;
 /** Vanilla inventory and interaction packets only. Never edits the client/server world to fake a placement. */
 final class BuildingInteractions {
     void editingEntered(){pendingPick=null;dragSelection=null;dragTarget=null;transfers.reset();wasUse=false;stroke.clear();}
-    boolean preservePrinterBreaking(){return controller.printer().ownsBreaking();}
+    boolean preservePrinterBreaking(){return controller.printer().ownsBreaking()||NativeMiner.ownsBreaking();}
     void manualPrinterInteraction(){if(!controller.printer().acting()){pendingPick=null;controller.bedrock().manualInput();controller.printer().manualContainerInteraction();controller.printer().pause("已暂停");}}
     private final MinecraftClient client;private final ProjectionController controller;
     private final InventoryTransfers transfers;private int ticks;private net.minecraft.client.world.ClientWorld transferWorld;
