@@ -132,7 +132,10 @@
       "yarn": "1.20.1+build.10",
       "fabricApi": "0.92.2+1.20.1",
       "loader": "0.19.5",
-      "overlays": []
+      "overlays": [
+        "review-1.20.1"
+      ],
+      "artifactVersion": "0.4.3-review.1"
     },
     {
       "minecraft": "1.20.2",
