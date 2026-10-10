@@ -191,6 +191,8 @@ final class ProjectionController implements AutoCloseable {
         tickDraftAssociation();tickDraftRecovery();editor.tick();
         if(draftFile!=null){var status=draftWriter.status(draftFile);if(!status.error().isEmpty()&&!status.error().equals(checkpointFailure)){checkpointFailure=status.error();fail("草稿保存失败，正在重试："+status.error());}else if(status.error().isEmpty())checkpointFailure="";}
         if(ready&&client.player!=null&&options.followLayer&&layer.mode()!=LayerRange.Mode.ALL)followPlayerLayer();
+        // Follow can be switched on without the range changing (wheel); keep renderers in the matching build mode.
+        if(ready){boolean smooth=smoothFollow();for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.layer(layer,smooth);}
         if (analysis != null) {analysis.tick();if(errorOverlay&&client.player!=null){var position=net.minecraft.util.math.BlockPos.ofFloored(client.player.getEyePos());analysis.updateHighlights(new Vec3i(position.getX(),position.getY(),position.getZ()));}}
         nearbyHighlights.tick(client,this);
         materialTotals();
@@ -254,7 +256,7 @@ final class ProjectionController implements AutoCloseable {
         var drawn=entry.renderer.layout().placement();
         if(!drawn.sameGeometry(entry.placement)||!drawn.displayFilter().equals(entry.placement.displayFilter()))entry.renderer.place(entry.placement);
         entry.renderer.visible(entry.placement.enabled()&&entry.placement.renderBlocks());entry.renderer.opacity(entry.placement.opacity());
-        if(!entry.renderer.layer().equals(layer))entry.renderer.layer(layer);
+        entry.renderer.layer(layer,smoothFollow());
     }
     private void rebuildScene(){var renderers=entries.values().stream().filter(e->e.renderer!=null).map(e->e.renderer).toList();scene=new ProjectionScene(renderers);for(var renderer:renderers)renderer.scene(scene);}
     boolean entityOverlayMaskNeeded(WorldRenderContext context){
@@ -282,15 +284,15 @@ final class ProjectionController implements AutoCloseable {
                 // Player-set build budget per frame; uploads scale with it (512 KiB per millisecond, the former 2 MiB per 4 ms).
                 int budget=options.display.buildBudget();
                 buildTurn=RenderScheduler.run(active.stream().map(entry->entry.renderer).toList(),buildTurn,Math.max(32,budget*16),System.nanoTime()+budget*1_000_000L,budget*512*1024);
-                for(var entry:active)entry.renderer.drawFrame(context);
+                var clip=visualLayer(context.tickDelta());for(var entry:active){entry.renderer.visualClip((int)clip[0],clip[1],clip[2],clip[3]);entry.renderer.drawFrame(context);}
             }finally{composite.finish(client,1f);}
         }
 
         ProjectionOverlays.placements(client,context,entries.values().stream().filter(e->e.renderer!=null&&e.placement.enabled()).map(e->e.renderer.layout()).toList(),selected,options.display,toolBounds,gizmo.previewPlacement(),gizmo.previewOffset());
-        if(options.printer.highlights){ProjectionOverlays.prepareNearby(client,context,nearbyHighlights.boxes(),options.printer,options.display.extraColor);ProjectionOverlays.drawNearby(client,context,options.printer,false);}
+        if(options.printer.highlights){ProjectionOverlays.prepareNearby(client,context,nearbyHighlights.boxes(),options.printer,options.display.extraColor,visualLayer(context.tickDelta()));ProjectionOverlays.drawNearby(client,context,options.printer,false);}
         printer.render(context);ProjectionOverlays.marker(client,context,editor.marker());
         if(options.printer.highlights)ProjectionOverlays.drawNearby(client,context,options.printer,true);
-        if (errorOverlay && analysis != null) ProjectionOverlays.errorBoxes(client,context,analysis.highlightBoxes(),options.display,true,options.printer.highlightLimit,layer);
+        if (errorOverlay && analysis != null) ProjectionOverlays.errorBoxes(client,context,analysis.highlightBoxes(),options.display,true,options.printer.highlightLimit,visualLayer(context.tickDelta()));
         gizmo.render(context);
     }
     List<Placement> placements() { return entries.values().stream().map(e -> e.placement).toList(); }
@@ -826,6 +828,19 @@ final class ProjectionController implements AutoCloseable {
     void layer(LayerRange.Axis axis, int min, int max) { requireWorld();var next=new LayerRange(axis,min,max);if(next.equals(layer))return;layer=next;for (Entry entry : entries.values()) apply(entry); dirty = true; }
     void cycleLayer(){cycleLayer(1);}
     void cycleLayer(int step){var mode=LayerRange.Mode.values()[Math.floorMod(layer.mode().ordinal()+step,LayerRange.Mode.values().length)];var p=playerPosition();int value=layer.min()==Integer.MIN_VALUE?layer.max()==Integer.MAX_VALUE?switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();}:layer.max():layer.min();var next=LayerRange.of(layer.axis(),mode,value,value);layer(next.axis(),next.min(),next.max());explicitLayerMode(mode);}
+    boolean smoothFollow(){return options.followLayer&&layer.axis()==LayerRange.Axis.Y&&(layer.mode()==LayerRange.Mode.ABOVE||layer.mode()==LayerRange.Mode.BELOW);}
+    static final double FOLLOW_FADE=.6;
+    /**
+     * The visible slab {axis, from, to, fade} drawn this frame: whole cells for fixed layers, the player's
+     * interpolated feet and head for followed ones, so the cut glides instead of stepping a block per tick.
+     * Printing still uses the whole-cell layer.
+     */
+    double[] visualLayer(float tickDelta){
+        if(layer.mode()==LayerRange.Mode.ALL)return new double[]{-1,0,0,0};
+        if(smoothFollow()&&client.player!=null){double feet=client.player.getLerpedPos(tickDelta).y;
+            return layer.mode()==LayerRange.Mode.ABOVE?new double[]{1,feet+2,1e9,FOLLOW_FADE}:new double[]{1,-1e9,feet,FOLLOW_FADE};}
+        return new double[]{layer.axis().ordinal(),layer.min()==Integer.MIN_VALUE?-1e9:layer.min(),layer.max()==Integer.MAX_VALUE?1e9:(double)layer.max()+1,0};
+    }
     void layerAtPlayer(){var next=playerLayer();layer(next.axis(),next.min(),next.max());}
     /**
      * Vertical "above"/"below" layers hinge on the player's body, not one point: above starts over the head and

@@ -90,6 +90,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     // Per-frame scheduling state: source requests are queued once per frame, hole search stops once exhausted.
     private boolean prefetchedThisFrame,frameMissingWork,holesExhausted;
     private final LinkedHashSet<LayerRange> unsettledLayers=new LinkedHashSet<>();private boolean unsettledOverflow;private long layerChangedAt;
+    private LayerRange semantic=LayerRange.ALL;private int capAxis=-1,clipAxis=-1;private long capLo,capHi;private double clipFrom,clipTo,clipFade;
+    private static final int FOLLOW_SPAN=6;
     private static final int MAX_UNSETTLED_LAYERS=256;private static final long LAYER_SETTLE_NANOS=300_000_000L;
     private float opacity=0.45f;
     void opacity(float value){opacity=value;}
@@ -232,16 +234,51 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         layout=new PlacementLayout(next,metadata().regions());displayPalette=null;invalidate();
     }
     /**
-     * Following the player moves the boundary a block at a time. The surface shader clips every mesh to the new
-     * range at once, so nothing is rebuilt while the layer keeps moving; once it has rested, one pass marks the
-     * sections whose cells or culling neighbours differ from any range seen since, and they replace their old
-     * meshes as they finish. Holes built meanwhile already use the current range.
+     * Fixed layers: the surface shader clips every mesh to the new range at once, so nothing is rebuilt while the
+     * range keeps changing; once it has rested, one pass marks the sections whose cells or culling neighbours
+     * differ from any range seen since, and they replace their old meshes as they finish.
+     *
+     * Following the player vertically: meshes are built {@link #FOLLOW_SPAN} cells past the boundary and keep
+     * top and bottom faces in that band, so the shader can cut anywhere inside it with a capped cross-section.
+     * Only when the boundary nears the edge of the built band is the band recentred and rebuilt.
      */
-    void layer(LayerRange next){
+    void layer(LayerRange next){layer(next,false);}
+    void layer(LayerRange next,boolean follow){
+        boolean smooth=follow&&next.axis()==LayerRange.Axis.Y&&(next.mode()==LayerRange.Mode.ABOVE||next.mode()==LayerRange.Mode.BELOW);
+        boolean wasSmooth=capAxis>=0;semantic=next;
+        if(smooth!=wasSmooth||smooth&&layer.mode()!=next.mode()){
+            // Entering, leaving or flipping a followed layer changes every section: refresh all, keep old meshes.
+            layer=smooth?followRange(next):next;caps(smooth);unsettledLayers.clear();unsettledOverflow=false;
+            worldRefresh.allChanged();failed.clear();deferred.clear();wakeWorldRefresh();return;
+        }
+        if(smooth){
+            if(followCovers(layer,next))return;
+            long oldLo=capLo,oldHi=capHi;layer=followRange(next);caps(true);
+            long lo=Math.min(oldLo,capLo)-1,hi=Math.max(oldHi,capHi)+1;
+            meshes.forEach((key,mesh)->{var box=mesh.bounds();if(box.maxY>lo&&box.minY<=hi)worldRefresh.changed(key);});
+            failed.clear();deferred.clear();wakeWorldRefresh();return;
+        }
         var previous=layer;if(previous.equals(next))return;layer=next;
         if(unsettledLayers.size()<MAX_UNSETTLED_LAYERS)unsettledLayers.add(previous);else unsettledOverflow=true;
         layerChangedAt=System.nanoTime();
     }
+    private static LayerRange followRange(LayerRange next){
+        return next.mode()==LayerRange.Mode.ABOVE?new LayerRange(next.axis(),(int)Math.max(Integer.MIN_VALUE+1L,(long)next.min()-FOLLOW_SPAN),Integer.MAX_VALUE)
+            :new LayerRange(next.axis(),Integer.MIN_VALUE,(int)Math.min(Integer.MAX_VALUE-1L,(long)next.max()+FOLLOW_SPAN));
+    }
+    /** The built band must hold one cell beyond the boundary (interpolated eye) and no more than two spans of slack. */
+    private static boolean followCovers(LayerRange built,LayerRange next){
+        if(built.mode()!=next.mode()||built.axis()!=next.axis())return false;
+        return next.mode()==LayerRange.Mode.ABOVE?(long)built.min()<=(long)next.min()-1&&(long)built.min()>=(long)next.min()-2L*FOLLOW_SPAN
+            :(long)built.max()>=(long)next.max()+2&&(long)built.max()<=(long)next.max()+2L*FOLLOW_SPAN;
+    }
+    private void caps(boolean smooth){
+        if(!smooth){capAxis=-1;capLo=capHi=0;return;}
+        capAxis=layer.axis().ordinal();
+        if(layer.mode()==LayerRange.Mode.ABOVE){capLo=layer.min();capHi=(long)layer.min()+2L*FOLLOW_SPAN+2;}else{capHi=layer.max();capLo=(long)layer.max()-2L*FOLLOW_SPAN-2;}
+    }
+    /** Continuous visible slab along {@code axis}, set every frame; meshes may hold more cells than it shows. */
+    void visualClip(int axis,double from,double to,double fade){clipAxis=axis;clipFrom=from;clipTo=to;clipFade=fade;}
     private void settleLayer(){
         if(unsettledLayers.isEmpty()&&!unsettledOverflow||System.nanoTime()-layerChangedAt<LAYER_SETTLE_NANOS)return;
         var seen=List.copyOf(unsettledLayers);boolean all=unsettledOverflow;unsettledLayers.clear();unsettledOverflow=false;
@@ -532,6 +569,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         // The usual single-placement, full-height path needs only local palette data.
         // Avoid six temporary world positions for every source block in a huge schematic.
         Vec3i neighborPosition=null;
+        // Inside a followed band every cut must be capped, so faces along the layer axis are never culled there.
+        if(capAxis>=0&&side.getAxis().ordinal()==capAxis){int c=capAxis==0?world.x():capAxis==1?world.y():world.z();if(c>=capLo&&c<=capHi)return false;}
         if(layer.mode()!=LayerRange.Mode.ALL||current.overlaps.size()>1){neighborPosition=world.add(new Vec3i(side.getOffsetX(),side.getOffsetY(),side.getOffsetZ()));if(!layer.contains(neighborPosition))return false;}
         BlockState neighbor;
         if(current.overlaps.size()>1){var cell=scene.sampleDisplayed(current.overlaps,neighborPosition);if(cell==null||cell.unknown())return false;neighbor=cell.renderer().resolve(cell.region().index(),cell.id());}
@@ -586,8 +625,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         // Values live on the shared program; entity meshes drawn after this bind the same state.
         shader.getUniformOrDefault("CameraPos").set((float)camera.x,(float)camera.y,(float)camera.z);
         shader.getUniformOrDefault("ViewInverse").set(new Matrix4f(context.matrixStack().peek().getPositionMatrix()).invert());
-        if(layer.mode()==LayerRange.Mode.ALL)shader.getUniformOrDefault("LayerClip").set(-1f,0f,0f,0f);
-        else shader.getUniformOrDefault("LayerClip").set(layer.axis().ordinal(),(float)layer.min(),(float)((long)layer.max()+1),0f);
+        shader.getUniformOrDefault("LayerClip").set((float)clipAxis,(float)Math.max(-1e9,clipFrom),(float)Math.min(1e9,clipTo),(float)clipFade);
         float farEnd=Math.max(FAR_FADE_START+16,Math.min(FAR_FADE_END,client.options.getViewDistance().getValue()*16f));
         shader.getUniformOrDefault("Fade").set(NEAR_CLEAR,NEAR_FULL,FAR_FADE_START,farEnd);shader.getUniformOrDefault("FarFloor").set(FAR_OPACITY,FAR_SATURATION);
         try{

@@ -83,7 +83,7 @@ final class ProjectionOverlays {
     private static final class PreparedBox {
         private final dev.betterlitematica.core.HighlightCuboids.Box source;
         private final Box bounds;
-        private int color;private float alpha;
+        private int color;private float alpha;private Box drawn;
         PreparedBox(dev.betterlitematica.core.HighlightCuboids.Box source,Box bounds){this.source=source;this.bounds=bounds;}
         dev.betterlitematica.core.HighlightCuboids.Box source(){return source;}
         Box bounds(){return bounds;}
@@ -113,7 +113,7 @@ final class ProjectionOverlays {
     private static final java.util.ArrayList<PreparedBox> nearbyMissing=new java.util.ArrayList<>(),nearbyErrors=new java.util.ArrayList<>();
     static void clearCaches(){nearbyOrder.clear();releaseVerificationIndex();errorSlots=new int[256];errorAlpha=new float[256];errorCount=0;nearbyMissing.clear();nearbyErrors.clear();}
     /** One selection for both passes preserves the shared limit and their draw order. */
-    static void prepareNearby(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,PrinterSettings settings,int extraColor){
+    static void prepareNearby(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,PrinterSettings settings,int extraColor,double[] clip){
         nearbyMissing.clear();nearbyErrors.clear();
         if(client.player==null||context.matrixStack()==null)return;
         var camera=context.camera().getPos();var origin=client.player.getCameraPosVec(context.tickDelta());
@@ -122,12 +122,15 @@ final class ProjectionOverlays {
         float pulse=NearbyProjectionHighlights.alpha(System.nanoTime());
         for(var prepared:nearbyOrder.get(boxes,origin,settings.highlightLimit)){
             var box=prepared.source();var bounds=prepared.bounds();
+            // Scanned regardless of layer; the visible slab clips them here so they glide with it instead of rescanning.
+            int axis=(int)clip[0];if(axis>=0){double a=axis==0?bounds.minX:axis==1?bounds.minY:bounds.minZ,b=axis==0?bounds.maxX:axis==1?bounds.maxY:bounds.maxZ;if(b<=clip[1]||a>=clip[2])continue;
+                if(a<clip[1]||b>clip[2]){double lo=Math.max(a,clip[1]),hi=Math.min(b,clip[2]);bounds=axis==0?new Box(lo,bounds.minY,bounds.minZ,hi,bounds.maxY,bounds.maxZ):axis==1?new Box(bounds.minX,lo,bounds.minZ,bounds.maxX,hi,bounds.maxZ):new Box(bounds.minX,bounds.minY,lo,bounds.maxX,bounds.maxY,hi);}}
             if(distance(box,origin)>rangeSquared||context.frustum()!=null&&!context.frustum().isVisible(bounds))continue;
             if(settings.highlightLimit>0&&selected++>=settings.highlightLimit)break;
             var kind=NEARBY_KINDS[box.group()];boolean missing=kind==NearbyProjectionHighlights.Kind.MISSING;
             int color=missing?NearbyProjectionHighlights.MISSING_COLOR:kind==NearbyProjectionHighlights.Kind.WRONG?NearbyProjectionHighlights.WRONG_COLOR:extraColor;
             float alpha=missing?missingAlpha(bounds,origin,camera,look,settings.highlightRange):pulse;
-            if(alpha>0){prepared.color=color;prepared.alpha=alpha;(missing?nearbyMissing:nearbyErrors).add(prepared);}
+            if(alpha>0){prepared.color=color;prepared.alpha=alpha;prepared.drawn=bounds;(missing?nearbyMissing:nearbyErrors).add(prepared);}
         }
     }
     private static Box bounds(dev.betterlitematica.core.HighlightCuboids.Box b){return new Box(b.min().x(),b.min().y(),b.min().z(),(double)b.max().x()+1,(double)b.max().y()+1,(double)b.max().z()+1);}
@@ -150,16 +153,15 @@ final class ProjectionOverlays {
         var buffers=client.getBufferBuilders().getEntityVertexConsumers();var layer=OverlayLayers.nearLines(settings.highlightOnTop);
         matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);
         try{var vertices=buffers.getBuffer(layer);for(var box:boxes){int color=box.color;
-            WorldRenderer.drawBox(matrices,vertices,box.bounds(),((color>>>16)&255)/255f,((color>>>8)&255)/255f,(color&255)/255f,box.alpha);
+            WorldRenderer.drawBox(matrices,vertices,box.drawn,((color>>>16)&255)/255f,((color>>>8)&255)/255f,(color&255)/255f,box.alpha);
         }}finally{matrices.pop();buffers.draw(layer);}
     }
-    static void errorBoxes(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,DisplayOptions settings,boolean onTop,int limit,dev.betterlitematica.core.LayerRange layer){
+    static void errorBoxes(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,DisplayOptions settings,boolean onTop,int limit,double[] clip){
         if(client.player==null||boxes.isEmpty()||context.matrixStack()==null)return;
         var index=verificationIndex(boxes);if(index.size()==0)return;
         var camera=context.camera().getPos();var origin=client.player.getCameraPosVec(context.tickDelta());var look=net.minecraft.util.math.Vec3d.fromPolar(context.camera().getPitch(),context.camera().getYaw());
         // Verification spans the whole placement; only the visible layers are drawn, clipped at the layer planes.
-        boolean all=layer.mode()==dev.betterlitematica.core.LayerRange.Mode.ALL;
-        var test=new LayerViewTest(new FrustumTest(context.frustum()),all?-1:layer.axis().ordinal(),all?0:layer.min(),all?0:(double)layer.max()+1);float pulse=NearbyProjectionHighlights.alpha(System.nanoTime());
+        var test=new LayerViewTest(new FrustumTest(context.frustum()),(int)clip[0],clip[1],clip[2]);float pulse=NearbyProjectionHighlights.alpha(System.nanoTime());
         // Select first, then emit lines and faces as two batches: alternating layers per box flushes a draw call each time.
         errorCount=0;
         if(limit>0){
