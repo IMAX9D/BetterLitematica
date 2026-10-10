@@ -828,14 +828,13 @@ final class ProjectionController implements AutoCloseable {
     void cycleLayer(int step){var mode=LayerRange.Mode.values()[Math.floorMod(layer.mode().ordinal()+step,LayerRange.Mode.values().length)];var p=playerPosition();int value=layer.min()==Integer.MIN_VALUE?layer.max()==Integer.MAX_VALUE?switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();}:layer.max():layer.min();var next=LayerRange.of(layer.axis(),mode,value,value);layer(next.axis(),next.min(),next.max());explicitLayerMode(mode);}
     void layerAtPlayer(){var next=playerLayer();layer(next.axis(),next.min(),next.max());}
     /**
-     * Vertical "above"/"below" layers hinge on the player's body, not one point: above starts under the feet and
-     * below ends over the head, each with a one-block margin so the printer can still reach the cells it stands on
-     * and beside its head.
+     * Vertical "above"/"below" layers hinge on the player's body, not one point: above starts over the head and
+     * below ends under the feet. The body's own two cells stay outside as a safety zone, so the printer never
+     * places into the space the player occupies.
      */
-    static final int FOLLOW_MARGIN=1;
     static int playerAnchor(LayerRange.Axis axis,LayerRange.Mode mode,int feet){
         if(axis!=LayerRange.Axis.Y)return feet;
-        return mode==LayerRange.Mode.ABOVE?feet-FOLLOW_MARGIN:mode==LayerRange.Mode.BELOW?feet+1+FOLLOW_MARGIN:feet;
+        return mode==LayerRange.Mode.ABOVE?feet+2:mode==LayerRange.Mode.BELOW?feet-1:feet;
     }
     private LayerRange playerLayer(){
         var p=playerPosition();var mode=layer.mode()==LayerRange.Mode.ALL?LayerRange.Mode.SINGLE:layer.mode();
@@ -843,11 +842,11 @@ final class ProjectionController implements AutoCloseable {
         int last=mode==LayerRange.Mode.RANGE?Math.addExact(value,Math.subtractExact(layer.max(),layer.min())):value;
         return LayerRange.of(layer.axis(),mode,value,last);
     }
-    /** Jumping must not shift the layer: in the air the boundary only follows a move of two or more blocks. */
+    /** Jumping must not shift the layer; flying follows every block so the boundary moves smoothly. */
     private void followPlayerLayer(){
         var next=playerLayer();if(next.equals(layer))return;
         long shift=layer.mode()==LayerRange.Mode.BELOW?(long)next.max()-layer.max():(long)next.min()-layer.min();
-        if(!client.player.isOnGround()&&Math.abs(shift)<2)return;
+        if(!client.player.isOnGround()&&!client.player.getAbilities().flying&&Math.abs(shift)<2)return;
         layer(next.axis(),next.min(),next.max());
     }
     void allLayers() { layer(LayerRange.ALL.axis(), LayerRange.ALL.min(), LayerRange.ALL.max()); }
