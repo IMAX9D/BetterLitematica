@@ -63,6 +63,22 @@ final class ProjectionOverlays {
         }
         @Override public boolean intersects(double x0,double y0,double z0,double x1,double y1,double z1){return frustum==null||frustum.isVisible(new Box(x0,y0,z0,x1,y1,z1));}
     }
+    /** Frustum intersected with the visible layer slab; both convex, so the combination classifies exactly. */
+    private record LayerViewTest(FrustumTest view,int axis,double from,double to) implements dev.betterlitematica.core.HighlightBoxIndex.BoundsTest {
+        public int test(double x0,double y0,double z0,double x1,double y1,double z1){
+            int slab=slab(x0,y0,z0,x1,y1,z1);if(slab==dev.betterlitematica.core.HighlightBoxIndex.OUTSIDE)return slab;
+            int sight=view.test(x0,y0,z0,x1,y1,z1);return sight==dev.betterlitematica.core.HighlightBoxIndex.INSIDE&&slab==dev.betterlitematica.core.HighlightBoxIndex.INSIDE?sight:sight==dev.betterlitematica.core.HighlightBoxIndex.OUTSIDE?sight:dev.betterlitematica.core.HighlightBoxIndex.INTERSECTS;
+        }
+        @Override public boolean intersects(double x0,double y0,double z0,double x1,double y1,double z1){return slab(x0,y0,z0,x1,y1,z1)!=dev.betterlitematica.core.HighlightBoxIndex.OUTSIDE&&view.intersects(x0,y0,z0,x1,y1,z1);}
+        private int slab(double x0,double y0,double z0,double x1,double y1,double z1){
+            if(axis<0)return dev.betterlitematica.core.HighlightBoxIndex.INSIDE;
+            double a=axis==0?x0:axis==1?y0:z0,b=axis==0?x1:axis==1?y1:z1;
+            return b<=from||a>=to?dev.betterlitematica.core.HighlightBoxIndex.OUTSIDE:a>=from&&b<=to?dev.betterlitematica.core.HighlightBoxIndex.INSIDE:dev.betterlitematica.core.HighlightBoxIndex.INTERSECTS;
+        }
+        /** Cell-exclusive bound along {@code a} of a box clipped to the slab; draw extents stay within the layer. */
+        double low(int a,double value){return a==axis?Math.max(value,from):value;}
+        double high(int a,double value){return a==axis?Math.min(value,to):value;}
+    }
     private static int[] errorSlots=new int[256];private static float[] errorAlpha=new float[256];private static int errorCount;
     private static final class PreparedBox {
         private final dev.betterlitematica.core.HighlightCuboids.Box source;
@@ -137,36 +153,38 @@ final class ProjectionOverlays {
             WorldRenderer.drawBox(matrices,vertices,box.bounds(),((color>>>16)&255)/255f,((color>>>8)&255)/255f,(color&255)/255f,box.alpha);
         }}finally{matrices.pop();buffers.draw(layer);}
     }
-    static void errorBoxes(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,DisplayOptions settings,boolean onTop,int limit){
+    static void errorBoxes(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,DisplayOptions settings,boolean onTop,int limit,dev.betterlitematica.core.LayerRange layer){
         if(client.player==null||boxes.isEmpty()||context.matrixStack()==null)return;
         var index=verificationIndex(boxes);if(index.size()==0)return;
         var camera=context.camera().getPos();var origin=client.player.getCameraPosVec(context.tickDelta());var look=net.minecraft.util.math.Vec3d.fromPolar(context.camera().getPitch(),context.camera().getYaw());
-        var test=new FrustumTest(context.frustum());float pulse=NearbyProjectionHighlights.alpha(System.nanoTime());
+        // Verification spans the whole placement; only the visible layers are drawn, clipped at the layer planes.
+        boolean all=layer.mode()==dev.betterlitematica.core.LayerRange.Mode.ALL;
+        var test=new LayerViewTest(new FrustumTest(context.frustum()),all?-1:layer.axis().ordinal(),all?0:layer.min(),all?0:(double)layer.max()+1);float pulse=NearbyProjectionHighlights.alpha(System.nanoTime());
         // Select first, then emit lines and faces as two batches: alternating layers per box flushes a draw call each time.
         errorCount=0;
         if(limit>0){
             if(errorSlots.length<limit){errorSlots=new int[limit];errorAlpha=new float[limit];}
             int selected=index.nearest(origin.x,origin.y,origin.z,128*128,limit,test,errorSlots);
-            for(int i=0;i<selected;i++)keepError(index,errorSlots[i],origin,camera,look,pulse);
-        }else index.forEach(origin.x,origin.y,origin.z,128*128,test,(slot,distance)->keepError(index,slot,origin,camera,look,pulse));
+            for(int i=0;i<selected;i++)keepError(index,errorSlots[i],test,origin,camera,look,pulse);
+        }else index.forEach(origin.x,origin.y,origin.z,128*128,test,(slot,distance)->keepError(index,slot,test,origin,camera,look,pulse));
         if(errorCount==0)return;
         var matrices=context.matrixStack();var buffers=client.getBufferBuilders().getEntityVertexConsumers();var lines=OverlayLayers.nearLines(onTop);var faces=OverlayLayers.nearFaces(onTop);
         matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);
         try{
             if(settings.errorStyle!=PrinterSettings.HighlightStyle.FILLED){var vertices=buffers.getBuffer(lines);
                 for(int i=0;i<errorCount;i++){int slot=errorSlots[i],color=errorColor(index,slot,settings);
-                    WorldRenderer.drawBox(matrices,vertices,index.minX(slot)-.002,index.minY(slot)-.002,index.minZ(slot)-.002,index.maxX(slot)+1.002,index.maxY(slot)+1.002,index.maxZ(slot)+1.002,((color>>>16)&255)/255f,((color>>>8)&255)/255f,(color&255)/255f,errorAlpha[i]);}
+                    WorldRenderer.drawBox(matrices,vertices,test.low(0,index.minX(slot))-.002,test.low(1,index.minY(slot))-.002,test.low(2,index.minZ(slot))-.002,test.high(0,index.maxX(slot)+1.0)+.002,test.high(1,index.maxY(slot)+1.0)+.002,test.high(2,index.maxZ(slot)+1.0)+.002,((color>>>16)&255)/255f,((color>>>8)&255)/255f,(color&255)/255f,errorAlpha[i]);}
                 buffers.draw(lines);}
             if(settings.errorStyle!=PrinterSettings.HighlightStyle.OUTLINE){var vertices=buffers.getBuffer(faces);var matrix=matrices.peek().getPositionMatrix();
                 for(int i=0;i<errorCount;i++){int slot=errorSlots[i],color=errorColor(index,slot,settings);float r=((color>>>16)&255)/255f,g=((color>>>8)&255)/255f,b=(color&255)/255f,a=errorAlpha[i]*.25f;
-                    float x0=(float)(index.minX(slot)-.002),y0=(float)(index.minY(slot)-.002),z0=(float)(index.minZ(slot)-.002),x1=(float)(index.maxX(slot)+1.002),y1=(float)(index.maxY(slot)+1.002),z1=(float)(index.maxZ(slot)+1.002);
+                    float x0=(float)(test.low(0,index.minX(slot))-.002),y0=(float)(test.low(1,index.minY(slot))-.002),z0=(float)(test.low(2,index.minZ(slot))-.002),x1=(float)(test.high(0,index.maxX(slot)+1.0)+.002),y1=(float)(test.high(1,index.maxY(slot)+1.0)+.002),z1=(float)(test.high(2,index.maxZ(slot)+1.0)+.002);
                     for(var face:FACE_CORNERS)for(int corner:face)vertices.vertex(matrix,(corner&1)!=0?x1:x0,(corner&2)!=0?y1:y0,(corner&4)!=0?z1:z0).color(r,g,b,a).next();}
                 buffers.draw(faces);}
         }finally{matrices.pop();buffers.draw(lines);buffers.draw(faces);}
     }
     /** Same order and limit semantics as before: a box selected for the limit counts even if its fade is zero. */
-    private static void keepError(dev.betterlitematica.core.HighlightBoxIndex index,int slot,net.minecraft.util.math.Vec3d origin,net.minecraft.util.math.Vec3d camera,net.minecraft.util.math.Vec3d look,float pulse){
-        float a=COMPARISONS[index.box(slot).group()]==dev.betterlitematica.core.Comparison.MISSING?missingAlpha(index.minX(slot)-.002,index.minY(slot)-.002,index.minZ(slot)-.002,index.maxX(slot)+1.002,index.maxY(slot)+1.002,index.maxZ(slot)+1.002,origin,camera,look,128):pulse;
+    private static void keepError(dev.betterlitematica.core.HighlightBoxIndex index,int slot,LayerViewTest test,net.minecraft.util.math.Vec3d origin,net.minecraft.util.math.Vec3d camera,net.minecraft.util.math.Vec3d look,float pulse){
+        float a=COMPARISONS[index.box(slot).group()]==dev.betterlitematica.core.Comparison.MISSING?missingAlpha(test.low(0,index.minX(slot))-.002,test.low(1,index.minY(slot))-.002,test.low(2,index.minZ(slot))-.002,test.high(0,index.maxX(slot)+1.0)+.002,test.high(1,index.maxY(slot)+1.0)+.002,test.high(2,index.maxZ(slot)+1.0)+.002,origin,camera,look,128):pulse;
         if(a<=0)return;
         if(errorCount==errorSlots.length){errorSlots=java.util.Arrays.copyOf(errorSlots,errorCount*2);errorAlpha=java.util.Arrays.copyOf(errorAlpha,errorCount*2);}
         errorSlots[errorCount]=slot;errorAlpha[errorCount++]=a;

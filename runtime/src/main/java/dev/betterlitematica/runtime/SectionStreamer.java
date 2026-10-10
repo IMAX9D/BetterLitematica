@@ -25,6 +25,12 @@ public final class SectionStreamer implements AutoCloseable {
             if(r.section!=null&&cache.put(r.key,r.section))revision++;if(!r.error.isEmpty())error=r.error;
         }
     }
+    /** Opt-in decoding threads (1..8); the request queue, ready queue and cache stay bounded as before. */
+    public void parallelism(int threads){
+        int n=Math.max(1,Math.min(8,threads));
+        synchronized(workers){if(n>workers.getMaximumPoolSize()){workers.setMaximumPoolSize(n);workers.setCorePoolSize(n);}else{workers.setCorePoolSize(n);workers.setMaximumPoolSize(n);}}
+    }
+    public int parallelism(){return workers.getMaximumPoolSize();}
     public PackedSection get(SectionKey key){return cache.get(key);}
     public boolean request(SectionKey key){
         if(closed||cache.contains(key)||!source.index().containsKey(key))return false;

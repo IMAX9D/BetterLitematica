@@ -30,6 +30,9 @@ public final class CoreTests {
         try(var stream=new SectionStreamer(BlueprintCache.open(cachePath),65536)){
             var key=stream.source().index().keySet().iterator().next();var ready=streamerReady(stream);var old=decoded(stream,key);
             check(stream.revision()==0&&stream.get(key)==null,"Submission and worker completion do not announce cache admission");
+            check(stream.parallelism()==2,"Decoding stays at two threads unless a renderer opts in");
+            stream.parallelism(4);check(stream.parallelism()==4,"Opt-in decoding threads apply");
+            stream.parallelism(99);check(stream.parallelism()==8,"Decoding threads are capped");stream.parallelism(0);check(stream.parallelism()==1,"At least one decoding thread remains");stream.parallelism(2);
             stream.cancelPending();check(stream.revision()==0,"Cancellation is not a successful decode wakeup");
             // Replay an actual decoded old-generation result after cancellation, deterministically.
             check(ready.offer(old),"Old decoded result placed back at the consumer boundary");stream.drain();
@@ -61,6 +64,7 @@ public final class CoreTests {
             test("placement quantity uses byte budgets not fixed counts",()->{checks+=UnlimitedPlacementChecks.run();});
             test("per-placement display filters and legacy settings migration",()->{checks+=BlockDisplayFilterChecks.run();});
             test("spatial highlight index equals a stable full sort",()->{checks+=HighlightBoxIndexChecks.run();});
+            test("layer moves rebuild only sections whose membership changed",()->{checks+=LayerRefreshChecks.run();});
             test("complete bounded directory search and cancellation",()->{checks+=DirectorySearchChecks.run(temp);});
             test("draft persistence ordering and failure recovery",()->{checks+=DraftRecoveryChecks.run(temp.resolve("recovery"));});
             test("finite material batches avoid needless switches without starvation",()->{checks+=PrinterBatchChecks.run();});

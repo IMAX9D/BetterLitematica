@@ -34,6 +34,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     /** Blocks: surfaces nearer than NEAR_CLEAR are removed, fully back by NEAR_FULL; far ones keep FAR_OPACITY and FAR_SATURATION. */
     private static final float NEAR_CLEAR=.75f,NEAR_FULL=2.5f,FAR_FADE_START=48f,FAR_FADE_END=160f,FAR_OPACITY=.6f,FAR_SATURATION=.65f;
     private static final long BUILD_NANOS=4_000_000,MAX_ACTIVE_SECTION_BYTES=8L<<20;
+    /** Decoding threads and requests kept in flight; the streamer's queue still bounds memory. */
+    private static final int DECODE_THREADS=Math.max(2,Math.min(4,Runtime.getRuntime().availableProcessors()-2)),PREFETCH_IN_FLIGHT=32;
     private static final Direction[] DIRECTIONS=Direction.values();
     private record Part(VertexBuffer buffer,int bytes,net.minecraft.util.Identifier texture,boolean intensity,QuadVisibility.Part visibility) {}
     private record Mesh(List<Part> parts,long bytes,Box bounds,RenderResources.Group resources,long worldRevision,QuadVisibility.Mask mask,QuadVisibility.Mask wrong,RenderedCells cells,BitSet omitted) implements AutoCloseable {
@@ -85,11 +87,13 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private Vec3i lastCamera;private Job job;private SectionKey coolingKey;private long coolingUntil;
     @Override public boolean building(){return job!=null;}
     private boolean visible=true,budgetSaturated;
+    // Per-frame scheduling state: source requests are queued once per frame, hole search stops once exhausted.
+    private boolean prefetchedThisFrame,frameMissingWork,holesExhausted;
     private float opacity=0.45f;
     void opacity(float value){opacity=value;}
     private int frameUploadBytes,frameUploadLimit=UPLOAD_BYTES_PER_FRAME,drawCalls;private long builtSections,lastBuildNanos;private String failure="";
     ProjectionRenderer1201(MinecraftClient client,LoadCoordinator.Loaded loaded,RenderResources resources){
-        this.client=client;this.resources=resources;sourceLease=loaded;details=loaded.details();detailsError=loaded.detailsError();entities=new ProjectionEntities(client,details,resources);stream=loaded.stream();index=loaded.index();place(new Placement(UUID.randomUUID(),"preview","preview.litematic",new PlacementTransform(Vec3i.ZERO,0,false,false),true,false));scene=new ProjectionScene(List.of(this));
+        this.client=client;this.resources=resources;sourceLease=loaded;details=loaded.details();detailsError=loaded.detailsError();entities=new ProjectionEntities(client,details,resources);stream=loaded.stream();stream.parallelism(DECODE_THREADS);index=loaded.index();place(new Placement(UUID.randomUUID(),"preview","preview.litematic",new PlacementTransform(Vec3i.ZERO,0,false,false),true,false));scene=new ProjectionScene(List.of(this));
     }
     PlacementTransform transform(){return layout.placement().transform();}
     PlacementLayout layout(){return layout;}
@@ -225,7 +229,19 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     void place(Placement next){
         layout=new PlacementLayout(next,metadata().regions());displayPalette=null;invalidate();
     }
-    void layer(LayerRange next){layer=next;invalidate();}
+    /**
+     * Following the player moves the boundary a block at a time. Every mesh stays on screen (the surface shader
+     * clips stale ones to the new range at once) and only sections whose cells or culling neighbours changed
+     * membership are rebuilt, replacing their old mesh when done.
+     */
+    void layer(LayerRange next){
+        var previous=layer;if(previous.equals(next))return;layer=next;
+        var axis=LayerRange.sharedAxis(previous,next);
+        if(axis==null)worldRefresh.allChanged();
+        else meshes.forEach((key,mesh)->{var box=mesh.bounds();double from=switch(axis){case X->box.minX;case Y->box.minY;case Z->box.minZ;},to=switch(axis){case X->box.maxX;case Y->box.maxY;case Z->box.maxZ;};
+            if(LayerRange.affects(previous,next,(int)Math.floor(from),(int)Math.ceil(to)-1))worldRefresh.changed(key);});
+        failed.clear();deferred.clear();wakeWorldRefresh();
+    }
     LayerRange layer(){return layer;}
     void visible(boolean value){visible=value;}
     boolean visible(){return visible;}
@@ -237,7 +253,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         meshes.size(),drawCalls,builtSections,stream.cachedBytes()/1048576.0,(meshes.usedBytes()+(job==null?0:job.bytes))/1048576.0,stream.queuedJobs(),lastBuildNanos/1e6,resolvers.values().stream().mapToInt(StateResolver1201::unsupportedCount).sum());}
     String error(){return !failure.isEmpty()?failure:!detailsError.isEmpty()?detailsError:!entities.error().isEmpty()?entities.error():stream.error();}
     void prepareFrame(WorldRenderContext context,boolean active){
-        stream.drain();drawCalls=0;lastBuildNanos=0;frameReady=active&&visible&&client.world!=null;
+        stream.drain();drawCalls=0;lastBuildNanos=0;frameReady=active&&visible&&client.world!=null;prefetchedThisFrame=false;frameMissingWork=false;holesExhausted=false;
         // Disk workers can finish between frames. Wake builds on admitted data instead of
         // leaving a ready section idle until the fallback polling interval expires.
         if(decodedRevision!=stream.revision()){decodedRevision=stream.revision();nextWorkProbe=0;}
@@ -296,16 +312,22 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         if(!frameReady||System.nanoTime()>=deadline||uploadLimit<=0)return RenderScheduler.Work.NONE;
         long started=System.nanoTime();frameUploadBytes=0;frameUploadLimit=uploadLimit;boolean progressed=false;
         try{
+            // Decoded sections wait in a short bounded queue; collect them before every attempt, not once per frame,
+            // so decoding threads never stall behind it while this frame still has budget.
+            stream.drain();if(decodedRevision!=stream.revision()){decodedRevision=stream.revision();nextWorkProbe=0;}
             long workNow=started;boolean schedule=(job!=null||workNow>=nextWorkProbe)&&waitingRevision!=resources.revision();
             boolean missingWork=job!=null||stream.queuedJobs()>0;
-            if(schedule){
+            if(schedule&&!prefetchedThisFrame){
             // A mesh needs its six neighboring source sections too. Queue a bounded
             // working set of complete neighborhoods before filling the queue with more
             // centers; otherwise their dependencies sit behind unrelated requests.
-            missingWork|=prefetch(visibleKeys,buildCursor,deadline,false);
+            // Once per frame: later attempts in the same frame only build what has arrived.
+            prefetchedThisFrame=true;
+            frameMissingWork=prefetch(visibleKeys,buildCursor,deadline,false);
             boolean warm=resources.warm()&&meshes.usedBytes()<meshes.capacity()*3/4&&meshes.size()<24576;
-            if(warm&&stream.queuedJobs()<16)missingWork|=prefetch(candidates,surroundingCursor,deadline,true);
+            if(warm&&stream.queuedJobs()<16)frameMissingWork|=prefetch(candidates,surroundingCursor,deadline,true);
             }
+            if(schedule)missingWork|=frameMissingWork;
             boolean warm=resources.warm()&&meshes.usedBytes()<meshes.capacity()*3/4&&meshes.size()<24576;
             if(schedule&&!missingWork)nextWorkProbe=Long.MAX_VALUE;
             if(schedule&&missingWork){
@@ -313,8 +335,10 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                 int completed=0;
                 while(completed<1&&System.nanoTime()<deadline&&frameUploadBytes<frameUploadLimit){
                     if(job==null){
-                        if(job==null&&!budgetSaturated)job=findJob(visibleKeys,deadline,false);
-                        if(job==null&&warm)job=findJob(candidates,deadline,true);
+                        // Visible holes first; refreshing a section that is already drawn can wait.
+                        if(job==null&&!budgetSaturated&&!holesExhausted){job=findJob(visibleKeys,deadline,false,true);if(job==null)holesExhausted=true;}
+                        if(job==null&&!budgetSaturated)job=findJob(visibleKeys,deadline,false,false);
+                        if(job==null&&warm)job=findJob(candidates,deadline,true,false);
                         if(job==null)break;
                     }
                     int cursorBefore=job.cursor,partsBefore=job.parts.size();
@@ -340,13 +364,13 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         try{renderMeshes(context,context.camera().getPos(),visibleKeys);entities.render(context,entityCandidates,opacity);}
         catch(RuntimeException e){failure="Renderer paused: "+e;visible=false;frameReady=false;discardJob();BetterLitematicaClient.LOGGER.error("Projection draw failed",e);}
     }
-    private Job findJob(List<SectionKey> keys,long deadline,boolean surrounding){
+    private Job findJob(List<SectionKey> keys,long deadline,boolean surrounding,boolean holesOnly){
         int start=Math.floorMod(surrounding?surroundingCursor:buildCursor,Math.max(1,keys.size()));
         for(int visited=0;visited<keys.size();visited++){
             int at=(start+visited)%keys.size();SectionKey key=keys.get(at);
             if(System.nanoTime()>=deadline)return null;
             if(surrounding&&visibleSet.contains(key)||key.equals(coolingKey)&&System.nanoTime()<coolingUntil)continue;
-            if(!needsMesh(key)||failed.contains(key)||deferred.contains(key))continue;
+            if(holesOnly&&meshes.contains(key)||!needsMesh(key)||failed.contains(key)||deferred.contains(key))continue;
             var section=section(key);if(section==null)continue;
             Job next=prepare(key,section);if(next!=null){if(surrounding)surroundingCursor=at+1;else buildCursor=at+1;return next;}
         }
@@ -355,7 +379,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private boolean prefetch(List<SectionKey> keys,int cursor,long deadline,boolean surrounding){
         boolean missing=false;int neighborhoods=0,start=Math.floorMod(cursor,Math.max(1,keys.size()));
         for(int visited=0;visited<keys.size()&&neighborhoods<(surrounding?2:8);visited++){
-            if(System.nanoTime()>=deadline||stream.queuedJobs()>=24)return true;
+            if(System.nanoTime()>=deadline||stream.queuedJobs()>=PREFETCH_IN_FLIGHT)return true;
             var key=keys.get((start+visited)%keys.size());
             if(surrounding&&visibleSet.contains(key)||failed.contains(key)||deferred.contains(key)||!needsMesh(key))continue;
             missing=true;neighborhoods++;stream.request(key);
@@ -546,6 +570,13 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private void renderMeshes(WorldRenderContext context,Vec3d camera,List<SectionKey> visibleKeys){
         int previousTexture=RenderSystem.getShaderTexture(0);ShaderProgram previous=RenderSystem.getShader();float[] previousColor=RenderSystem.getShaderColor().clone();
         ShaderProgram shader=ProjectionShaders.surface();boolean bound=false;
+        // Values live on the shared program; entity meshes drawn after this bind the same state.
+        shader.getUniformOrDefault("CameraPos").set((float)camera.x,(float)camera.y,(float)camera.z);
+        shader.getUniformOrDefault("ViewInverse").set(new Matrix4f(context.matrixStack().peek().getPositionMatrix()).invert());
+        if(layer.mode()==LayerRange.Mode.ALL)shader.getUniformOrDefault("LayerClip").set(-1f,0f,0f,0f);
+        else shader.getUniformOrDefault("LayerClip").set(layer.axis().ordinal(),(float)layer.min(),(float)((long)layer.max()+1),0f);
+        float farEnd=Math.max(FAR_FADE_START+16,Math.min(FAR_FADE_END,client.options.getViewDistance().getValue()*16f));
+        shader.getUniformOrDefault("Fade").set(NEAR_CLEAR,NEAR_FULL,FAR_FADE_START,farEnd);shader.getUniformOrDefault("FarFloor").set(FAR_OPACITY,FAR_SATURATION);
         try{
             RenderSystem.setShader(ProjectionShaders::surface);RenderSystem.setShaderTexture(0,SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
             RenderSystem.setShaderColor(1,1,1,opacity);RenderSystem.disableBlend();RenderSystem.enableDepthTest();RenderSystem.depthMask(true);RenderSystem.disableCull();RenderSystem.enablePolygonOffset();RenderSystem.polygonOffset(-1f,-1f);
@@ -561,11 +592,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                     shader.addSampler("Sampler0",RenderSystem.getShaderTexture(0));
                     if(shader.projectionMat!=null)shader.projectionMat.set(context.projectionMatrix());
                     if(shader.colorModulator!=null)shader.colorModulator.set(1f,1f,1f,opacity);
-                    shader.getUniformOrDefault("TextureMode").set(0);shader.getUniformOrDefault("SurfaceTint").set(0);
-                    // Clear the eye, then recede gently with distance; entity meshes drawn next share these values.
-                    float far=Math.max(FAR_FADE_START+16,Math.min(FAR_FADE_END,client.options.getViewDistance().getValue()*16f));
-                    shader.getUniformOrDefault("Fade").set(NEAR_CLEAR,NEAR_FULL,FAR_FADE_START,far);shader.getUniformOrDefault("FarFloor").set(FAR_OPACITY,FAR_SATURATION);
-                    bound=true;shader.bind();
+                    shader.getUniformOrDefault("TextureMode").set(0);shader.getUniformOrDefault("SurfaceTint").set(0);bound=true;shader.bind();
                 }else if(shader.modelViewMat!=null)shader.modelViewMat.upload();
                 for(Part part:parts){shader.getUniformOrDefault("TextureMode").set(part.intensity?1:0);if(!part.texture.equals(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)){RenderSystem.setShaderTexture(0,part.texture);shader.addSampler("Sampler0",RenderSystem.getShaderTexture(0));shader.bind();}
                     shader.getUniformOrDefault("TextureMode").set(part.intensity?1:0);var mode=shader.getUniform("TextureMode");if(mode!=null)mode.upload();part.buffer.bind();

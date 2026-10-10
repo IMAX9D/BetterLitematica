@@ -10,6 +10,11 @@ uniform vec2 FarFloor;
 in vec2 texCoord;
 in vec4 vertexColor;
 in float vertexDistance;
+in vec3 eyeOffset;
+uniform vec3 CameraPos;
+// x: layer axis 0..2 or negative when every layer shows, y: first cell, z: one past the last cell.
+// Meshes built for a previous range stay on screen while they rebuild; this keeps them inside the current one.
+uniform vec4 LayerClip;
 out vec4 fragColor;
 void main(){
     vec4 texel=texture(Sampler0,texCoord);
@@ -17,6 +22,7 @@ void main(){
     vec4 t=texel*vertexColor;
     // Cutout precedes opacity: a 5% projection must not be discarded.
     if(t.a<0.1)discard;
+    if(LayerClip.x>=0.0){int axis=int(LayerClip.x+0.5);float c=CameraPos[axis]+eyeOffset[axis];if(c<LayerClip.y-0.01||c>LayerClip.z+0.01)discard;}
     // Surfaces at the eye are removed rather than dimmed: the composite keeps one surface per pixel,
     // so a discarded fragment lets the world and farther projection surfaces show through.
     float near=Fade.y>Fade.x?smoothstep(Fade.x,Fade.y,vertexDistance):1.0;

@@ -62,7 +62,8 @@ final class ProjectionController implements AutoCloseable {
     private boolean temporarilyHidden;
     void temporarilyHidden(boolean value){temporarilyHidden=value;}
     private LayerRange layer = LayerRange.ALL;
-    private float opacity = 0.45f;
+    static final float DEFAULT_OPACITY=.8f,LEGACY_DEFAULT_OPACITY=.45f;
+    private float opacity = DEFAULT_OPACITY;
     private String message = "", cachedHud = "";
     private String actionError = "";
     private int ticks, buildTurn, materialTurn;
@@ -163,7 +164,8 @@ final class ProjectionController implements AutoCloseable {
         if (restoring != null && restoring.isDone()) {
             try {
                 PlacementSession session = restoring.join();
-                layer = session.layer(); opacity = session.opacity(); rendering = session.rendering(); selected = session.selected();
+                // 0.45 was the untouched former default (only a command changes it); new placements now start at 80%.
+                layer = session.layer(); opacity = session.opacity()==LEGACY_DEFAULT_OPACITY?DEFAULT_OPACITY:session.opacity(); rendering = session.rendering(); selected = session.selected();
                 for (Placement placement : session.placements()) { entries.put(placement.id(), new Entry(placement)); queued.add(placement.id()); }
                 message = entries.isEmpty() ? "Press M to load a blueprint" : "Restored " + entries.size() + " placements";
             } catch (CompletionException e) {
@@ -277,7 +279,9 @@ final class ProjectionController implements AutoCloseable {
         if(!active.isEmpty()&&options.display.projection){
             composite.begin(client);
             try{
-                buildTurn=RenderScheduler.run(active.stream().map(entry->entry.renderer).toList(),buildTurn,32,System.nanoTime()+4_000_000L,2*1024*1024);
+                // Player-set build budget per frame; uploads scale with it (512 KiB per millisecond, the former 2 MiB per 4 ms).
+                int budget=options.display.buildBudget();
+                buildTurn=RenderScheduler.run(active.stream().map(entry->entry.renderer).toList(),buildTurn,Math.max(32,budget*16),System.nanoTime()+budget*1_000_000L,budget*512*1024);
                 for(var entry:active)entry.renderer.drawFrame(context);
             }finally{composite.finish(client,1f);}
         }
@@ -286,7 +290,7 @@ final class ProjectionController implements AutoCloseable {
         if(options.printer.highlights){ProjectionOverlays.prepareNearby(client,context,nearbyHighlights.boxes(),options.printer,options.display.extraColor);ProjectionOverlays.drawNearby(client,context,options.printer,false);}
         printer.render(context);ProjectionOverlays.marker(client,context,editor.marker());
         if(options.printer.highlights)ProjectionOverlays.drawNearby(client,context,options.printer,true);
-        if (errorOverlay && analysis != null) ProjectionOverlays.errorBoxes(client,context,analysis.highlightBoxes(),options.display,true,options.printer.highlightLimit);
+        if (errorOverlay && analysis != null) ProjectionOverlays.errorBoxes(client,context,analysis.highlightBoxes(),options.display,true,options.printer.highlightLimit,layer);
         gizmo.render(context);
     }
     List<Placement> placements() { return entries.values().stream().map(e -> e.placement).toList(); }
@@ -396,7 +400,8 @@ final class ProjectionController implements AutoCloseable {
         if(analysis!=null&&analysis.world(client.world))analysis.chunkChanged(x,z);
     }
     void startAnalysis(){startAnalysis(selected);}
-    void startAnalysis(UUID id) { Entry entry=entries.get(id);if(entry==null)throw new IllegalStateException("投影已移除"); if (entry.renderer == null) throw new IllegalStateException("请等待投影加载完成"); cancelAnalysis(); analysis = new PlacementAnalysis(entry.renderer, client.world, layer); }
+    /** Verification covers the whole placement; layers only filter what is shown, so following the player never restarts it. */
+    void startAnalysis(UUID id) { Entry entry=entries.get(id);if(entry==null)throw new IllegalStateException("投影已移除"); if (entry.renderer == null) throw new IllegalStateException("请等待投影加载完成"); cancelAnalysis(); analysis = new PlacementAnalysis(entry.renderer, client.world, LayerRange.ALL); }
     void pauseAnalysis() { if (analysis == null) throw new IllegalStateException("尚无扫描任务"); analysis.pause(); }
     void cancelAnalysis() { errorOverlay = false; if (analysis != null) analysis.cancel(); ProjectionOverlays.releaseVerificationIndex(); }
     boolean errorOverlayEnabled() { return errorOverlay; }
@@ -818,7 +823,7 @@ final class ProjectionController implements AutoCloseable {
         layer(next.axis(),next.min(),next.max());options.followLayer=mode.follows();options.wheelRenderMode=mode;
         if(settingsChanged)saveOptions();
     }
-    void layer(LayerRange.Axis axis, int min, int max) { requireWorld();var next=new LayerRange(axis,min,max);if(next.equals(layer))return;cancelAnalysis();layer=next;for (Entry entry : entries.values()) apply(entry); dirty = true; }
+    void layer(LayerRange.Axis axis, int min, int max) { requireWorld();var next=new LayerRange(axis,min,max);if(next.equals(layer))return;layer=next;for (Entry entry : entries.values()) apply(entry); dirty = true; }
     void cycleLayer(){cycleLayer(1);}
     void cycleLayer(int step){var mode=LayerRange.Mode.values()[Math.floorMod(layer.mode().ordinal()+step,LayerRange.Mode.values().length)];var p=playerPosition();int value=layer.min()==Integer.MIN_VALUE?layer.max()==Integer.MAX_VALUE?switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();}:layer.max():layer.min();var next=LayerRange.of(layer.axis(),mode,value,value);layer(next.axis(),next.min(),next.max());explicitLayerMode(mode);}
     void layerAtPlayer(){var p=playerPosition();int value=switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();};int last=layer.mode()==LayerRange.Mode.RANGE?Math.addExact(value,Math.subtractExact(layer.max(),layer.min())):value;var next=LayerRange.of(layer.axis(),layer.mode()==LayerRange.Mode.ALL?LayerRange.Mode.SINGLE:layer.mode(),value,last);layer(next.axis(),next.min(),next.max());}
@@ -875,7 +880,7 @@ final class ProjectionController implements AutoCloseable {
         cancelCapture();
         save(); restoring = null; release(); ready = false; writable = true; dirty = false; sessionFile = null; lastWorld = null;
         editingJobs.clear();selection=AreaSelection.EMPTY;selectionTarget=null;selectionFile=null;selectionRestoring=null;selectionDirty=false;selectionWritable=true;
-        layer = LayerRange.ALL; opacity = 0.45f; rendering = true; actionError = ""; cachedHud = "";
+        layer = LayerRange.ALL; opacity = DEFAULT_OPACITY; rendering = true; actionError = ""; cachedHud = "";
     }
     void resourcesReloaded() { for (Entry entry : entries.values()) if (entry.renderer != null) entry.renderer.invalidate(); }
     void report(String text) { message = text == null ? "Unknown error" : text; BetterLitematicaClient.LOGGER.info(message); if (client.player != null) client.player.sendMessage(Text.literal("[BetterLitematica] " + message), false); }
