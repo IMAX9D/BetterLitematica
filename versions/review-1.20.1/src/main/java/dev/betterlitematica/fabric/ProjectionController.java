@@ -829,16 +829,12 @@ final class ProjectionController implements AutoCloseable {
     void cycleLayer(){cycleLayer(1);}
     void cycleLayer(int step){var mode=LayerRange.Mode.values()[Math.floorMod(layer.mode().ordinal()+step,LayerRange.Mode.values().length)];var p=playerPosition();int value=layer.min()==Integer.MIN_VALUE?layer.max()==Integer.MAX_VALUE?switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();}:layer.max():layer.min();var next=LayerRange.of(layer.axis(),mode,value,value);layer(next.axis(),next.min(),next.max());explicitLayerMode(mode);}
     boolean smoothFollow(){return options.followLayer&&layer.axis()==LayerRange.Axis.Y&&(layer.mode()==LayerRange.Mode.ABOVE||layer.mode()==LayerRange.Mode.BELOW);}
-    static final double FOLLOW_FADE=.6;
     /**
-     * The visible slab {axis, from, to, fade} drawn this frame: whole cells for fixed layers, the player's
-     * interpolated feet and head for followed ones, so the cut glides instead of stepping a block per tick.
-     * Printing still uses the whole-cell layer.
+     * The visible slab {axis, from, to, fade} drawn this frame, in whole cells: a followed layer steps one block
+     * at a time with the player. Meshes for it are built past the boundary, so each step is a shader cut, not a rebuild.
      */
     double[] visualLayer(float tickDelta){
         if(layer.mode()==LayerRange.Mode.ALL)return new double[]{-1,0,0,0};
-        if(smoothFollow()&&client.player!=null){double feet=client.player.getLerpedPos(tickDelta).y;
-            return layer.mode()==LayerRange.Mode.ABOVE?new double[]{1,feet+2,1e9,FOLLOW_FADE}:new double[]{1,-1e9,feet,FOLLOW_FADE};}
         return new double[]{layer.axis().ordinal(),layer.min()==Integer.MIN_VALUE?-1e9:layer.min(),layer.max()==Integer.MAX_VALUE?1e9:(double)layer.max()+1,0};
     }
     void layerAtPlayer(){var next=playerLayer();layer(next.axis(),next.min(),next.max());}
