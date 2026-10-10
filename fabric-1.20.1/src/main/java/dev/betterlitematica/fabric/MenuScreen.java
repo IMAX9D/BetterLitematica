@@ -205,11 +205,11 @@ abstract class MenuScreen extends Screen {
         var v=viewport();var window=client.getWindow();
         var preview=previewControl();
         var frame=motion.frame();animatedX=preview==null?frame.x():0;animatedY=preview==null?frame.y():0;
-        if(preview==null){ctx.fill(0,0,window.getScaledWidth(),window.getScaledHeight(),UiMotion.alpha(UiTheme.BACKDROP,frame.alpha()));ctx.draw();}
         int x=(int)Math.floor(v.localPixelX(client.mouse.getX()*v.pixelWidth()/Math.max(1,window.getWidth()))-animatedX);
         int y=(int)Math.floor(v.localPixelY(client.mouse.getY()*v.pixelHeight()/Math.max(1,window.getHeight()))-animatedY);
         var ui=IndependentUi.INSTANCE;
         if(!ui.beginMenu(ctx,v)){
+            if(preview==null)ctx.fill(0,0,window.getScaledWidth(),window.getScaledHeight(),UiMotion.alpha(UiTheme.BACKDROP,frame.alpha()));
             // A geometric progress indicator during the one-time background font load; no native glyph fallback.
             int cx=window.getScaledWidth()/2,cy=window.getScaledHeight()/2;ctx.fill(cx-24,cy,cx+24,cy+1,UiMotion.alpha(UiTheme.ACCENT,.5));int p=(int)((System.nanoTime()/8_000_000L)%48);ctx.fill(cx-24+Math.max(0,p-12),cy,cx-24+p,cy+1,UiTheme.ACCENT);return;
         }
@@ -217,7 +217,14 @@ abstract class MenuScreen extends Screen {
             if(preview!=null){
                 if(preview instanceof OverlayOpacitySlider){double l=preview.getX()-8,t=preview.getY()-6,r=preview.getX()+preview.getWidth()+8,b=preview.getY()+preview.getHeight()+6;ui.shadow(l,t,r,b,UiTheme.CARD_RADIUS);ui.roundRect(l,t,r,b,UiTheme.CARD_RADIUS,UiTheme.OVERLAY_PANEL);ui.roundFrame(l,t,r,b,UiTheme.CARD_RADIUS,UiTheme.BORDER);}
                 preview.render(ctx,x,y,delta);
-            }else{ui.effect(animatedX,animatedY,frame.alpha());renderCanvas(ctx,x,y,delta,ui);}
+            }else{
+                // Keep the backdrop and panel contents in one physical-pixel UI pass instead of
+                // flushing a separate vanilla full-screen fill before the custom renderer starts.
+                ui.effect(0,0,frame.alpha());
+                ui.rect(v.localPixelX(0),v.localPixelY(0),v.localPixelX(v.pixelWidth()),v.localPixelY(v.pixelHeight()),UiTheme.BACKDROP);
+                ui.effect(animatedX,animatedY,frame.alpha());
+                renderCanvas(ctx,x,y,delta,ui);
+            }
         }finally{ui.end();}
         }finally{ctx.getMatrices().pop();}
     }
