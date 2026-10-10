@@ -31,6 +31,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private static final int MAX_PART_VERTICES=16384,MAX_BLOCK_QUADS=512;
     private static final int BLOCKS_PER_FRAME=8192,UPLOAD_BYTES_PER_FRAME=2*1024*1024,MAX_COMPLETED_PER_FRAME=32;
     private static final int QUERY_RADIUS=512,MAX_CANDIDATES=32768;
+    /** Blocks: surfaces nearer than NEAR_CLEAR are removed, fully back by NEAR_FULL; far ones keep FAR_OPACITY and FAR_SATURATION. */
+    private static final float NEAR_CLEAR=.75f,NEAR_FULL=2.5f,FAR_FADE_START=48f,FAR_FADE_END=160f,FAR_OPACITY=.6f,FAR_SATURATION=.65f;
     private static final long BUILD_NANOS=4_000_000,MAX_ACTIVE_SECTION_BYTES=8L<<20;
     private static final Direction[] DIRECTIONS=Direction.values();
     private record Part(VertexBuffer buffer,int bytes,net.minecraft.util.Identifier texture,boolean intensity,QuadVisibility.Part visibility) {}
@@ -559,7 +561,11 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                     shader.addSampler("Sampler0",RenderSystem.getShaderTexture(0));
                     if(shader.projectionMat!=null)shader.projectionMat.set(context.projectionMatrix());
                     if(shader.colorModulator!=null)shader.colorModulator.set(1f,1f,1f,opacity);
-                    shader.getUniformOrDefault("TextureMode").set(0);shader.getUniformOrDefault("SurfaceTint").set(0);bound=true;shader.bind();
+                    shader.getUniformOrDefault("TextureMode").set(0);shader.getUniformOrDefault("SurfaceTint").set(0);
+                    // Clear the eye, then recede gently with distance; entity meshes drawn next share these values.
+                    float far=Math.max(FAR_FADE_START+16,Math.min(FAR_FADE_END,client.options.getViewDistance().getValue()*16f));
+                    shader.getUniformOrDefault("Fade").set(NEAR_CLEAR,NEAR_FULL,FAR_FADE_START,far);shader.getUniformOrDefault("FarFloor").set(FAR_OPACITY,FAR_SATURATION);
+                    bound=true;shader.bind();
                 }else if(shader.modelViewMat!=null)shader.modelViewMat.upload();
                 for(Part part:parts){shader.getUniformOrDefault("TextureMode").set(part.intensity?1:0);if(!part.texture.equals(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE)){RenderSystem.setShaderTexture(0,part.texture);shader.addSampler("Sampler0",RenderSystem.getShaderTexture(0));shader.bind();}
                     shader.getUniformOrDefault("TextureMode").set(part.intensity?1:0);var mode=shader.getUniform("TextureMode");if(mode!=null)mode.upload();part.buffer.bind();

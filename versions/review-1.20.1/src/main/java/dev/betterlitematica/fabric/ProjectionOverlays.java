@@ -131,7 +131,7 @@ final class ProjectionOverlays {
         var boxes=errors?nearbyErrors:nearbyMissing;
         if(boxes.isEmpty()||context.matrixStack()==null)return;
         var matrices=context.matrixStack();var camera=context.camera().getPos();
-        var buffers=client.getBufferBuilders().getEntityVertexConsumers();var layer=OverlayLayers.lines(settings.highlightOnTop);
+        var buffers=client.getBufferBuilders().getEntityVertexConsumers();var layer=OverlayLayers.nearLines(settings.highlightOnTop);
         matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);
         try{var vertices=buffers.getBuffer(layer);for(var box:boxes){int color=box.color;
             WorldRenderer.drawBox(matrices,vertices,box.bounds(),((color>>>16)&255)/255f,((color>>>8)&255)/255f,(color&255)/255f,box.alpha);
@@ -150,7 +150,7 @@ final class ProjectionOverlays {
             for(int i=0;i<selected;i++)keepError(index,errorSlots[i],origin,camera,look,pulse);
         }else index.forEach(origin.x,origin.y,origin.z,128*128,test,(slot,distance)->keepError(index,slot,origin,camera,look,pulse));
         if(errorCount==0)return;
-        var matrices=context.matrixStack();var buffers=client.getBufferBuilders().getEntityVertexConsumers();var lines=OverlayLayers.lines(onTop);var faces=OverlayLayers.faces(onTop);
+        var matrices=context.matrixStack();var buffers=client.getBufferBuilders().getEntityVertexConsumers();var lines=OverlayLayers.nearLines(onTop);var faces=OverlayLayers.nearFaces(onTop);
         matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);
         try{
             if(settings.errorStyle!=PrinterSettings.HighlightStyle.FILLED){var vertices=buffers.getBuffer(lines);

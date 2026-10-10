@@ -569,11 +569,13 @@ final class ProjectionController implements AutoCloseable {
         if(!rendering)return "投影已隐藏";
         Entry entry=entries.get(selected);
         if(entry!=null){
-            if(entry.renderer==null)return entry.placement.name()+" · "+entryStatus(selected);
-            if(!entry.renderer.error().isEmpty())return entry.placement.name()+" · "+entry.renderer.error();
+            // The HUD card is narrow: the state leads and the name, without its extension, may be cut.
+            if(entry.renderer==null)return entryStatus(selected)+" · "+hudName(entry.placement.name());
+            if(!entry.renderer.error().isEmpty())return "渲染异常 · "+hudName(entry.placement.name());
         }
         return "投影 "+entries.size()+" · 仅预览附近区域";
     }
+    private static String hudName(String name){return name.replaceFirst("(?i)\\.(litematic|schem|schematic|nbt)$","");}
     String menuStatus() {
         if(!actionError.isEmpty())return actionError;
         if(!writable)return "配置文件异常，自动保存已停用";
