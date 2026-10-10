@@ -89,6 +89,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private boolean visible=true,budgetSaturated;
     // Per-frame scheduling state: source requests are queued once per frame, hole search stops once exhausted.
     private boolean prefetchedThisFrame,frameMissingWork,holesExhausted;
+    private final LinkedHashSet<LayerRange> unsettledLayers=new LinkedHashSet<>();private boolean unsettledOverflow;private long layerChangedAt;
+    private static final int MAX_UNSETTLED_LAYERS=256;private static final long LAYER_SETTLE_NANOS=300_000_000L;
     private float opacity=0.45f;
     void opacity(float value){opacity=value;}
     private int frameUploadBytes,frameUploadLimit=UPLOAD_BYTES_PER_FRAME,drawCalls;private long builtSections,lastBuildNanos;private String failure="";
@@ -230,16 +232,26 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         layout=new PlacementLayout(next,metadata().regions());displayPalette=null;invalidate();
     }
     /**
-     * Following the player moves the boundary a block at a time. Every mesh stays on screen (the surface shader
-     * clips stale ones to the new range at once) and only sections whose cells or culling neighbours changed
-     * membership are rebuilt, replacing their old mesh when done.
+     * Following the player moves the boundary a block at a time. The surface shader clips every mesh to the new
+     * range at once, so nothing is rebuilt while the layer keeps moving; once it has rested, one pass marks the
+     * sections whose cells or culling neighbours differ from any range seen since, and they replace their old
+     * meshes as they finish. Holes built meanwhile already use the current range.
      */
     void layer(LayerRange next){
         var previous=layer;if(previous.equals(next))return;layer=next;
-        var axis=LayerRange.sharedAxis(previous,next);
-        if(axis==null)worldRefresh.allChanged();
-        else meshes.forEach((key,mesh)->{var box=mesh.bounds();double from=switch(axis){case X->box.minX;case Y->box.minY;case Z->box.minZ;},to=switch(axis){case X->box.maxX;case Y->box.maxY;case Z->box.maxZ;};
-            if(LayerRange.affects(previous,next,(int)Math.floor(from),(int)Math.ceil(to)-1))worldRefresh.changed(key);});
+        if(unsettledLayers.size()<MAX_UNSETTLED_LAYERS)unsettledLayers.add(previous);else unsettledOverflow=true;
+        layerChangedAt=System.nanoTime();
+    }
+    private void settleLayer(){
+        if(unsettledLayers.isEmpty()&&!unsettledOverflow||System.nanoTime()-layerChangedAt<LAYER_SETTLE_NANOS)return;
+        var seen=List.copyOf(unsettledLayers);boolean all=unsettledOverflow;unsettledLayers.clear();unsettledOverflow=false;
+        for(var range:seen)if(LayerRange.sharedAxis(range,layer)==null)all=true;
+        if(all)worldRefresh.allChanged();
+        else meshes.forEach((key,mesh)->{var box=mesh.bounds();
+            for(var range:seen){var axis=LayerRange.sharedAxis(range,layer);
+                double from=switch(axis){case X->box.minX;case Y->box.minY;case Z->box.minZ;},to=switch(axis){case X->box.maxX;case Y->box.maxY;case Z->box.maxZ;};
+                if(LayerRange.affects(range,layer,(int)Math.floor(from),(int)Math.ceil(to)-1)){worldRefresh.changed(key);break;}
+            }});
         failed.clear();deferred.clear();wakeWorldRefresh();
     }
     LayerRange layer(){return layer;}
@@ -253,6 +265,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         meshes.size(),drawCalls,builtSections,stream.cachedBytes()/1048576.0,(meshes.usedBytes()+(job==null?0:job.bytes))/1048576.0,stream.queuedJobs(),lastBuildNanos/1e6,resolvers.values().stream().mapToInt(StateResolver1201::unsupportedCount).sum());}
     String error(){return !failure.isEmpty()?failure:!detailsError.isEmpty()?detailsError:!entities.error().isEmpty()?entities.error():stream.error();}
     void prepareFrame(WorldRenderContext context,boolean active){
+        settleLayer();
         stream.drain();drawCalls=0;lastBuildNanos=0;frameReady=active&&visible&&client.world!=null;prefetchedThisFrame=false;frameMissingWork=false;holesExhausted=false;
         // Disk workers can finish between frames. Wake builds on admitted data instead of
         // leaving a ready section idle until the fallback polling interval expires.

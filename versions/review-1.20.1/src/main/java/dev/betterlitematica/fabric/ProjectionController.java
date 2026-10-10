@@ -190,7 +190,7 @@ final class ProjectionController implements AutoCloseable {
         }
         tickDraftAssociation();tickDraftRecovery();editor.tick();
         if(draftFile!=null){var status=draftWriter.status(draftFile);if(!status.error().isEmpty()&&!status.error().equals(checkpointFailure)){checkpointFailure=status.error();fail("草稿保存失败，正在重试："+status.error());}else if(status.error().isEmpty())checkpointFailure="";}
-        if(ready&&client.player!=null&&options.followLayer&&layer.mode()!=LayerRange.Mode.ALL)layerAtPlayer();
+        if(ready&&client.player!=null&&options.followLayer&&layer.mode()!=LayerRange.Mode.ALL)followPlayerLayer();
         if (analysis != null) {analysis.tick();if(errorOverlay&&client.player!=null){var position=net.minecraft.util.math.BlockPos.ofFloored(client.player.getEyePos());analysis.updateHighlights(new Vec3i(position.getX(),position.getY(),position.getZ()));}}
         nearbyHighlights.tick(client,this);
         materialTotals();
@@ -818,7 +818,7 @@ final class ProjectionController implements AutoCloseable {
     WheelRenderMode wheelRenderMode(){return WheelRenderMode.selected(layer,options.followLayer,options.wheelRenderMode);}
     void explicitLayerMode(LayerRange.Mode mode){var next=WheelRenderMode.valueOf(mode.name());if(options.wheelRenderMode!=next){options.wheelRenderMode=next;saveOptions();}}
     void wheelRendering(WheelRenderMode mode,int first,int second){
-        requireWorld();var next=mode.range(first,second,playerPosition().y());
+        requireWorld();int feet=playerPosition().y();var next=mode.range(first,second,mode==WheelRenderMode.PLAYER_ABOVE?playerAnchor(LayerRange.Axis.Y,LayerRange.Mode.ABOVE,feet):mode==WheelRenderMode.PLAYER_BELOW?playerAnchor(LayerRange.Axis.Y,LayerRange.Mode.BELOW,feet):feet);
         boolean settingsChanged=options.followLayer!=mode.follows()||options.wheelRenderMode!=mode;
         layer(next.axis(),next.min(),next.max());options.followLayer=mode.follows();options.wheelRenderMode=mode;
         if(settingsChanged)saveOptions();
@@ -826,7 +826,30 @@ final class ProjectionController implements AutoCloseable {
     void layer(LayerRange.Axis axis, int min, int max) { requireWorld();var next=new LayerRange(axis,min,max);if(next.equals(layer))return;layer=next;for (Entry entry : entries.values()) apply(entry); dirty = true; }
     void cycleLayer(){cycleLayer(1);}
     void cycleLayer(int step){var mode=LayerRange.Mode.values()[Math.floorMod(layer.mode().ordinal()+step,LayerRange.Mode.values().length)];var p=playerPosition();int value=layer.min()==Integer.MIN_VALUE?layer.max()==Integer.MAX_VALUE?switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();}:layer.max():layer.min();var next=LayerRange.of(layer.axis(),mode,value,value);layer(next.axis(),next.min(),next.max());explicitLayerMode(mode);}
-    void layerAtPlayer(){var p=playerPosition();int value=switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();};int last=layer.mode()==LayerRange.Mode.RANGE?Math.addExact(value,Math.subtractExact(layer.max(),layer.min())):value;var next=LayerRange.of(layer.axis(),layer.mode()==LayerRange.Mode.ALL?LayerRange.Mode.SINGLE:layer.mode(),value,last);layer(next.axis(),next.min(),next.max());}
+    void layerAtPlayer(){var next=playerLayer();layer(next.axis(),next.min(),next.max());}
+    /**
+     * Vertical "above"/"below" layers hinge on the player's body, not one point: above starts under the feet and
+     * below ends over the head, each with a one-block margin so the printer can still reach the cells it stands on
+     * and beside its head.
+     */
+    static final int FOLLOW_MARGIN=1;
+    static int playerAnchor(LayerRange.Axis axis,LayerRange.Mode mode,int feet){
+        if(axis!=LayerRange.Axis.Y)return feet;
+        return mode==LayerRange.Mode.ABOVE?feet-FOLLOW_MARGIN:mode==LayerRange.Mode.BELOW?feet+1+FOLLOW_MARGIN:feet;
+    }
+    private LayerRange playerLayer(){
+        var p=playerPosition();var mode=layer.mode()==LayerRange.Mode.ALL?LayerRange.Mode.SINGLE:layer.mode();
+        int value=playerAnchor(layer.axis(),mode,switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();});
+        int last=mode==LayerRange.Mode.RANGE?Math.addExact(value,Math.subtractExact(layer.max(),layer.min())):value;
+        return LayerRange.of(layer.axis(),mode,value,last);
+    }
+    /** Jumping must not shift the layer: in the air the boundary only follows a move of two or more blocks. */
+    private void followPlayerLayer(){
+        var next=playerLayer();if(next.equals(layer))return;
+        long shift=layer.mode()==LayerRange.Mode.BELOW?(long)next.max()-layer.max():(long)next.min()-layer.min();
+        if(!client.player.isOnGround()&&Math.abs(shift)<2)return;
+        layer(next.axis(),next.min(),next.max());
+    }
     void allLayers() { layer(LayerRange.ALL.axis(), LayerRange.ALL.min(), LayerRange.ALL.max()); }
     void shiftLayer(int amount) {
         requireWorld();if(layer.mode()==LayerRange.Mode.ALL)layerAtPlayer();var next=layer.shifted(amount);layer(next.axis(),next.min(),next.max());
