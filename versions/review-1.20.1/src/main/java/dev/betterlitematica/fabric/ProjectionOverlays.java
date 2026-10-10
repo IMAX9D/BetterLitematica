@@ -26,20 +26,44 @@ final class ProjectionOverlays {
     private static final NearbyProjectionHighlights.Kind[] NEARBY_KINDS=NearbyProjectionHighlights.Kind.values();
     private static final dev.betterlitematica.core.Comparison[] COMPARISONS=dev.betterlitematica.core.Comparison.values();
     private static final BoxOrder nearbyOrder=new BoxOrder(.003);
-    private static final VerificationOrder errorOrder=new VerificationOrder();
-    // Verification can contain hundreds of thousands of boxes. Keep its geometry
-    // allocation range-filtered rather than duplicating the entire ledger in this cache.
-    private static final class VerificationOrder {
-        private List<dev.betterlitematica.core.HighlightCuboids.Box> source=List.of(),sorted=List.of();
-        private net.minecraft.util.math.BlockPos eye;
-        List<dev.betterlitematica.core.HighlightCuboids.Box> get(List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,net.minecraft.util.math.Vec3d camera,int limit){
-            if(limit==0){clear();return boxes;}
-            var next=net.minecraft.util.math.BlockPos.ofFloored(camera);
-            if(source!=boxes||!next.equals(eye)){source=boxes;eye=next;var result=new java.util.ArrayList<>(boxes);result.sort(java.util.Comparator.comparingDouble(b->distance(b,camera)));sorted=result;}
-            return sorted;
+    /**
+     * Verification highlights can hold hundreds of thousands of merged boxes. They are indexed into 16³ buckets
+     * off the render thread whenever the published list changes; a frame then touches only buckets that are in
+     * range and in view, and selects its nearest boxes without sorting the ledger.
+     */
+    private static final java.util.concurrent.ExecutorService INDEXER=java.util.concurrent.Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"BetterLitematica highlight index");thread.setDaemon(true);thread.setPriority(Thread.MIN_PRIORITY);return thread;});
+    private static final int SYNC_INDEX_LIMIT=4096;
+    private static List<dev.betterlitematica.core.HighlightCuboids.Box> indexSource=List.of(),indexPendingSource;
+    private static dev.betterlitematica.core.HighlightBoxIndex verificationIndex=dev.betterlitematica.core.HighlightBoxIndex.EMPTY;
+    private static java.util.concurrent.CompletableFuture<dev.betterlitematica.core.HighlightBoxIndex> indexPending;
+    /** At most one build in flight. A finished build is always newer than the one on screen, so it is shown; a newer list starts the next build. */
+    private static dev.betterlitematica.core.HighlightBoxIndex verificationIndex(List<dev.betterlitematica.core.HighlightCuboids.Box> boxes){
+        if(indexPending!=null&&indexPending.isDone()){
+            try{verificationIndex=indexPending.join();indexSource=indexPendingSource;}catch(RuntimeException e){BetterLitematicaClient.LOGGER.warn("Highlight index build failed",e);}
+            indexPending=null;indexPendingSource=null;
         }
-        void clear(){source=List.of();sorted=List.of();eye=null;}
+        if(boxes!=indexSource&&boxes!=indexPendingSource){
+            if(boxes.size()<=SYNC_INDEX_LIMIT){releaseVerificationIndex();verificationIndex=dev.betterlitematica.core.HighlightBoxIndex.build(boxes);indexSource=boxes;}
+            else if(indexPending==null){indexPendingSource=boxes;indexPending=java.util.concurrent.CompletableFuture.supplyAsync(()->dev.betterlitematica.core.HighlightBoxIndex.build(boxes),INDEXER);}
+        }
+        return verificationIndex;
     }
+    static void releaseVerificationIndex(){
+        if(indexPending!=null)indexPending.cancel(false);indexPending=null;indexPendingSource=null;
+        indexSource=List.of();verificationIndex=dev.betterlitematica.core.HighlightBoxIndex.EMPTY;
+    }
+    /** Frustum classification: whole buckets inside the view skip per-box tests; boxes only ask "intersects". */
+    private record FrustumTest(Frustum frustum) implements dev.betterlitematica.core.HighlightBoxIndex.BoundsTest {
+        public int test(double x0,double y0,double z0,double x1,double y1,double z1){
+            if(frustum==null)return dev.betterlitematica.core.HighlightBoxIndex.INSIDE;
+            if(!frustum.isVisible(new Box(x0,y0,z0,x1,y1,z1)))return dev.betterlitematica.core.HighlightBoxIndex.OUTSIDE;
+            // A convex volume contains a box exactly when it contains all eight corners.
+            for(int c=0;c<8;c++){double x=(c&1)!=0?x1:x0,y=(c&2)!=0?y1:y0,z=(c&4)!=0?z1:z0;if(!frustum.isVisible(new Box(x,y,z,x,y,z)))return dev.betterlitematica.core.HighlightBoxIndex.INTERSECTS;}
+            return dev.betterlitematica.core.HighlightBoxIndex.INSIDE;
+        }
+        @Override public boolean intersects(double x0,double y0,double z0,double x1,double y1,double z1){return frustum==null||frustum.isVisible(new Box(x0,y0,z0,x1,y1,z1));}
+    }
+    private static int[] errorSlots=new int[256];private static float[] errorAlpha=new float[256];private static int errorCount;
     private static final class PreparedBox {
         private final dev.betterlitematica.core.HighlightCuboids.Box source;
         private final Box bounds;
@@ -71,7 +95,7 @@ final class ProjectionOverlays {
         void clear(){source=List.of();prepared=List.of();sorted=List.of();eye=null;}
     }
     private static final java.util.ArrayList<PreparedBox> nearbyMissing=new java.util.ArrayList<>(),nearbyErrors=new java.util.ArrayList<>();
-    static void clearCaches(){nearbyOrder.clear();errorOrder.clear();nearbyMissing.clear();nearbyErrors.clear();}
+    static void clearCaches(){nearbyOrder.clear();releaseVerificationIndex();errorSlots=new int[256];errorAlpha=new float[256];errorCount=0;nearbyMissing.clear();nearbyErrors.clear();}
     /** One selection for both passes preserves the shared limit and their draw order. */
     static void prepareNearby(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,PrinterSettings settings,int extraColor){
         nearbyMissing.clear();nearbyErrors.clear();
@@ -95,8 +119,11 @@ final class ProjectionOverlays {
         double x=Math.max(b.min().x()-p.x,Math.max(0,p.x-b.max().x()-1)),y=Math.max(b.min().y()-p.y,Math.max(0,p.y-b.max().y()-1)),z=Math.max(b.min().z()-p.z,Math.max(0,p.z-b.max().z()-1));return x*x+y*y+z*z;
     }
     private static float missingAlpha(Box box,net.minecraft.util.math.Vec3d eye,net.minecraft.util.math.Vec3d camera,net.minecraft.util.math.Vec3d look,double range){
-        double x=Math.max(box.minX-eye.x,Math.max(0,eye.x-box.maxX)),y=Math.max(box.minY-eye.y,Math.max(0,eye.y-box.maxY)),z=Math.max(box.minZ-eye.z,Math.max(0,eye.z-box.maxZ));
-        double dx=(box.minX+box.maxX)*.5-camera.x,dy=(box.minY+box.maxY)*.5-camera.y,dz=(box.minZ+box.maxZ)*.5-camera.z;
+        return missingAlpha(box.minX,box.minY,box.minZ,box.maxX,box.maxY,box.maxZ,eye,camera,look,range);
+    }
+    private static float missingAlpha(double minX,double minY,double minZ,double maxX,double maxY,double maxZ,net.minecraft.util.math.Vec3d eye,net.minecraft.util.math.Vec3d camera,net.minecraft.util.math.Vec3d look,double range){
+        double x=Math.max(minX-eye.x,Math.max(0,eye.x-maxX)),y=Math.max(minY-eye.y,Math.max(0,eye.y-maxY)),z=Math.max(minZ-eye.z,Math.max(0,eye.z-maxZ));
+        double dx=(minX+maxX)*.5-camera.x,dy=(minY+maxY)*.5-camera.y,dz=(minZ+maxZ)*.5-camera.z;
         double length=Math.sqrt(dx*dx+dy*dy+dz*dz),alignment=length<1e-6?1:(dx*look.x+dy*look.y+dz*look.z)/length;
         return HighlightFades.missing(Math.sqrt(x*x+y*y+z*z),range,alignment);
     }
@@ -112,24 +139,49 @@ final class ProjectionOverlays {
     }
     static void errorBoxes(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,DisplayOptions settings,boolean onTop,int limit){
         if(client.player==null||boxes.isEmpty()||context.matrixStack()==null)return;
-        var camera=context.camera().getPos();var origin=client.player.getCameraPosVec(context.tickDelta());var look=net.minecraft.util.math.Vec3d.fromPolar(context.camera().getPitch(),context.camera().getYaw());var matrices=context.matrixStack();var buffers=client.getBufferBuilders().getEntityVertexConsumers();var lines=OverlayLayers.lines(onTop);var faces=OverlayLayers.faces(onTop);int drawn=0;float pulse=NearbyProjectionHighlights.alpha(System.nanoTime());
+        var index=verificationIndex(boxes);if(index.size()==0)return;
+        var camera=context.camera().getPos();var origin=client.player.getCameraPosVec(context.tickDelta());var look=net.minecraft.util.math.Vec3d.fromPolar(context.camera().getPitch(),context.camera().getYaw());
+        var test=new FrustumTest(context.frustum());float pulse=NearbyProjectionHighlights.alpha(System.nanoTime());
+        // Select first, then emit lines and faces as two batches: alternating layers per box flushes a draw call each time.
+        errorCount=0;
+        if(limit>0){
+            if(errorSlots.length<limit){errorSlots=new int[limit];errorAlpha=new float[limit];}
+            int selected=index.nearest(origin.x,origin.y,origin.z,128*128,limit,test,errorSlots);
+            for(int i=0;i<selected;i++)keepError(index,errorSlots[i],origin,camera,look,pulse);
+        }else index.forEach(origin.x,origin.y,origin.z,128*128,test,(slot,distance)->keepError(index,slot,origin,camera,look,pulse));
+        if(errorCount==0)return;
+        var matrices=context.matrixStack();var buffers=client.getBufferBuilders().getEntityVertexConsumers();var lines=OverlayLayers.lines(onTop);var faces=OverlayLayers.faces(onTop);
         matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);
-        try{for(var box:errorOrder.get(boxes,origin,limit)){
-            if(distance(box,origin)>128*128)continue;var bounds=bounds(box).expand(.002);if(context.frustum()!=null&&!context.frustum().isVisible(bounds))continue;
-            if(limit>0&&drawn++>=limit)break;
-            var type=COMPARISONS[box.group()];
-            int color=switch(type){case MISSING->NearbyProjectionHighlights.MISSING_COLOR;case EXTRA->settings.extraColor;case WRONG_BLOCK,WRONG_STATE->NearbyProjectionHighlights.WRONG_COLOR;default->0xff999999;};
-            float r=((color>>>16)&255)/255f,g=((color>>>8)&255)/255f,b=(color&255)/255f,a=type==dev.betterlitematica.core.Comparison.MISSING?missingAlpha(bounds,origin,camera,look,128):pulse;if(a<=0)continue;
-            if(settings.errorStyle!=PrinterSettings.HighlightStyle.FILLED)WorldRenderer.drawBox(matrices,buffers.getBuffer(lines),bounds,r,g,b,a);
-            if(settings.errorStyle!=PrinterSettings.HighlightStyle.OUTLINE){var vertices=buffers.getBuffer(faces);var matrix=matrices.peek().getPositionMatrix();for(var face:FACE_CORNERS)for(int corner:face)vertices.vertex(matrix,(float)((corner&1)!=0?bounds.maxX:bounds.minX),(float)((corner&2)!=0?bounds.maxY:bounds.minY),(float)((corner&4)!=0?bounds.maxZ:bounds.minZ)).color(r,g,b,a*.25f).next();}
-        }}finally{matrices.pop();buffers.draw(lines);buffers.draw(faces);}
+        try{
+            if(settings.errorStyle!=PrinterSettings.HighlightStyle.FILLED){var vertices=buffers.getBuffer(lines);
+                for(int i=0;i<errorCount;i++){int slot=errorSlots[i],color=errorColor(index,slot,settings);
+                    WorldRenderer.drawBox(matrices,vertices,index.minX(slot)-.002,index.minY(slot)-.002,index.minZ(slot)-.002,index.maxX(slot)+1.002,index.maxY(slot)+1.002,index.maxZ(slot)+1.002,((color>>>16)&255)/255f,((color>>>8)&255)/255f,(color&255)/255f,errorAlpha[i]);}
+                buffers.draw(lines);}
+            if(settings.errorStyle!=PrinterSettings.HighlightStyle.OUTLINE){var vertices=buffers.getBuffer(faces);var matrix=matrices.peek().getPositionMatrix();
+                for(int i=0;i<errorCount;i++){int slot=errorSlots[i],color=errorColor(index,slot,settings);float r=((color>>>16)&255)/255f,g=((color>>>8)&255)/255f,b=(color&255)/255f,a=errorAlpha[i]*.25f;
+                    float x0=(float)(index.minX(slot)-.002),y0=(float)(index.minY(slot)-.002),z0=(float)(index.minZ(slot)-.002),x1=(float)(index.maxX(slot)+1.002),y1=(float)(index.maxY(slot)+1.002),z1=(float)(index.maxZ(slot)+1.002);
+                    for(var face:FACE_CORNERS)for(int corner:face)vertices.vertex(matrix,(corner&1)!=0?x1:x0,(corner&2)!=0?y1:y0,(corner&4)!=0?z1:z0).color(r,g,b,a).next();}
+                buffers.draw(faces);}
+        }finally{matrices.pop();buffers.draw(lines);buffers.draw(faces);}
+    }
+    /** Same order and limit semantics as before: a box selected for the limit counts even if its fade is zero. */
+    private static void keepError(dev.betterlitematica.core.HighlightBoxIndex index,int slot,net.minecraft.util.math.Vec3d origin,net.minecraft.util.math.Vec3d camera,net.minecraft.util.math.Vec3d look,float pulse){
+        float a=COMPARISONS[index.box(slot).group()]==dev.betterlitematica.core.Comparison.MISSING?missingAlpha(index.minX(slot)-.002,index.minY(slot)-.002,index.minZ(slot)-.002,index.maxX(slot)+1.002,index.maxY(slot)+1.002,index.maxZ(slot)+1.002,origin,camera,look,128):pulse;
+        if(a<=0)return;
+        if(errorCount==errorSlots.length){errorSlots=java.util.Arrays.copyOf(errorSlots,errorCount*2);errorAlpha=java.util.Arrays.copyOf(errorAlpha,errorCount*2);}
+        errorSlots[errorCount]=slot;errorAlpha[errorCount++]=a;
+    }
+    private static int errorColor(dev.betterlitematica.core.HighlightBoxIndex index,int slot,DisplayOptions settings){
+        return switch(COMPARISONS[index.box(slot).group()]){case MISSING->NearbyProjectionHighlights.MISSING_COLOR;case EXTRA->settings.extraColor;case WRONG_BLOCK,WRONG_STATE->NearbyProjectionHighlights.WRONG_COLOR;default->0xff999999;};
     }
     static void actions(MinecraftClient client,WorldRenderContext context,java.util.Collection<dev.betterlitematica.core.ActionHighlights.Mark> marks,PrinterSettings settings){
         if(client.player==null||marks.isEmpty()||context.matrixStack()==null)return;var matrices=context.matrixStack();var camera=context.camera().getPos();var origin=client.player.getEyePos();var buffers=client.getBufferBuilders().getEntityVertexConsumers();var lines=OverlayLayers.lines(settings.highlightOnTop);var faces=OverlayLayers.faces(settings.highlightOnTop);long now=System.nanoTime();
-        matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);try{java.util.Collection<dev.betterlitematica.core.ActionHighlights.Mark> ordered=marks;if(settings.highlightLimit>0){var sorted=new java.util.ArrayList<>(marks);sorted.sort(java.util.Comparator.comparingDouble(m->PrinterReach.distanceSquared(origin,net.minecraft.util.math.BlockPos.fromLong(m.position()))));ordered=sorted;}int drawn=0;for(var mark:ordered){var pos=net.minecraft.util.math.BlockPos.fromLong(mark.position());if(PrinterReach.distanceSquared(origin,pos)>settings.highlightRange*(double)settings.highlightRange)continue;if(settings.highlightLimit>0&&drawn++>=settings.highlightLimit)break;int color=switch(mark.kind()){case PLACE->settings.placeColor;case ADJUST->settings.adjustColor;case BREAK->settings.breakColor;case FAILED->settings.failedColor;};float r=((color>>>16)&255)/255f,g=((color>>>8)&255)/255f,b=(color&255)/255f,alpha=(color>>>24)/255f*HighlightFades.action(mark,now);if(alpha<=0)continue;
-                if(settings.highlightStyle!=PrinterSettings.HighlightStyle.FILLED)WorldRenderer.drawBox(matrices,buffers.getBuffer(lines),new Box(pos).expand(0.003),r,g,b,alpha);
-                if(settings.highlightStyle!=PrinterSettings.HighlightStyle.OUTLINE){var vertices=buffers.getBuffer(faces);var matrix=matrices.peek().getPositionMatrix();for(var face:FACE_CORNERS)for(int corner:face)vertices.vertex(matrix,pos.getX()+((corner&1)!=0?1.003f:-0.003f),pos.getY()+((corner&2)!=0?1.003f:-0.003f),pos.getZ()+((corner&4)!=0?1.003f:-0.003f)).color(r,g,b,alpha*0.25f).next();}
-            }}finally{matrices.pop();buffers.draw(lines);buffers.draw(faces);}
+        matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);try{java.util.Collection<dev.betterlitematica.core.ActionHighlights.Mark> ordered=marks;if(settings.highlightLimit>0){var sorted=new java.util.ArrayList<>(marks);sorted.sort(java.util.Comparator.comparingDouble(m->PrinterReach.distanceSquared(origin,net.minecraft.util.math.BlockPos.fromLong(m.position()))));ordered=sorted;}
+            // Lines then faces: switching layers per mark would flush a draw call each time.
+            for(int pass=0;pass<2;pass++){if(pass==0?settings.highlightStyle==PrinterSettings.HighlightStyle.FILLED:settings.highlightStyle==PrinterSettings.HighlightStyle.OUTLINE)continue;var vertices=buffers.getBuffer(pass==0?lines:faces);int drawn=0;for(var mark:ordered){var pos=net.minecraft.util.math.BlockPos.fromLong(mark.position());if(PrinterReach.distanceSquared(origin,pos)>settings.highlightRange*(double)settings.highlightRange)continue;if(settings.highlightLimit>0&&drawn++>=settings.highlightLimit)break;int color=switch(mark.kind()){case PLACE->settings.placeColor;case ADJUST->settings.adjustColor;case BREAK->settings.breakColor;case FAILED->settings.failedColor;};float r=((color>>>16)&255)/255f,g=((color>>>8)&255)/255f,b=(color&255)/255f,alpha=(color>>>24)/255f*HighlightFades.action(mark,now);if(alpha<=0)continue;
+                if(pass==0)WorldRenderer.drawBox(matrices,vertices,pos.getX()-.003,pos.getY()-.003,pos.getZ()-.003,pos.getX()+1.003,pos.getY()+1.003,pos.getZ()+1.003,r,g,b,alpha);
+                else{var matrix=matrices.peek().getPositionMatrix();for(var face:FACE_CORNERS)for(int corner:face)vertices.vertex(matrix,pos.getX()+((corner&1)!=0?1.003f:-0.003f),pos.getY()+((corner&2)!=0?1.003f:-0.003f),pos.getZ()+((corner&4)!=0?1.003f:-0.003f)).color(r,g,b,alpha*0.25f).next();}
+            }buffers.draw(pass==0?lines:faces);}}finally{matrices.pop();buffers.draw(lines);buffers.draw(faces);}
     }
     static void selection(MinecraftClient client,WorldRenderContext context,dev.betterlitematica.core.AreaSelection selection,dev.betterlitematica.core.SelectionTarget target){
         selection(client,context,selection,target,false);

@@ -398,9 +398,9 @@ final class ProjectionController implements AutoCloseable {
     void startAnalysis(){startAnalysis(selected);}
     void startAnalysis(UUID id) { Entry entry=entries.get(id);if(entry==null)throw new IllegalStateException("投影已移除"); if (entry.renderer == null) throw new IllegalStateException("请等待投影加载完成"); cancelAnalysis(); analysis = new PlacementAnalysis(entry.renderer, client.world, layer); }
     void pauseAnalysis() { if (analysis == null) throw new IllegalStateException("尚无扫描任务"); analysis.pause(); }
-    void cancelAnalysis() { errorOverlay = false; if (analysis != null) analysis.cancel(); }
+    void cancelAnalysis() { errorOverlay = false; if (analysis != null) analysis.cancel(); ProjectionOverlays.releaseVerificationIndex(); }
     boolean errorOverlayEnabled() { return errorOverlay; }
-    void toggleErrorOverlay() { errorOverlay = !errorOverlay; }
+    void toggleErrorOverlay() { errorOverlay = !errorOverlay; if (!errorOverlay) ProjectionOverlays.releaseVerificationIndex(); }
     void exportMaterials() { exportMaterials(1,false,""); }
     void exportMaterials(int multiplier,boolean missingOnly,String query){exportMaterials(selected,multiplier,missingOnly,query);}
     void exportMaterials(UUID id,int multiplier,boolean missingOnly,String query) {

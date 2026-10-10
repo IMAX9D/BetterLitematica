@@ -60,6 +60,7 @@ public final class CoreTests {
             test("bounded bedrock construction geometry and power directions",()->{checks+=BedrockPlanChecks.run();});
             test("placement quantity uses byte budgets not fixed counts",()->{checks+=UnlimitedPlacementChecks.run();});
             test("per-placement display filters and legacy settings migration",()->{checks+=BlockDisplayFilterChecks.run();});
+            test("spatial highlight index equals a stable full sort",()->{checks+=HighlightBoxIndexChecks.run();});
             test("complete bounded directory search and cancellation",()->{checks+=DirectorySearchChecks.run(temp);});
             test("draft persistence ordering and failure recovery",()->{checks+=DraftRecoveryChecks.run(temp.resolve("recovery"));});
             test("finite material batches avoid needless switches without starvation",()->{checks+=PrinterBatchChecks.run();});
