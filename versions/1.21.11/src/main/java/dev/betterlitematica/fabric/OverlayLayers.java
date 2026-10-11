@@ -9,15 +9,18 @@ import net.minecraft.client.render.*;
 
 /** Each overlay owns its draw state, including the entity mask for through-wall inspection. */
 final class OverlayLayers extends RenderLayer {
-    private final boolean face,through;
+    private final boolean face,through,near;
     private final RenderPipeline pipeline;
     private static final RenderLayer[] LINES={new OverlayLayers(false,false),new OverlayLayers(false,true)};
     private static final RenderLayer[] FACES={new OverlayLayers(true,false),new OverlayLayers(true,true)};
-    private OverlayLayers(boolean face,boolean through){
+    private OverlayLayers(boolean face,boolean through){this(face,through,false);}
+    private OverlayLayers(boolean face,boolean through,boolean near){
         super("betterlitematica_overlay_"+face+"_"+through,setup(face,through));
-        this.face=face;this.through=through;pipeline=getRenderPipeline();
+        this.near=near;this.face=face;this.through=through;pipeline=getRenderPipeline();
     }
     private static RenderSetup setup(boolean face,boolean through){var builder=RenderSetup.builder(ProjectionShaders.overlay(face,through)).expectedBufferSize(32768);if(face)builder.translucent();return builder.build();}
+    private static final RenderLayer[] NEAR_LINES={new OverlayLayers(false,false,true),new OverlayLayers(false,true,true)},NEAR_FACES={new OverlayLayers(true,false,true),new OverlayLayers(true,true,true)};
+    static RenderLayer nearLines(boolean through){return NEAR_LINES[through?1:0];}static RenderLayer nearFaces(boolean through){return NEAR_FACES[through?1:0];}
     static RenderLayer lines(boolean through){return LINES[through?1:0];}
     static RenderLayer faces(boolean through){return FACES[through?1:0];}
     public Framebuffer getTarget(){return MinecraftClient.getInstance().getFramebuffer();}
@@ -30,7 +33,7 @@ final class OverlayLayers extends RenderLayer {
             var sequential=RenderSystem.getSequentialBuffer(parameters.mode());
             var indices=source.getSortedBuffer()==null?sequential.getIndexBuffer(parameters.indexCount()):format.uploadImmediateIndexBuffer(source.getSortedBuffer());
             var indexType=source.getSortedBuffer()==null?sequential.getIndexType():parameters.indexType();
-            var transforms=ProjectionUniforms.transforms(RenderSystem.getModelViewMatrix(),1,1,1,1,1);var mask=EntityOverlayMask.prepare(through);
+            var transforms=ProjectionUniforms.transforms(RenderSystem.getModelViewMatrix(),1,1,1,1,1);var mask=EntityOverlayMask.prepare(through,near);
             try(var pass=ProjectionGpu.pass(getTarget(),pipeline)){
                 pass.setUniform("DynamicTransforms",transforms);
                 mask.bind(pass);pass.setVertexBuffer(0,vertices);pass.setIndexBuffer(indices,indexType);pass.drawIndexed(0,0,parameters.indexCount(),1);

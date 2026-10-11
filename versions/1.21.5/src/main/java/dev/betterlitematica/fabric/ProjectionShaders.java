@@ -19,16 +19,16 @@ final class ProjectionShaders {
             .withUniform(projection?"ProjectionColor":"ColorModulator",UniformType.VEC4).withCull(false);
     }
     static final RenderPipeline SURFACE=RenderPipelines.register(common("projection_surface","betterlitematica:core/projection","betterlitematica:core/projection_surface")
-        .withSampler("Sampler0").withUniform("TextureMode",UniformType.INT).withUniform("SurfaceTint",UniformType.INT)
+        .withUniform("ViewInverse",UniformType.MATRIX4X4).withUniform("CameraPos",UniformType.VEC3).withUniform("LayerClip",UniformType.VEC4).withUniform("Fade",UniformType.VEC2).withSampler("Sampler0").withUniform("TextureMode",UniformType.INT).withUniform("SurfaceTint",UniformType.INT)
         .withVertexFormat(VertexFormats.POSITION_TEXTURE_COLOR,VertexFormat.DrawMode.QUADS)
         .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST).withDepthWrite(true).withDepthBias(-1,-1).withoutBlend().build());
-    static final RenderPipeline COMPOSITE=RenderPipelines.register(common("projection_composite","betterlitematica:core/projection","betterlitematica:core/projection_composite")
+    static final RenderPipeline COMPOSITE=RenderPipelines.register(common("projection_composite","betterlitematica:core/projection_composite","betterlitematica:core/projection_composite")
         .withSampler("Sampler0").withVertexFormat(VertexFormats.POSITION_TEXTURE_COLOR,VertexFormat.DrawMode.QUADS)
         .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST).withDepthWrite(false).withBlend(BlendFunction.TRANSLUCENT).build());
     static RenderPipeline overlay(boolean face,boolean through){
-        var builder=common("overlay_"+face+"_"+through,face?"minecraft:core/position_color":"minecraft:core/rendertype_lines",
+        var builder=common("overlay_"+face+"_"+through,face?"betterlitematica:core/overlay_faces":"minecraft:core/rendertype_lines",
             face?"betterlitematica:core/overlay_faces":"betterlitematica:core/overlay_lines")
-            .withSampler("EntityDepthBefore").withSampler("EntityDepthAfter").withUniform("EntityMaskEnabled",UniformType.INT)
+            .withUniform("NearFade",UniformType.VEC3).withSampler("EntityDepthBefore").withSampler("EntityDepthAfter").withUniform("EntityMaskEnabled",UniformType.INT)
             .withVertexFormat(face?VertexFormats.POSITION_COLOR:VertexFormats.POSITION_COLOR_NORMAL,face?VertexFormat.DrawMode.QUADS:VertexFormat.DrawMode.LINES)
             .withDepthTestFunction(through?DepthTestFunction.NO_DEPTH_TEST:DepthTestFunction.LEQUAL_DEPTH_TEST)
             .withDepthWrite(false).withBlend(BlendFunction.TRANSLUCENT);

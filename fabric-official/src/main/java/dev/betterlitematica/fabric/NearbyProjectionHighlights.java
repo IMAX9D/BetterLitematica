@@ -1,5 +1,4 @@
 package dev.betterlitematica.fabric;
-
 import dev.betterlitematica.core.*;
 import java.util.*;
 import java.util.function.*;
@@ -7,7 +6,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-
 /** Live bounded observation, independent of full verification and printer work queues. */
 final class NearbyProjectionHighlights {
     static final int MISSING_COLOR=0xffff8f29,WRONG_COLOR=0xffff3338;
@@ -26,7 +24,8 @@ final class NearbyProjectionHighlights {
     void tick(Minecraft client,ProjectionController controller){
         if(client.level==null||client.player==null||client.gameMode==null||!controller.projectionRenderingEnabled()||!controller.options().printer.highlights){clear();return;}
         var sources=controller.printerSources();if(sources.isEmpty()){clear();return;}
-        advance(client.level,sources,controller.layerRange(),client.player.getEyePosition(),controller.options().printer.highlightRange,controller::printerSampler,p->WorldChunks.loaded(client.level,p)?client.level.getBlockState(p):null,System::nanoTime);
+        // Layer-independent: the overlay clips to the visible slab, so moving the layer never clears and rescans.
+        advance(client.level,sources,LayerRange.ALL,client.player.getEyePosition(),controller.options().printer.highlightRange,controller::printerSampler,p->WorldChunks.loaded(client.level,p)?client.level.getBlockState(p):null,System::nanoTime);
     }
     void advance(Object nextWorld,List<?> nextSources,LayerRange nextLayer,Vec3 nextEye,double nextReach,Supplier<Function<Vec3i,ProjectionController.PrinterSample>> source,Function<BlockPos,BlockState> actual,LongSupplier clock){
         if(!Double.isFinite(nextReach)||nextReach<0||nextReach>32)throw new IllegalArgumentException("Highlight range must be 0–32");
@@ -77,9 +76,13 @@ final class NearbyProjectionHighlights {
         return chunkScan!=null&&chunkScan.hasNext()?chunkScan.next():null;
     }
     static Kind classify(ProjectionController.PrinterSample wanted,BlockState actual){
-        if(wanted==null||!wanted.inside()||wanted.state()==null||actual==null||actual==wanted.state())return null;
-        if(wanted.state().isAir())return actual.isAir()?null:Kind.EXTRA;
-        return actual.isAir()?Kind.MISSING:Kind.WRONG;
+        if(wanted==null||!wanted.inside())return null;
+        return switch(PrinterRules.comparison(true,actual,wanted.state())){
+            case MATCH,UNKNOWN->null;
+            case EXTRA->Kind.EXTRA;
+            case MISSING->Kind.MISSING;
+            case WRONG_BLOCK,WRONG_STATE->Kind.WRONG;
+        };
     }
     private boolean inRange(BlockPos pos){return layer.contains(vector(pos))&&PrinterReach.distanceSquared(eye,pos)<=reach*reach;}
     void changed(BlockPos pos,BlockState state){

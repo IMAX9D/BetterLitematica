@@ -1,5 +1,5 @@
 {
-  "vertex": "minecraft:core/position_color",
+  "vertex": "betterlitematica:core/overlay_faces",
   "fragment": "betterlitematica:core/overlay_faces",
   "attributes": [
     "Position",
@@ -77,6 +77,16 @@
       "count": 1,
       "values": [
         0
+      ]
+    },
+    {
+      "name": "NearFade",
+      "type": "float",
+      "count": 3,
+      "values": [
+        0,
+        0,
+        1
       ]
     }
   ],

@@ -52,10 +52,10 @@ final class NearbyBuildHud {
             if(client.world.isOutOfHeightLimit(pos)||!client.world.getWorldBorder().contains(pos)||!inScope(at,s.printScope))continue;
             var projected=sample.apply(at);if(projected==null||!projected.inside())continue;
             if(projected.state()==null||!WorldChunks.loaded(client.world,pos)){unknown++;continue;}
-            var wanted=projected.state();var actual=client.world.getBlockState(pos);compared++;if(wanted.equals(actual))matched++;
+            var wanted=projected.state();var actual=client.world.getBlockState(pos);boolean matches=PrinterRules.constructionMatches(actual,wanted);compared++;if(matches)matched++;
             add(counts,wanted,actual);
-            if(!wanted.equals(actual))for(var cost:BuildMaterials.forState(wanted))needs.merge(cost.item(),cost.count(),Integer::sum);
-            if(!wanted.isAir()&&!wanted.equals(actual)&&!actual.isAir())(wanted.isOf(actual.getBlock())?wrongStates:wrongBlocks).merge(wanted.getBlock(),1,Integer::sum);
+            if(!matches)for(var cost:BuildMaterials.forState(wanted))needs.merge(cost.item(),cost.count(),Integer::sum);
+            if(!wanted.isAir()&&!matches&&!actual.isAir())(wanted.isOf(actual.getBlock())?wrongStates:wrongBlocks).merge(wanted.getBlock(),1,Integer::sum);
         }
         boolean scanning=cursor.hasNext();
         // Replace complete rounds atomically; never flash an empty prefix every scan cycle.
@@ -71,7 +71,7 @@ final class NearbyBuildHud {
     }
     static void add(Map<Block,Integer> counts,BlockState wanted,BlockState actual){
         // Count unfinished positions, including wrong states. Air is demolition, not a block to build.
-        if(wanted!=null&&actual!=null&&!wanted.isAir()&&!wanted.equals(actual))counts.merge(wanted.getBlock(),1,Integer::sum);
+        if(wanted!=null&&actual!=null&&!wanted.isAir()&&!PrinterRules.constructionMatches(actual,wanted))counts.merge(wanted.getBlock(),1,Integer::sum);
     }
     static List<Entry> entries(Map<Block,Integer> counts){
         return counts.entrySet().stream().sorted(Comparator.comparing(e->Registry.BLOCK.getId(e.getKey()).toString()))

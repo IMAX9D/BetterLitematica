@@ -1,5 +1,4 @@
 package dev.betterlitematica.fabric;
-
 /** Stable identities shared by controls, help, dependencies and search navigation. */
 enum SettingId {
     PRINTER_PRINT,
@@ -89,6 +88,8 @@ enum SettingId {
     DISPLAY_INFORMATION,
     DISPLAY_WORLD_INFORMATION,
     DISPLAY_STATES,
+    DISPLAY_BUILD_BUDGET,
+    DISPLAY_RENDER_BUDGET,
     BEDROCK_BREAK_DOWN,
     BEDROCK_BREAK_UP,
     BEDROCK_BREAK_NORTH,

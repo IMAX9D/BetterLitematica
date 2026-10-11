@@ -37,6 +37,7 @@ def prepareResources = tasks.register('prepareAdapterResources', Sync) {
         metadata.depends.java = ">=${target.java}"
         metadata.depends.fabricloader = ">=${target.loader}"
         metadata.depends.remove('fabric-api')
+        metadata.depends.remove('fabric')
         metadata.depends[target.fabricApiId ?: 'fabric-api'] = ">=${target.fabricApi}"
         file.setText(JsonOutput.prettyPrint(JsonOutput.toJson(metadata)) + '\n', 'UTF-8')
         def mixins = new File(resourceOutput.get().asFile, 'betterlitematica.mixins.json')

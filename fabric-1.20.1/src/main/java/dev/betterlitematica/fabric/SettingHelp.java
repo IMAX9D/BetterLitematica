@@ -84,6 +84,8 @@ final class SettingHelp {
         put(SettingId.OPTIONS_COMPATIBILITY,"模组共存","查看检测到的模组与功能接管说明。");
         put(SettingId.DISPLAY_THEME,"界面主题","切换瓷白或曜石界面配色。");
         put(SettingId.DISPLAY_ERROR_STYLE,"错误样式","选择世界差异的轮廓或填充显示方式。");
+        put(SettingId.DISPLAY_RENDER_BUDGET,"投影显存","投影可占用的显存上限；用满时保留离你最近的部分，转身不会重新加载。自动按显卡估算，不限可能耗尽显存。");
+        put(SettingId.DISPLAY_BUILD_BUDGET,"加载预算","每帧用于生成投影的最长时间；越高加载越快，加载期间帧率可能下降，加载完成后不占用。");
         put(SettingId.DISPLAY_PROJECTION,"投影方块","显示或隐藏投影的方块模型。");
         put(SettingId.DISPLAY_LAYERS,"分层","选择投影显示与施工的层范围。");
         put(SettingId.DISPLAY_PLACEMENT_BOUNDS,"摆放边框","显示各投影摆放的外边界。");

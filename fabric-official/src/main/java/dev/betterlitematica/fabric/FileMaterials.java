@@ -4,7 +4,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
 import java.util.*;
-
 /** Complete source histogram, independent of resident/rendered sections and the world. */
 final class FileMaterials {
     enum Sort {MISSING,TOTAL,AVAILABLE,NAME;String label(){return switch(this){case MISSING->"缺少";case TOTAL->"总量";case AVAILABLE->"拥有";case NAME->"名称";};}}
@@ -33,7 +32,7 @@ final class FileMaterials {
         if(client.player!=null)for(int i=0;i<client.player.getInventory().getContainerSize();i++){var stack=client.player.getInventory().getItem(i);if(!stack.isEmpty())inventory.merge(stack.getItem(),(long)stack.getCount(),Long::sum);}
         String query=filter.toLowerCase(Locale.ROOT);var result=new ArrayList<PlacementAnalysis.Material>();
         totals.forEach((item,count)->{long total=Math.multiplyExact(count,multiplier),available=inventory.getOrDefault(item,0L);
-            if((!missingOnly||total>available)&&(item.getName(new net.minecraft.world.item.ItemStack(item)).getString().toLowerCase(Locale.ROOT).contains(query)||BuiltInRegistries.ITEM.getKey(item).toString().contains(query)))result.add(new PlacementAnalysis.Material(item,total,total,0,available));
+            if((!missingOnly||total>available)&&SearchText.matches(item.getName(new net.minecraft.world.item.ItemStack(item)).getString()+" "+BuiltInRegistries.ITEM.getKey(item),query))result.add(new PlacementAnalysis.Material(item,total,total,0,available));
         });
         result.sort(comparator(sort,descending));return result;
     }

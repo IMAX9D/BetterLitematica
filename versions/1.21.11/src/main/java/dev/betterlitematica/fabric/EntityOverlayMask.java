@@ -21,9 +21,10 @@ final class EntityOverlayMask {
         copy(client,before);captured=true;
     }
     static void after(MinecraftClient client){if(captured){copy(client,after);ready=true;}}
-    static Mask prepare(boolean enabled){
+    static Mask prepare(boolean enabled){return prepare(enabled,false);}
+    static Mask prepare(boolean enabled,boolean near){
         var depth=MinecraftClient.getInstance().getFramebuffer().getDepthAttachmentView();
-        return new Mask(ProjectionUniforms.modes(0,0,ready&&enabled),ready?beforeView:depth,ready?afterView:depth,RenderSystem.getSamplerCache().get(FilterMode.NEAREST));
+        return new Mask(ProjectionUniforms.modes(0,0,ready&&enabled,near),ready?beforeView:depth,ready?afterView:depth,RenderSystem.getSamplerCache().get(FilterMode.NEAREST));
     }
     record Mask(com.mojang.blaze3d.buffers.GpuBuffer modes,GpuTextureView before,GpuTextureView after,net.minecraft.client.gl.GpuSampler sampler){
         void bind(RenderPass pass){pass.setUniform("ProjectionModes",modes);pass.bindTexture("EntityDepthBefore",before,sampler);pass.bindTexture("EntityDepthAfter",after,sampler);}

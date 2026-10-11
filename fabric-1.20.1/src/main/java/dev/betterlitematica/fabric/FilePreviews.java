@@ -71,7 +71,10 @@ final class FilePreviews implements AutoCloseable {
             if(images!=null&&(!interactive||model!=null)){unchanged(source,stamp);return new Preview(images,model,detailSource);}
             Map<String,Object> root=NbtReader.readPartial(source,SchematicImporter.SOURCE_LIMITS,cancel,FilePreviews::omitAuxiliary);
             sourceReads.incrementAndGet();
-            if(images==null&&regions.isEmpty()){images=SchematicPreview.embedded(root,cancel);if(images!=null)embedded.incrementAndGet();}
+            if(regions.isEmpty()&&(images==null||interactive&&model==null)){
+                var saved=EmbeddedPreviewCache.read(root,cancel);
+                if(saved!=null){if(images==null){images=saved.images();embedded.incrementAndGet();}if(interactive&&model==null&&saved.model()!=null){model=saved.model();modelHits.incrementAndGet();}}
+            }
             if(images==null||interactive&&model==null){
                 var geometry=SchematicPreview.readGeometry(root,regions,cancel);root=null;int[] colors=colors(geometry,cancel);
                 if(images==null){images=SchematicPreview.render(geometry,colors,cancel);generated.incrementAndGet();}
@@ -95,7 +98,31 @@ final class FilePreviews implements AutoCloseable {
 
     /** Captured root is private to this save. It is never a live game object or an existing file. */
     CompletableFuture<SchematicPreview.Images> attach(Map<String,Object> root,Cancellation owner){
-        return submit(cancel->{Cancellation together=()->cancel.cancelled()||owner.cancelled();var images=generate(SchematicPreview.readGeometry(root,together),together);SchematicPreview.embed(root,images,together);return images;});
+        return attach(root,null,false,owner);
+    }
+    CompletableFuture<SchematicPreview.Images> attach(Map<String,Object> root,Path source,boolean preserveEmptyThumbnail,Cancellation owner){
+        return submit(cancel->{
+            Cancellation together=()->cancel.cancelled()||owner.cancelled();together.check();
+            PreviewSourceArrays.materialize(root,together);
+            var saved=EmbeddedPreviewCache.read(root,together);
+            SchematicPreview.Images images=saved==null?null:saved.images();
+            SchematicPreview.OrbitModel model=saved==null?null:saved.model();
+            if(source!=null&&(images==null||model==null)){
+                String key=SchematicImporter.sha256(source,together),digest=SchematicPreview.geometryDigest(root,together);
+                try{
+                    var local=orbitCache.read(key,together);
+                    if(EmbeddedPreviewCache.matches(local,digest,images)){
+                        model=local;modelHits.incrementAndGet();if(images==null){images=cache.read(key,together);if(images!=null&&!EmbeddedPreviewCache.matches(model,digest,images))images=null;}
+                    }
+                }catch(InterruptedIOException cancelled){throw cancelled;}catch(IOException unavailable){BetterLitematicaClient.LOGGER.debug("Export preview cache unavailable",unavailable);}
+            }
+            if(images==null||model==null){
+                var geometry=SchematicPreview.readGeometry(root,together);int[] colors=colors(geometry,together);
+                if(images==null){images=SchematicPreview.render(geometry,colors,together);generated.incrementAndGet();}
+                if(model==null){model=SchematicPreview.createOrbitModel(geometry,colors,together);modelBuilds.incrementAndGet();}
+            }
+            EmbeddedPreviewCache.write(root,new EmbeddedPreviewCache.Cached(images,model),preserveEmptyThumbnail,together);return images;
+        });
     }
     void remember(Path source,SchematicPreview.Images images,Cancellation cancel)throws IOException{store(SchematicImporter.sha256(source,cancel),images,cancel);}
     private SchematicPreview.Images generate(SchematicPreview.Geometry geometry,Cancellation cancel)throws IOException{

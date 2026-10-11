@@ -15,7 +15,7 @@ final class OptionsScreen extends MenuScreen {
     private void save(){controller.saveOptions();refresh();}
     private void selectTab(int next){recording=false;pressed.clear();tab=next;refresh();}
     private void bind(String value){String normalized=InputBindings.normalize(value),conflict=InputBindings.conflict(controller.options().keys,selected,normalized);if(selected.equals("wheel"))ModeWheelInput.bindingCode(normalized);if(!conflict.isEmpty())throw new IllegalArgumentException("快捷键已用于："+InputBindings.label(conflict));controller.options().keys.put(selected,normalized);drafts.put(selected,normalized);controller.saveOptions();refresh();}
-    private void rows(){if(list!=null)list.rows(controller.options().keys.keySet().stream().filter(k->(InputBindings.label(k)+k).toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT))).map(k->new OverlayList.Row(k,InputBindings.label(k),!controller.options().keys.get(k).isEmpty())).toList(),selected);}
+    private void rows(){if(list!=null)list.rows(controller.options().keys.keySet().stream().filter(k->SearchText.matches(InputBindings.label(k)+" "+k,query)).map(k->new OverlayList.Row(k,InputBindings.label(k),!controller.options().keys.get(k).isEmpty())).toList(),selected);}
     @Override protected void buildMenu(){
         chord=null;search=null;cancelRecord=null;
         ghostAt("搜索全部设置",left+innerWidth-120,28,120,()->client.setScreen(new SettingsSearchScreen(this,controller)),true);
@@ -31,8 +31,8 @@ final class OptionsScreen extends MenuScreen {
             setting(SettingId.OPTIONS_COMPATIBILITY,button("模组共存",0,2,7,()->client.setScreen(new CompatibilityScreen(this,controller))));
         }else{
             int w=180,right=left+w+18,rw=innerWidth-w-18;
-            search=settingAction(fieldAt("搜索",query,left,40,w,100));search.setChangedListener(v->{query=v;rows();});
-            if(list==null)list=new OverlayList(left,w,Math.max(40,bodyBottom-bodyTop-88),id->{selected=id;recording=false;refresh();});rows();addBody(list,88);
+            search=settingAction(searchAt("名称或拼音",query,left,54,w,100));search.setChangedListener(v->{query=v;rows();});
+            double offset=list==null?0:list.scrollOffset();list=new OverlayList(left,w,Math.max(40,bodyBottom-bodyTop-88),id->{selected=id;recording=false;refresh();});rows();list.scrollOffset(offset);addBody(list,88);
             chord=settingAction(fieldAt(InputBindings.label(selected),drafts.getOrDefault(selected,s.keys.get(selected)),right,40,rw,120));chord.setChangedListener(v->drafts.put(selected,v));chord.setEditable(!recording);
             settingAction(buttonAt(recording?(selected.equals("wheel")?"按下按键…":"按下组合键…"):"录入按键",right,92,rw,()->{recording=true;pressed.clear();if(Screen.hasControlDown())pressed.add("CTRL");if(Screen.hasAltDown())pressed.add("ALT");if(Screen.hasShiftDown())pressed.add("SHIFT");setFocused(null);refresh();},true,recording));
             int half=(rw-8)/2;settingAction(buttonAt("保存",right,124,half,()->bind(chord.getText()),!recording,true));settingAction(buttonAt("清除",right+half+8,124,half,()->bind(""),!recording,false));

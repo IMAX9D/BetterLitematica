@@ -62,12 +62,30 @@ final class ProjectionController implements AutoCloseable {
     private boolean temporarilyHidden;
     void temporarilyHidden(boolean value){temporarilyHidden=value;}
     private LayerRange layer = LayerRange.ALL;
-    private float opacity = 0.45f;
+    static final float DEFAULT_OPACITY=.8f,LEGACY_DEFAULT_OPACITY=.45f;
+    private float opacity = DEFAULT_OPACITY;
     private String message = "", cachedHud = "";
     private String actionError = "";
     private int ticks, buildTurn, materialTurn;
     private final ProjectionComposite composite=new ProjectionComposite();
     private final RenderResources gpuResources=new RenderResources(1L<<30,65536,65536,8L<<20,8192,1);
+    { gpuResources.distanceOrdered(true); }
+    private long usableVram=-1;
+    /** Player budget, or for "自动" part of the memory the graphics driver reports (previous 1 GiB when it reports none). */
+    private void applyRenderBudget(){
+        int choice=options.display.renderBudget();long bytes;
+        if(choice<0)bytes=Long.MAX_VALUE>>2;else if(choice>0)bytes=(long)choice<<30;
+        else{if(usableVram<0)usableVram=detectUsableVram();bytes=usableVram>0?Math.max(1L<<30,Math.min(8L<<30,usableVram)):1L<<30;}
+        int objects=(int)Math.max(65536,Math.min(1<<20,bytes/(16L<<10)));
+        gpuResources.resize(bytes,objects);
+    }
+    private static long detectUsableVram(){
+        try{var caps=org.lwjgl.opengl.GL.getCapabilities();
+            if(caps.GL_NVX_gpu_memory_info)return org.lwjgl.opengl.GL11.glGetInteger(0x9048)*1024L*2/5;
+            if(caps.GL_ATI_meminfo){int[] free=new int[4];org.lwjgl.opengl.GL11.glGetIntegerv(0x87FC,free);return free[0]*1024L*3/5;}
+        }catch(RuntimeException|LinkageError unavailable){}
+        return 0;
+    }
     private boolean gpuReleaseFailure;
     private void releaseGpu(int limit,long deadline){try{gpuResources.drain(limit,deadline);gpuReleaseFailure=false;}catch(RuntimeException e){if(!gpuReleaseFailure)BetterLitematicaClient.LOGGER.error("GPU resource release will retry",e);gpuReleaseFailure=true;}}
     private ProjectionScene scene=new ProjectionScene(List.of());
@@ -163,7 +181,8 @@ final class ProjectionController implements AutoCloseable {
         if (restoring != null && restoring.isDone()) {
             try {
                 PlacementSession session = restoring.join();
-                layer = session.layer(); opacity = session.opacity(); rendering = session.rendering(); selected = session.selected();
+                // 0.45 was the untouched former default (only a command changes it); new placements now start at 80%.
+                layer = session.layer(); opacity = session.opacity()==LEGACY_DEFAULT_OPACITY?DEFAULT_OPACITY:session.opacity(); rendering = session.rendering(); selected = session.selected();
                 for (Placement placement : session.placements()) { entries.put(placement.id(), new Entry(placement)); queued.add(placement.id()); }
                 message = entries.isEmpty() ? "Press M to load a blueprint" : "Restored " + entries.size() + " placements";
             } catch (CompletionException e) {
@@ -188,7 +207,9 @@ final class ProjectionController implements AutoCloseable {
         }
         tickDraftAssociation();tickDraftRecovery();editor.tick();
         if(draftFile!=null){var status=draftWriter.status(draftFile);if(!status.error().isEmpty()&&!status.error().equals(checkpointFailure)){checkpointFailure=status.error();fail("草稿保存失败，正在重试："+status.error());}else if(status.error().isEmpty())checkpointFailure="";}
-        if(ready&&client.player!=null&&options.followLayer&&layer.mode()!=LayerRange.Mode.ALL)layerAtPlayer();
+        if(ready&&client.player!=null&&options.followLayer&&layer.mode()!=LayerRange.Mode.ALL)followPlayerLayer();
+        // Follow can be switched on without the range changing (wheel); keep renderers in the matching build mode.
+        if(ready){boolean smooth=smoothFollow();for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.layer(layer,smooth);}
         if (analysis != null) {analysis.tick();if(errorOverlay&&client.player!=null){var position=net.minecraft.util.math.BlockPos.ofFloored(client.player.getEyePos());analysis.updateHighlights(new Vec3i(position.getX(),position.getY(),position.getZ()));}}
         nearbyHighlights.tick(client,this);
         materialTotals();
@@ -252,7 +273,7 @@ final class ProjectionController implements AutoCloseable {
         var drawn=entry.renderer.layout().placement();
         if(!drawn.sameGeometry(entry.placement)||!drawn.displayFilter().equals(entry.placement.displayFilter()))entry.renderer.place(entry.placement);
         entry.renderer.visible(entry.placement.enabled()&&entry.placement.renderBlocks());entry.renderer.opacity(entry.placement.opacity());
-        if(!entry.renderer.layer().equals(layer))entry.renderer.layer(layer);
+        entry.renderer.layer(layer,smoothFollow());
     }
     private void rebuildScene(){var renderers=entries.values().stream().filter(e->e.renderer!=null).map(e->e.renderer).toList();scene=new ProjectionScene(renderers);for(var renderer:renderers)renderer.scene(scene);}
     boolean entityOverlayMaskNeeded(WorldRenderContext context){
@@ -262,7 +283,7 @@ final class ProjectionController implements AutoCloseable {
             ||(options.printer.highlights&&options.printer.highlightOnTop&&(!nearbyHighlights.boxes().isEmpty()||!printer.actionMarks(System.nanoTime()).isEmpty()));
     }
     void render(WorldRenderContext context) {
-        gpuResources.nextFrame();
+        applyRenderBudget();gpuResources.nextFrame();
         if(renderChanges.takeAll()){for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldAllChanged();}
         else{var changes=renderChanges.drain(64);if(!changes.isEmpty())for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldChanged(changes);}
         boolean show=rendering&&!temporarilyHidden&&options.display.projection;
@@ -277,16 +298,18 @@ final class ProjectionController implements AutoCloseable {
         if(!active.isEmpty()&&options.display.projection){
             composite.begin(client);
             try{
-                buildTurn=RenderScheduler.run(active.stream().map(entry->entry.renderer).toList(),buildTurn,32,System.nanoTime()+4_000_000L,2*1024*1024);
-                for(var entry:active)entry.renderer.drawFrame(context);
+                // Player-set build budget per frame; uploads scale with it (512 KiB per millisecond, the former 2 MiB per 4 ms).
+                int budget=options.display.buildBudget();
+                buildTurn=RenderScheduler.run(active.stream().map(entry->entry.renderer).toList(),buildTurn,Math.max(32,budget*16),System.nanoTime()+budget*1_000_000L,budget*512*1024);
+                var clip=visualLayer(context.tickCounter().getTickDelta(false));for(var entry:active){entry.renderer.visualClip((int)clip[0],clip[1],clip[2],clip[3]);entry.renderer.drawFrame(context);}
             }finally{composite.finish(client,1f);}
         }
 
         ProjectionOverlays.placements(client,context,entries.values().stream().filter(e->e.renderer!=null&&e.placement.enabled()).map(e->e.renderer.layout()).toList(),selected,options.display,toolBounds,gizmo.previewPlacement(),gizmo.previewOffset());
-        if(options.printer.highlights)ProjectionOverlays.nearbyBoxes(client,context,nearbyHighlights.boxes(),options.printer,options.display.extraColor,false);
+        if(options.printer.highlights){ProjectionOverlays.prepareNearby(client,context,nearbyHighlights.boxes(),options.printer,options.display.extraColor,visualLayer(context.tickCounter().getTickDelta(false)));ProjectionOverlays.drawNearby(client,context,options.printer,false);}
         printer.render(context);ProjectionOverlays.marker(client,context,editor.marker());
-        if(options.printer.highlights)ProjectionOverlays.nearbyBoxes(client,context,nearbyHighlights.boxes(),options.printer,options.display.extraColor,true);
-        if (errorOverlay && analysis != null) ProjectionOverlays.errorBoxes(client,context,analysis.highlightBoxes(),options.display,true,options.printer.highlightLimit);
+        if(options.printer.highlights)ProjectionOverlays.drawNearby(client,context,options.printer,true);
+        if (errorOverlay && analysis != null) ProjectionOverlays.errorBoxes(client,context,analysis.highlightBoxes(),options.display,true,options.printer.highlightLimit,visualLayer(context.tickCounter().getTickDelta(false)));
         gizmo.render(context);
     }
     List<Placement> placements() { return entries.values().stream().map(e -> e.placement).toList(); }
@@ -396,11 +419,12 @@ final class ProjectionController implements AutoCloseable {
         if(analysis!=null&&analysis.world(client.world))analysis.chunkChanged(x,z);
     }
     void startAnalysis(){startAnalysis(selected);}
-    void startAnalysis(UUID id) { Entry entry=entries.get(id);if(entry==null)throw new IllegalStateException("投影已移除"); if (entry.renderer == null) throw new IllegalStateException("请等待投影加载完成"); cancelAnalysis(); analysis = new PlacementAnalysis(entry.renderer, client.world, layer); }
+    /** Verification covers the whole placement; layers only filter what is shown, so following the player never restarts it. */
+    void startAnalysis(UUID id) { Entry entry=entries.get(id);if(entry==null)throw new IllegalStateException("投影已移除"); if (entry.renderer == null) throw new IllegalStateException("请等待投影加载完成"); cancelAnalysis(); analysis = new PlacementAnalysis(entry.renderer, client.world, LayerRange.ALL); }
     void pauseAnalysis() { if (analysis == null) throw new IllegalStateException("尚无扫描任务"); analysis.pause(); }
-    void cancelAnalysis() { errorOverlay = false; if (analysis != null) analysis.cancel(); }
+    void cancelAnalysis() { errorOverlay = false; if (analysis != null) analysis.cancel(); ProjectionOverlays.releaseVerificationIndex(); }
     boolean errorOverlayEnabled() { return errorOverlay; }
-    void toggleErrorOverlay() { errorOverlay = !errorOverlay; }
+    void toggleErrorOverlay() { errorOverlay = !errorOverlay; if (!errorOverlay) ProjectionOverlays.releaseVerificationIndex(); }
     void exportMaterials() { exportMaterials(1,false,""); }
     void exportMaterials(int multiplier,boolean missingOnly,String query){exportMaterials(selected,multiplier,missingOnly,query);}
     void exportMaterials(UUID id,int multiplier,boolean missingOnly,String query) {
@@ -487,7 +511,13 @@ final class ProjectionController implements AutoCloseable {
     }
     CompletableFuture<String> saveDraft(UUID id,SchematicEdits.Snapshot patch,String name,NewFileCommit commit){
         var entry=require(id);var reference=temporarySources.reference(schematicDirectory,entry.placement.source());Path target=exportPath(name,".litematic"),directory=cacheDirectory.resolve("edit-operations");
-        return io.submit(()->{Files.createDirectories(directory);Path temporary=directory.resolve(UUID.randomUUID()+".litematic");try{SchematicPatchIO.write(reference.read(),temporary,patch,()->Thread.currentThread().isInterrupted()||commit.cancelled());if(!commit.commit(temporary,target))throw new CancellationException("另存已取消");return schematicDirectory.relativize(target).toString().replace('\\','/');}finally{Files.deleteIfExists(temporary);}});
+        return io.submit(()->{
+            Files.createDirectories(directory);Path temporary=directory.resolve(UUID.randomUUID()+".litematic");
+            try{Cancellation cancel=()->Thread.currentThread().isInterrupted()||commit.cancelled();Path source=reference.read();var root=SchematicPatchIO.prepare(source,patch,cancel);
+                FilePreviews.await(filePreviews.attach(root,source,false,cancel),cancel);NbtWriter.writeNew(temporary,root,cancel);
+                if(!commit.commit(temporary,target))throw new CancellationException("另存已取消");return schematicDirectory.relativize(target).toString().replace('\\','/');
+            }finally{Files.deleteIfExists(temporary);}
+        });
     }
     void adoptDraft(UUID id,String source){var entry=require(id);draftAdoptions.put(id,entry.placement);entry.placement=entry.placement.source(source);entry.state="Loading";queued.add(id);}
     private void tickDraftAssociation(){
@@ -514,11 +544,17 @@ final class ProjectionController implements AutoCloseable {
         var existing=editingJobs.get(id);if(existing!=null&&!existing.isDone())throw new IllegalStateException("此投影正在导出");
         Entry entry=require(id);var input=sourceInput(entry);Path target=exportPath(output,".litematic");
         BlockStateSpec original=BlockStateSpec.parse(from),replacement=BlockStateSpec.parse(to);
-        editingJobs.entrySet().removeIf(e->!entries.containsKey(e.getKey())&&e.getValue().isDone());editingJobs.put(id,submit("投影替换",()->{try(var source=input.open(Cancellation.THREAD)){var result=LitematicEdit.replace(source.path(),target,original,replacement,blockType,null,Cancellation.THREAD);return "已生成 "+target.getFileName()+" · 修改 "+result.changed()+" 格";}}));
+        editingJobs.entrySet().removeIf(e->!entries.containsKey(e.getKey())&&e.getValue().isDone());editingJobs.put(id,submit("投影替换",()->{try(var source=input.open(Cancellation.THREAD)){
+            var prepared=LitematicEdit.prepare(source.path(),original,replacement,blockType,null,Cancellation.THREAD);FilePreviews.await(filePreviews.attach(prepared.root(),source.path(),false,Cancellation.THREAD),Cancellation.THREAD);
+            NbtWriter.writeNew(target,prepared.root(),Cancellation.THREAD);return "已生成 "+target.getFileName()+" · 修改 "+prepared.result().changed()+" 格";
+        }}));
     }
     void editSet(int x,int y,int z,String state,String output) {
         Entry entry=require();var input=sourceInput(entry);Path target=exportPath(output,".litematic");BlockStateSpec replacement=BlockStateSpec.parse(state);
-        submit("投影单格编辑",()->{try(var source=input.open(Cancellation.THREAD)){var result=LitematicEdit.replace(source.path(),target,null,replacement,false,new Vec3i(x,y,z),Cancellation.THREAD);return "已生成 "+target.getFileName()+"：修改 "+result.changed()+" 格";}});
+        submit("投影单格编辑",()->{try(var source=input.open(Cancellation.THREAD)){
+            var prepared=LitematicEdit.prepare(source.path(),null,replacement,false,new Vec3i(x,y,z),Cancellation.THREAD);FilePreviews.await(filePreviews.attach(prepared.root(),source.path(),false,Cancellation.THREAD),Cancellation.THREAD);
+            NbtWriter.writeNew(target,prepared.root(),Cancellation.THREAD);return "已生成 "+target.getFileName()+"：修改 "+prepared.result().changed()+" 格";
+        }});
     }
     private Path exportPath(String name,String extension) {
         if(!name.matches("[\\p{L}\\p{N}_ .-]{1,100}")||name.equals(".")||name.equals(".."))throw new IllegalArgumentException("请使用普通文件名，不能包含路径");
@@ -529,6 +565,7 @@ final class ProjectionController implements AutoCloseable {
         Entry entry=require();var input=sourceInput(entry);if(!List.of("litematic","schem","nbt").contains(format))throw new IllegalArgumentException("格式应为 litematic/schem/nbt");Path target=exportPath(name,"."+format);
         submit("格式转换",()->{try(var handle=input.open(Cancellation.THREAD)){Path source=handle.path();
             Map<String,Object> root;if(format.equals("litematic"))root=SourceVersions.litematic(SchematicFormats.canonical(NbtReader.read(source,SchematicImporter.SOURCE_LIMITS,Cancellation.THREAD),Cancellation.THREAD),Cancellation.THREAD);else root=SchematicFormats.exportSingle(SchematicDocument.read(source,Cancellation.THREAD),format);
+            if(format.equals("litematic"))FilePreviews.await(filePreviews.attach(root,source,false,Cancellation.THREAD),Cancellation.THREAD);else EmbeddedPreviewCache.remove(root);
             NbtWriter.writeNew(target,root,Cancellation.THREAD);return "已导出 "+target.getFileName()+(format.equals("litematic")?"":"；目标格式不保存 Litematica 计划刻，原文件保留");}});
     }
     void saveVersion(String project){CompletableFuture<String> task=saveProjectVersion(project);background.put("项目快照-"+UUID.randomUUID(),task.thenApply(v->"项目版本已保存："+v));}
@@ -553,7 +590,18 @@ final class ProjectionController implements AutoCloseable {
     FilePreviews.Orbit previewOrbit(SchematicPreview.OrbitModel model){return filePreviews.orbit(model);}
     FilePreviews.Orbit previewOrbit(FilePreviews.Preview preview){return filePreviews.orbit(preview);}
     FilePreviews.Stats previewStats(){return filePreviews.stats();}
-    CompletableFuture<String> exportFile(String relative,String output,String format,String name,String author,String description,int[] preview){Path filename=exportPath(output,"."+format).getFileName();var reference=temporarySources.reference(schematicDirectory,relative);int[] pixels=preview==null?null:preview.clone();return io.submit(()->{Path source=reference.read(),target=(reference.temporary()?schematicDirectory.toRealPath():source.getParent()).resolve(filename);SchematicFileInfo.export(source,target,format,name,author,description,pixels,Cancellation.THREAD);return schematicDirectory.toRealPath().relativize(target).toString().replace((char)92,(char)47);});}
+    CompletableFuture<String> exportFile(String relative,String output,String format,String name,String author,String description,int[] preview){return exportFile(relative,output,format,name,author,description,preview,true);}
+    CompletableFuture<String> exportFile(String relative,String output,String format,String name,String author,String description,int[] preview,boolean attachPreview){
+        Path filename=exportPath(output,"."+format).getFileName();var reference=temporarySources.reference(schematicDirectory,relative);int[] pixels=preview==null?null:preview.clone();
+        return io.submit(()->{
+            Path source=reference.read(),target=(reference.temporary()?schematicDirectory.toRealPath():source.getParent()).resolve(filename);
+            var root=SchematicFileInfo.prepareExport(source,format,name,author,description,pixels,Cancellation.THREAD);
+            if(format.equals("litematic")&&attachPreview)FilePreviews.await(filePreviews.attach(root,source,pixels!=null&&pixels.length==0,Cancellation.THREAD),Cancellation.THREAD);
+            else EmbeddedPreviewCache.remove(root);
+            NbtWriter.writeNew(target,root,Cancellation.THREAD);
+            return schematicDirectory.toRealPath().relativize(target).toString().replace((char)92,(char)47);
+        });
+    }
     CompletableFuture<String> createDirectory(String relative,String name){return io.submit(()->{if(!name.matches("[\\p{L}\\p{N}_ -]{1,80}"))throw new IOException("无效目录名称");Path root=schematicDirectory.toRealPath(),parent=root.resolve(relative).normalize().toRealPath();if(!parent.startsWith(root))throw new IOException("目录越界");Files.createDirectory(parent.resolve(name));return name;});}
     CompletableFuture<int[]> preview(){requireWorld();if(previewCapture!=null&&!previewCapture.isDone())throw new IllegalStateException("预览图正在获取");previewCapture=new CompletableFuture<>();return previewCapture;}
     @SuppressWarnings("deprecation") void capturePreview(){var request=previewCapture;if(request==null)return;previewCapture=null;if(request.isCancelled())return;try{var framebuffer=client.getFramebuffer();if((long)framebuffer.textureWidth*framebuffer.textureHeight>16_777_216)throw new IllegalStateException("窗口分辨率超过截图预算");try(var image=net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(framebuffer);var small=new net.minecraft.client.texture.NativeImage(140,140,false)){int side=Math.min(image.getWidth(),image.getHeight());image.resizeSubRectTo((image.getWidth()-side)/2,(image.getHeight()-side)/2,side,side,small);request.complete(small.makePixelArray());}}catch(RuntimeException e){request.completeExceptionally(e);}}
@@ -569,11 +617,13 @@ final class ProjectionController implements AutoCloseable {
         if(!rendering)return "投影已隐藏";
         Entry entry=entries.get(selected);
         if(entry!=null){
-            if(entry.renderer==null)return entry.placement.name()+" · "+entryStatus(selected);
-            if(!entry.renderer.error().isEmpty())return entry.placement.name()+" · "+entry.renderer.error();
+            // The HUD card is narrow: the state leads and the name, without its extension, may be cut.
+            if(entry.renderer==null)return entryStatus(selected)+" · "+hudName(entry.placement.name());
+            if(!entry.renderer.error().isEmpty())return "渲染异常 · "+hudName(entry.placement.name());
         }
         return "投影 "+entries.size()+" · 仅预览附近区域";
     }
+    private static String hudName(String name){return name.replaceFirst("(?i)\\.(litematic|schem|schematic|nbt)$","");}
     String menuStatus() {
         if(!actionError.isEmpty())return actionError;
         if(!writable)return "配置文件异常，自动保存已停用";
@@ -811,15 +861,46 @@ final class ProjectionController implements AutoCloseable {
     WheelRenderMode wheelRenderMode(){return WheelRenderMode.selected(layer,options.followLayer,options.wheelRenderMode);}
     void explicitLayerMode(LayerRange.Mode mode){var next=WheelRenderMode.valueOf(mode.name());if(options.wheelRenderMode!=next){options.wheelRenderMode=next;saveOptions();}}
     void wheelRendering(WheelRenderMode mode,int first,int second){
-        requireWorld();var next=mode.range(first,second,playerPosition().y());
+        requireWorld();int feet=playerPosition().y();var next=mode.range(first,second,mode==WheelRenderMode.PLAYER_ABOVE?playerAnchor(LayerRange.Axis.Y,LayerRange.Mode.ABOVE,feet):mode==WheelRenderMode.PLAYER_BELOW?playerAnchor(LayerRange.Axis.Y,LayerRange.Mode.BELOW,feet):feet);
         boolean settingsChanged=options.followLayer!=mode.follows()||options.wheelRenderMode!=mode;
         layer(next.axis(),next.min(),next.max());options.followLayer=mode.follows();options.wheelRenderMode=mode;
         if(settingsChanged)saveOptions();
     }
-    void layer(LayerRange.Axis axis, int min, int max) { requireWorld();var next=new LayerRange(axis,min,max);if(next.equals(layer))return;cancelAnalysis();layer=next;for (Entry entry : entries.values()) apply(entry); dirty = true; }
+    void layer(LayerRange.Axis axis, int min, int max) { requireWorld();var next=new LayerRange(axis,min,max);if(next.equals(layer))return;layer=next;for (Entry entry : entries.values()) apply(entry); dirty = true; }
     void cycleLayer(){cycleLayer(1);}
     void cycleLayer(int step){var mode=LayerRange.Mode.values()[Math.floorMod(layer.mode().ordinal()+step,LayerRange.Mode.values().length)];var p=playerPosition();int value=layer.min()==Integer.MIN_VALUE?layer.max()==Integer.MAX_VALUE?switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();}:layer.max():layer.min();var next=LayerRange.of(layer.axis(),mode,value,value);layer(next.axis(),next.min(),next.max());explicitLayerMode(mode);}
-    void layerAtPlayer(){var p=playerPosition();int value=switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();};int last=layer.mode()==LayerRange.Mode.RANGE?Math.addExact(value,Math.subtractExact(layer.max(),layer.min())):value;var next=LayerRange.of(layer.axis(),layer.mode()==LayerRange.Mode.ALL?LayerRange.Mode.SINGLE:layer.mode(),value,last);layer(next.axis(),next.min(),next.max());}
+    boolean smoothFollow(){return options.followLayer&&layer.axis()==LayerRange.Axis.Y&&(layer.mode()==LayerRange.Mode.ABOVE||layer.mode()==LayerRange.Mode.BELOW);}
+    /**
+     * The visible slab {axis, from, to, fade} drawn this frame, in whole cells: a followed layer steps one block
+     * at a time with the player. Meshes for it are built past the boundary, so each step is a shader cut, not a rebuild.
+     */
+    double[] visualLayer(float tickDelta){
+        if(layer.mode()==LayerRange.Mode.ALL)return new double[]{-1,0,0,0};
+        return new double[]{layer.axis().ordinal(),layer.min()==Integer.MIN_VALUE?-1e9:layer.min(),layer.max()==Integer.MAX_VALUE?1e9:(double)layer.max()+1,0};
+    }
+    void layerAtPlayer(){var next=playerLayer();layer(next.axis(),next.min(),next.max());}
+    /**
+     * Vertical "above"/"below" layers hinge on the player's body, not one point: above starts over the head and
+     * below ends under the feet. The body's own two cells stay outside as a safety zone, so the printer never
+     * places into the space the player occupies.
+     */
+    static int playerAnchor(LayerRange.Axis axis,LayerRange.Mode mode,int feet){
+        if(axis!=LayerRange.Axis.Y)return feet;
+        return mode==LayerRange.Mode.ABOVE?feet+2:mode==LayerRange.Mode.BELOW?feet-1:feet;
+    }
+    private LayerRange playerLayer(){
+        var p=playerPosition();var mode=layer.mode()==LayerRange.Mode.ALL?LayerRange.Mode.SINGLE:layer.mode();
+        int value=playerAnchor(layer.axis(),mode,switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();});
+        int last=mode==LayerRange.Mode.RANGE?Math.addExact(value,Math.subtractExact(layer.max(),layer.min())):value;
+        return LayerRange.of(layer.axis(),mode,value,last);
+    }
+    /** Jumping must not shift the layer; flying follows every block so the boundary moves smoothly. */
+    private void followPlayerLayer(){
+        var next=playerLayer();if(next.equals(layer))return;
+        long shift=layer.mode()==LayerRange.Mode.BELOW?(long)next.max()-layer.max():(long)next.min()-layer.min();
+        if(!client.player.isOnGround()&&!client.player.getAbilities().flying&&Math.abs(shift)<2)return;
+        layer(next.axis(),next.min(),next.max());
+    }
     void allLayers() { layer(LayerRange.ALL.axis(), LayerRange.ALL.min(), LayerRange.ALL.max()); }
     void shiftLayer(int amount) {
         requireWorld();if(layer.mode()==LayerRange.Mode.ALL)layerAtPlayer();var next=layer.shifted(amount);layer(next.axis(),next.min(),next.max());
@@ -855,6 +936,7 @@ final class ProjectionController implements AutoCloseable {
         temporarySources.clear();if(temporarySources.cleanupPending())cleanupTemporary();
     }
     void disconnect() {
+        ProjectionOverlays.clearCaches();
         bedrock.disconnect();
         NativeMiner.disconnectAll();
         filePreviews.cancelAll();
@@ -872,7 +954,7 @@ final class ProjectionController implements AutoCloseable {
         cancelCapture();
         save(); restoring = null; release(); ready = false; writable = true; dirty = false; sessionFile = null; lastWorld = null;
         editingJobs.clear();selection=AreaSelection.EMPTY;selectionTarget=null;selectionFile=null;selectionRestoring=null;selectionDirty=false;selectionWritable=true;
-        layer = LayerRange.ALL; opacity = 0.45f; rendering = true; actionError = ""; cachedHud = "";
+        layer = LayerRange.ALL; opacity = DEFAULT_OPACITY; rendering = true; actionError = ""; cachedHud = "";
     }
     void resourcesReloaded() { for (Entry entry : entries.values()) if (entry.renderer != null) entry.renderer.invalidate(); }
     void report(String text) { message = text == null ? "Unknown error" : text; BetterLitematicaClient.LOGGER.info(message); if (client.player != null) client.player.sendMessage(Text.literal("[BetterLitematica] " + message), false); }

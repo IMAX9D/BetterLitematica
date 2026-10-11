@@ -53,7 +53,7 @@ final class PlacementAnalysis {
                 }
                 var r=source.metadata().regions().get(scan.key.region());var base=r.sectionOrigin(scan.key);var transform=layout.part(scan.key.region()).transform();
                 while(scan.cursor<4096&&cells-->0&&System.nanoTime()<end){int i=scan.cursor++;var local=base.add(new Vec3i(i&15,i>>>8,(i>>>4)&15));if(!r.contains(local))continue;var at=transform.apply(local);if(!layer.contains(at))continue;var cell=layout.sample(scan.overlaps,at,this.cells);if(cell!=null&&cell.unknown()){scan.cursor--;return;}if(cell==null||cell.part().index()!=scan.key.region())continue;int id=cell.state();var resolver=source.resolver(scan.key.region());BlockState expected=resolver.resolve(id);var pos=new BlockPos(at.x(),at.y(),at.z());boolean loaded=WorldChunks.loaded(world,pos);BlockState actual=loaded?world.getBlockState(pos):null;
-                    Comparison comparison=!loaded||resolver.unresolved(id)?Comparison.UNKNOWN:expected.equals(actual)||expected.isAir()&&actual.isAir()?Comparison.MATCH:expected.isAir()?Comparison.EXTRA:actual.isAir()?Comparison.MISSING:expected.getBlock()==actual.getBlock()?Comparison.WRONG_STATE:Comparison.WRONG_BLOCK;
+                    Comparison comparison=PrinterRules.comparison(loaded&&!resolver.unresolved(id),actual,expected);
                     String wanted="",found="";if(comparison!=Comparison.MATCH){wanted=descriptions.computeIfAbsent(((long)scan.key.region()<<32)|id,key->expected.toString());if(actual!=null){if(actualDescriptions.size()>=4096)actualDescriptions.clear();found=actualDescriptions.computeIfAbsent(actual,Object::toString);}}
                     scan.result.add(at,comparison,wanted,found);
                 }

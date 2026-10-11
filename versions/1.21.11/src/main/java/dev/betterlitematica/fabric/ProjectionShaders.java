@@ -14,10 +14,10 @@ final class ProjectionShaders {
             .withUniform("DynamicTransforms",UniformType.UNIFORM_BUFFER).withUniform("Projection",UniformType.UNIFORM_BUFFER).withCull(false);
     }
     static final RenderPipeline SURFACE=RenderPipelines.register(common("projection_surface","betterlitematica:core/projection","betterlitematica:core/projection_surface")
-        .withSampler("Sampler0").withUniform("ProjectionModes",UniformType.UNIFORM_BUFFER)
+        .withUniform("ProjectionClip",UniformType.UNIFORM_BUFFER).withSampler("Sampler0").withUniform("ProjectionModes",UniformType.UNIFORM_BUFFER)
         .withVertexFormat(VertexFormats.POSITION_TEXTURE_COLOR,VertexFormat.DrawMode.QUADS)
         .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST).withDepthWrite(true).withDepthBias(-1,-1).withoutBlend().build());
-    static final RenderPipeline COMPOSITE=RenderPipelines.register(common("projection_composite","betterlitematica:core/projection","betterlitematica:core/projection_composite")
+    static final RenderPipeline COMPOSITE=RenderPipelines.register(common("projection_composite","betterlitematica:core/projection_composite","betterlitematica:core/projection_composite")
         .withSampler("Sampler0").withVertexFormat(VertexFormats.POSITION_TEXTURE_COLOR,VertexFormat.DrawMode.QUADS)
         .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST).withDepthWrite(false).withBlend(BlendFunction.TRANSLUCENT).build());
     static RenderPipeline overlay(boolean face,boolean through){

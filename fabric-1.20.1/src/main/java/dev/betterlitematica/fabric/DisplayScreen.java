@@ -14,5 +14,7 @@ final class DisplayScreen extends MenuScreen {
         toggle(page,SettingId.DISPLAY_SELECTION_BOUNDS,"选区边框",controller.options().boxes,0,row+3,()->controller.options().boxes=!controller.options().boxes,save);toggle(page,SettingId.DISPLAY_ORIGINS,"原点",s.origins,1,row+3,()->s.origins=!s.origins,save);
         toggle(page,SettingId.DISPLAY_INFORMATION,"方块信息",s.information,0,row+4,()->s.information=!s.information,save);toggle(page,SettingId.DISPLAY_WORLD_INFORMATION,"实际方块信息",s.informationWorld,1,row+4,()->s.informationWorld=!s.informationWorld,save);
         toggle(page,SettingId.DISPLAY_STATES,"方块状态",s.informationStates,0,row+5,()->s.informationStates=!s.informationStates,save);
+        page.setting(SettingId.DISPLAY_RENDER_BUDGET,page.button("投影显存："+DisplayOptions.renderBudgetLabel(s.renderBudget()),0,2,row+6,()->{s.renderBudgetGiB=s.nextRenderBudget();save.run();}));
+        page.setting(SettingId.DISPLAY_BUILD_BUDGET,page.button("加载预算："+s.buildBudget()+" ms",1,2,row+5,()->{s.buildBudgetMs=s.nextBuildBudget();save.run();}));
     }
 }

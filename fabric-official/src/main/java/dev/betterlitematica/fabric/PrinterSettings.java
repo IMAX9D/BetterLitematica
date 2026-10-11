@@ -37,5 +37,7 @@ final class PrinterSettings {
     }
     private static void bounded(String label,int value,int min,int max){if(value<min||value>max)throw new IllegalArgumentException(label+"："+min+"–"+max);}
     static PrinterSettings read(JsonElement value){if(value==null)return new PrinterSettings();var settings=new Gson().fromJson(value,PrinterSettings.class);var root=value.getAsJsonObject();if(!root.has("highlightOnTop")&&(root.has("highlightThrough")||root.has("errorHighlightOnTop")))settings.highlightOnTop=(root.has("highlightThrough")&&root.get("highlightThrough").getAsBoolean())||(root.has("errorHighlightOnTop")&&root.get("errorHighlightOnTop").getAsBoolean());settings.preserved=root.deepCopy();settings.validate();return settings;}
-    JsonObject snapshot(){validate();var root=preserved.deepCopy();root.remove("highlightThrough");root.remove("errorHighlightOnTop");new Gson().toJsonTree(this).getAsJsonObject().entrySet().forEach(e->root.add(e.getKey(),e.getValue()));return root;}
+    JsonObject snapshot(){validate();return draftSnapshot();}
+    /** Editing may contain intermediate out-of-range values; only persistence validates them. */
+    JsonObject draftSnapshot(){var root=preserved.deepCopy();root.remove("highlightThrough");root.remove("errorHighlightOnTop");new GsonBuilder().serializeSpecialFloatingPointValues().create().toJsonTree(this).getAsJsonObject().entrySet().forEach(e->root.add(e.getKey(),e.getValue()));return root;}
 }

@@ -151,7 +151,7 @@ final class PrinterScreen extends MenuScreen {
     private void read(){discardConfirmed=false;notice="";invalidField=null;try{for(var reader:readers)reader.run();draft.validate();error="";}catch(RuntimeException e){error=Objects.toString(e.getMessage(),"设置无效");focusInvalidField();throw new IllegalArgumentException(error);}}
     private void save(){if(sessionEpoch!=controller.sessionEpoch())throw new IllegalStateException("世界已切换");read();try{controller.printer().configure(PrinterSettings.read(draft.snapshot()));draft=PrinterSettings.read(controller.options().printer.snapshot());rawInputs.clear();invalidInputs.clear();discardConfirmed=false;}catch(RuntimeException e){error=Objects.toString(e.getMessage(),"设置无效");focusInvalidField();throw e;}}
     private void commit(){save();super.close();}
-    private boolean dirty(){return !invalidInputs.isEmpty()||!draft.snapshot().equals(controller.options().printer.snapshot());}
+    private boolean dirty(){return !invalidInputs.isEmpty()||!draft.draftSnapshot().equals(controller.options().printer.snapshot());}
     private String exitLabel(){return discardConfirmed?"确认放弃":dirty()?"放弃":"返回";}
     private void discard(){close();}
     @Override public void close(){if(sessionEpoch!=controller.sessionEpoch()){client.setScreen(null);return;}if(dirty()&&!discardConfirmed){discardConfirmed=true;notice="再次返回将放弃未保存的更改";refresh();return;}super.close();}

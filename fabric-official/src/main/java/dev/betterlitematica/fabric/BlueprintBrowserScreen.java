@@ -8,7 +8,7 @@ import net.minecraft.client.gui.screens.Screen;
 
 final class BlueprintBrowserScreen extends MenuScreen {
     private final boolean resourceOnly;
-    private String directory="",query="",status="正在读取…",selectedPath="",selectedName="",previewPath="";
+    private String directory="",query="",status="正在读取…",selectedPath="",selectedName="",previewPath="",displayedPath="";
     private CompletableFuture<SessionIo.Listing> pending;
     private CompletableFuture<FilePreviews.Preview> previewPending;
     private List<SessionIo.FileEntry> files=List.of();private EditBox search;private BrowserGrid grid;
@@ -18,17 +18,21 @@ final class BlueprintBrowserScreen extends MenuScreen {
     void fileCreated(String path){if(reloadOnInit)return;read(true);}
     private void read(boolean preserve){cancelRead();if(!preserve){files=List.of();select(null);}status="正在读取…";pending=controller.files(directory,query);rows();}
     private void cancelRead(){if(pending!=null)pending.cancel(true);pending=null;queryDue=0;}
-    private void cancelPreview(){if(previewPending!=null)previewPending.cancel(true);previewPending=null;previewPath="";if(preview!=null)preview.close();}
+    private void cancelPreview(){if(previewPending!=null)previewPending.cancel(true);previewPending=null;previewPath="";displayedPath="";if(preview!=null)preview.close();}
     private void searchChanged(String value){if(query.equals(value))return;query=value;cancelRead();select(null);files=List.of();status="正在读取…";queryDue=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(200);rows();}
     private void select(SessionIo.FileEntry file){
         String next=file==null?"":file.path();if(next.equals(selectedPath))return;
-        cancelPreview();selectedPath=next;selectedName=file==null?"":file.name();
-        if(preview!=null)preview.selected(selectedName);if(grid!=null)grid.selected(selectedPath);updateActions();requestPreview();
+        selectedPath=next;selectedName=file==null?"":file.name();
+        if(grid!=null)grid.selected(selectedPath);updateActions();requestPreview();
     }
     private void requestPreview(){
-        if(preview==null||selectedPath.isEmpty()||previewPending!=null)return;
-        preview.selected(selectedName);previewPath=selectedPath;
-        try{previewPending=controller.interactivePreview(selectedPath);}catch(RuntimeException e){preview.failed();}
+        showPreview(selectedPath,selectedName);
+    }
+    private void showPreview(String path,String name){
+        if(preview==null||path.equals(displayedPath))return;
+        cancelPreview();displayedPath=path;preview.selected(name);
+        if(path.isEmpty())return;previewPath=path;
+        try{previewPending=controller.interactivePreview(path);}catch(RuntimeException e){preview.failed();}
     }
     private void click(SessionIo.FileEntry file){
         if(file.directory()){directory=file.path();query="";read(false);refresh();}
@@ -45,7 +49,8 @@ final class BlueprintBrowserScreen extends MenuScreen {
     }
     @Override protected void buildMenu(){
         if(reloadOnInit){reloadOnInit=false;read(true);}
-        search=fieldAt("搜索 · schematics/"+directory,query,left,0,innerWidth-154,120);
+        caption("投影目录：schematics/"+directory,left,0,innerWidth-154);
+        search=searchAt("搜索文件名",query,left,14,innerWidth-154,120);
         buttonAt("上级目录",left+innerWidth-148,14,72,()->{int slash=directory.lastIndexOf('/');directory=slash<0?"":directory.substring(0,slash);query="";read(false);refresh();},!directory.isEmpty(),false);
         buttonAt("刷新",left+innerWidth-70,14,70,()->{cancelPreview();read(true);requestPreview();},true,false);
         int gridWidth=(innerWidth-14)*38/100,bodyHeight=Math.max(30,bodyBottom-bodyTop-46);
@@ -70,10 +75,12 @@ final class BlueprintBrowserScreen extends MenuScreen {
             }catch(CompletionException|CancellationException e){status="读取失败";}
             pending=null;rows();
         }
+        var hovered=grid==null?null:grid.previewHovered();
+        showPreview(hovered==null?selectedPath:hovered.path(),hovered==null?selectedName:hovered.name());
         if(previewPending!=null&&previewPending.isDone()){
             var completed=previewPending;String path=previewPath;previewPending=null;previewPath="";
-            try{var images=completed.join();if(preview!=null&&path.equals(selectedPath))preview.images(images);}
-            catch(RuntimeException e){if(preview!=null&&path.equals(selectedPath))preview.failed();}
+            try{var images=completed.join();if(preview!=null&&path.equals(displayedPath))preview.images(images);}
+            catch(RuntimeException e){if(preview!=null&&path.equals(displayedPath))preview.failed();}
         }
     }
     @Override protected String statusLine(){return status;}

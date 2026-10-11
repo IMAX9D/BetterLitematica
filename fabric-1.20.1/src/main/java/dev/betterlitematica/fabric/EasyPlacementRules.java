@@ -26,9 +26,9 @@ final class EasyPlacementRules {
     private static double clamp(double eye,int cell){return Math.max(cell+0.001,Math.min(cell+0.999,eye));}
     static boolean matches(BlockState predicted,BlockState wanted){
         if(predicted==null||predicted.getBlock()!=wanted.getBlock())return false;
-        if(predicted.equals(wanted))return true;
+        if(PrinterRules.constructionMatches(predicted,wanted))return true;
         if(wanted.contains(Properties.SLAB_TYPE)&&wanted.get(Properties.SLAB_TYPE)==SlabType.DOUBLE){
-            return predicted.with(Properties.SLAB_TYPE,SlabType.DOUBLE).equals(wanted);
+            return PrinterRules.constructionMatches(predicted.with(Properties.SLAB_TYPE,SlabType.DOUBLE),wanted);
         }
         return false;
     }

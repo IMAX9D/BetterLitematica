@@ -54,7 +54,11 @@ final class BedrockSettings {
     }
     BedrockSettings copy(){return read(snapshot());}
     JsonObject snapshot(){
-        validate();var root=preserved.deepCopy();root.addProperty("version",1);
+        validate();return draftSnapshot();
+    }
+    /** Draft comparisons must not validate partially edited fields. */
+    JsonObject draftSnapshot(){
+        var root=preserved.deepCopy();root.addProperty("version",1);
         new Gson().toJsonTree(this).getAsJsonObject().entrySet().forEach(entry->root.add(entry.getKey(),entry.getValue()));return root;
     }
     private static boolean identifier(String value){return value!=null&&value.length()<=128&&value.matches("[a-z0-9_.-]+:[a-z0-9_./-]+");}

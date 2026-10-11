@@ -30,7 +30,7 @@ final class BuildingInteractions {
         if(client.world==null||client.player==null||client.interactionManager==null||client.currentScreen!=null||!client.isWindowFocused()){pendingPick=null;wasUse=false;stroke.clear();return;}
         if(pendingPick!=null){if(ticks>=pickExpires||controller.printer().running())pendingPick=null;else if(controller.action(this::continuePick)==0)pendingPick=null;}
         boolean use=client.options.useKey.isPressed();
-        if(enabled()&&(use||client.options.attackKey.isPressed())&&controller.options().hold)attempt();
+        if(enabled()&&controller.options().hold&&use)attempt();
         wasUse=use;
     }
     private boolean enabled(){return !controller.editor().claimsInput()&&!using&&!controller.printer().running()&&!controller.bedrock().enabled()&&controller.projectionRenderingEnabled()&&(controller.options().easyPlace||bindings.held("easyPlaceHold"))&&client.player!=null&&client.world!=null&&client.interactionManager!=null&&client.currentScreen==null&&client.isWindowFocused()&&!hasTool()&&!client.player.isSpectator()&&!client.player.isUsingItem();}
@@ -40,9 +40,7 @@ final class BuildingInteractions {
         return true;
     }
     /** Poll after mouse look, not only at 20 Hz; new targets never share a cooldown. */
-    void frame(){if(enabled()&&controller.options().hold&&(client.options.attackKey.isPressed()||client.options.useKey.isPressed()))attempt();}
-    boolean claimsAttack(){return enabled()&&controller.options().hold&&controller.target(client.player.getBlockInteractionRange())!=null;}
-    boolean attack(){if(!claimsAttack())return false;attempt();return true;}
+    void frame(){if(enabled()&&controller.options().hold&&client.options.useKey.isPressed())attempt();}
     private void attempt(){
         var target=controller.target(client.player.getBlockInteractionRange());if(target==null)return;
         var at=target.position();if(!stroke.allow(BlockPos.asLong(at.x(),at.y(),at.z()),ticks))return;
@@ -100,7 +98,7 @@ final class BuildingInteractions {
     private void easyPlace(ProjectionController.Target target){
         if(client.interactionManager==null)return;double reach=client.player.getBlockInteractionRange();
         var at=target.position();BlockPos pos=new BlockPos(at.x(),at.y(),at.z());if(!WorldChunks.loaded(client.world,pos))return;
-        var existing=client.world.getBlockState(pos);if(existing.equals(target.state()))return;
+        var existing=client.world.getBlockState(pos);if(PrinterRules.constructionMatches(existing,target.state()))return;
         boolean doubleSlab=target.state().contains(Properties.SLAB_TYPE)&&target.state().get(Properties.SLAB_TYPE)==SlabType.DOUBLE;
         if(!existing.isReplaceable()&&!(doubleSlab&&existing.getBlock()==target.state().getBlock()))return;
         // Do not target projection blocks behind a real wall.

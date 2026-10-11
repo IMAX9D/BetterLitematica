@@ -36,11 +36,15 @@ public final class SchematicPreview {
     public static final class OrbitModel{
         private final Geometry full,drag;private final int[] colors,surfaces,fullSurfaces;private final int[] low,high;
         private OrbitModel(Geometry full,Geometry drag,int[] colors,int[] surfaces,int[] fullSurfaces,int[] low,int[] high){this.full=full;this.drag=drag;this.colors=colors;this.surfaces=surfaces;this.fullSurfaces=fullSurfaces;this.low=low;this.high=high;}
+        public String digest(){return full.digest;}public Vec3i size(){return full.size;}public long blocks(){return full.blocks;}
     }
     private record Part(Region region,PackedBits blocks,int[] palette){}
     private record RegionGrid(Region region,RegionPlacement placement,Geometry geometry){}
     private static final PlacementTransform IDENTITY=new PlacementTransform(Vec3i.ZERO,0,false,false);
     private record Parsed(List<Part> parts,List<BlockStateSpec> palette,Vec3i min,Vec3i size,String digest){}
+
+    /** Geometry identity excludes optional metadata and does not allocate a decoded voxel grid. */
+    public static String geometryDigest(Map<String,Object> root,Cancellation cancel)throws IOException{return parse(root,cancel,false).digest();}
 
     public static Geometry readGeometry(Map<String,Object> root,Cancellation cancel)throws IOException{
         return readGeometry(root,LOD,cancel);

@@ -12,7 +12,7 @@ final class AnalysisScreen extends MenuScreen {
     private PlacementAnalysis analysis(){var value=controller.analysis();return value!=null&&Objects.equals(target,value.target())?value:null;}
     @Override protected void buildMenu(){
         var placement=controller.placement(target);addBody(new OverlayLabel(left,innerWidth,target==null?"未选择投影":placement==null?"投影已移除":placement.name()),0);
-        var search=fieldAt("搜索",materials?materialQuery:errorQuery,left,22,innerWidth-100,120);
+        var search=searchAt(materials?materialQuery:errorQuery,left,36,innerWidth-100,120);
         if(materials){
             buttonAt(sort.label(),left+innerWidth-92,36,62,()->{sort=FileMaterials.Sort.values()[(sort.ordinal()+1)%FileMaterials.Sort.values().length];updateGrid(true);refresh();},true,false);buttonAt(descending?"↓":"↑",left+innerWidth-24,36,24,()->{descending=!descending;updateGrid(true);refresh();},true,false);
             buttonAt("刷新",cellX(0,4),64,cellWidth(4),()->{controller.startMaterials(target);updateGrid(true);},placement!=null,true);
@@ -29,7 +29,6 @@ final class AnalysisScreen extends MenuScreen {
             highlight=buttonAt(controller.errorOverlayEnabled()?"高亮：开":"高亮：关",cellX(4,5),64,cellWidth(5),()->{controller.toggleErrorOverlay();refresh();},analysis()!=null,false);
             if(results==null)results=new VerificationList(left,innerWidth,bodyBottom-bodyTop-94,key->controller.action(()->{var a=analysis();if(a!=null){if(a.report().ignored(key))a.report().restore(key);else a.report().ignore(key);rows(false);}}));addBody(results,94);rows(false);search.setChangedListener(v->{errorQuery=v;rows(true);});
         }
-
         updateMenu();
     }
     static boolean validMultiplierInput(String value){if(value.isEmpty())return true;if(value.length()>10||!value.chars().allMatch(c->c>='0'&&c<='9'))return false;try{return Integer.parseInt(value)>0;}catch(NumberFormatException e){return false;}}
@@ -39,7 +38,7 @@ final class AnalysisScreen extends MenuScreen {
         var language=net.minecraft.util.Language.getInstance();if(verifierLanguage!=language){verifierNames.clear();verifierLanguage=language;}
         results.rows(groups.entrySet().stream().filter(e->report.ignored(e.getKey())==ignored&&matchesVerification(e.getKey(),query,this::verificationName)).sorted(Map.Entry.<VerificationReport.Key,Long>comparingByValue().reversed()).map(e->new VerificationList.Row(e.getKey(),e.getValue(),ignored)).toList(),reset);
     }
-    static boolean matchesVerification(VerificationReport.Key key,String query,java.util.function.Function<String,String> name){if(query.isBlank())return true;String raw=key.expected()+key.actual()+VerificationList.type(key.type())+key.type();String lower=query.toLowerCase(Locale.ROOT);return raw.toLowerCase(Locale.ROOT).contains(lower)||(name.apply(key.expected())+name.apply(key.actual())).toLowerCase(Locale.ROOT).contains(lower);}
+    static boolean matchesVerification(VerificationReport.Key key,String query,java.util.function.Function<String,String> name){if(query.isBlank())return true;String raw=key.expected()+" "+key.actual()+" "+VerificationList.type(key.type())+" "+key.type();return SearchText.matches(raw+" "+name.apply(key.expected())+" "+name.apply(key.actual()),query);}
     private String verificationName(String state){String known=verifierNames.get(state);if(known!=null)return known;if(verifierNames.size()>=VerificationReport.MAX_GROUPS*2)verifierNames.clear();return verifierNames.computeIfAbsent(state,AnalysisScreen::localizedStateName);}
     static String localizedStateName(String state){int start=state.indexOf('{'),end=state.indexOf('}');String id=start>=0&&end>start?state.substring(start+1,end):state.split("\\[",2)[0];var key=net.minecraft.util.Identifier.tryParse(id);return key!=null&&net.minecraft.util.registry.Registry.BLOCK.containsId(key)?net.minecraft.util.registry.Registry.BLOCK.get(key).getName().getString():state.isEmpty()?"未知":state;}
     @Override protected void updateMenu(){if(export==null)return;if(materials){if(multiplierInput!=null&&!multiplierInput.isFocused()&&multiplierInput.getText().isEmpty())multiplierInput.setText(Integer.toString(multiplier));var totals=controller.materialTotals(target);export.active=totals!=null&&totals.finished();if(++ticks%10==0)updateGrid(false);}else{var a=analysis();boolean live=a!=null&&!a.cancelled();pause.active=cancel.active=live;highlight.active=a!=null;pause.setMessage(net.minecraft.text.Text.literal(a!=null&&a.paused()?"继续":"暂停"));export.active=a!=null;if(++ticks%10==0)rows(false);}}

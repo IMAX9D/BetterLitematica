@@ -162,7 +162,7 @@ final class BedrockScreen extends MenuScreen {
         if(!next.snapshot().equals(current.snapshot()))controller.bedrock().configure(next);draft=controller.bedrock().settings().copy();rawInputs.clear();invalidInputs.clear();discardConfirmed=false;
     }
     private void commit(){save();super.close();}
-    private boolean dirty(){var saved=controller.bedrock().settings().snapshot();var edited=draft.snapshot();edited.add("regions",saved.get("regions"));return !invalidInputs.isEmpty()||!edited.equals(saved);}
+    private boolean dirty(){var saved=controller.bedrock().settings().snapshot();var edited=draft.draftSnapshot();edited.add("regions",saved.get("regions"));return !invalidInputs.isEmpty()||!edited.equals(saved);}
     private String exitLabel(){return discardConfirmed?"确认放弃":dirty()?"放弃":"返回";}
     private void discard(){close();}
     @Override public void close(){if(epoch!=controller.sessionEpoch()){client.setScreen(null);return;}if(dirty()&&!discardConfirmed){discardConfirmed=true;error="再次返回将放弃未保存的更改";refresh();return;}super.close();}

@@ -33,7 +33,7 @@ final class FileMaterials {
         if(client.player!=null)for(int i=0;i<client.player.getInventory().size();i++){var stack=client.player.getInventory().getStack(i);if(!stack.isEmpty())inventory.merge(stack.getItem(),(long)stack.getCount(),Long::sum);}
         String query=filter.toLowerCase(Locale.ROOT);var result=new ArrayList<PlacementAnalysis.Material>();
         totals.forEach((item,count)->{long total=Math.multiplyExact(count,multiplier),available=inventory.getOrDefault(item,0L);
-            if((!missingOnly||total>available)&&(item.getName().getString().toLowerCase(Locale.ROOT).contains(query)||Registries.ITEM.getId(item).toString().contains(query)))result.add(new PlacementAnalysis.Material(item,total,total,0,available));
+            if((!missingOnly||total>available)&&SearchText.matches(item.getName().getString()+" "+Registries.ITEM.getId(item),query))result.add(new PlacementAnalysis.Material(item,total,total,0,available));
         });
         result.sort(comparator(sort,descending));return result;
     }

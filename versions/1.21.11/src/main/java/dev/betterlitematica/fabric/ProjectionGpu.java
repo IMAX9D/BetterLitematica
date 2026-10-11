@@ -30,10 +30,10 @@ final class ProjectionGpu implements AutoCloseable {
         pass.setPipeline(pipeline);RenderSystem.bindDefaultUniforms(pass);return pass;
     }
     static Surface surface(org.joml.Matrix4f view,org.joml.Matrix4f projection,float opacity,net.minecraft.util.Identifier texture,boolean intensity,boolean wrong){
-        return new Surface(ProjectionUniforms.transforms(new org.joml.Matrix4f(RenderSystem.getModelViewMatrix()).mul(view),1,1,1,opacity,1),ProjectionUniforms.projection(projection),ProjectionUniforms.modes(intensity?1:0,wrong?1:0,false),net.minecraft.client.MinecraftClient.getInstance().getTextureManager().getTexture(texture).getGlTextureView(),net.minecraft.client.MinecraftClient.getInstance().getTextureManager().getTexture(texture).getSampler());
+        return new Surface(ProjectionUniforms.transforms(new org.joml.Matrix4f(RenderSystem.getModelViewMatrix()).mul(view),1,1,1,opacity,1),ProjectionUniforms.projection(projection),ProjectionUniforms.clip(),ProjectionUniforms.modes(intensity?1:0,wrong?1:0,false),net.minecraft.client.MinecraftClient.getInstance().getTextureManager().getTexture(texture).getGlTextureView(),net.minecraft.client.MinecraftClient.getInstance().getTextureManager().getTexture(texture).getSampler());
     }
-    record Surface(GpuBufferSlice transforms,GpuBufferSlice projection,GpuBuffer modes,com.mojang.blaze3d.textures.GpuTextureView texture,net.minecraft.client.gl.GpuSampler sampler){
-        void bind(RenderPass pass){pass.setUniform("DynamicTransforms",transforms);pass.setUniform("Projection",projection);pass.setUniform("ProjectionModes",modes);pass.bindTexture("Sampler0",texture,sampler);}
+    record Surface(GpuBufferSlice transforms,GpuBufferSlice projection,GpuBufferSlice clip,GpuBuffer modes,com.mojang.blaze3d.textures.GpuTextureView texture,net.minecraft.client.gl.GpuSampler sampler){
+        void bind(RenderPass pass){pass.setUniform("DynamicTransforms",transforms);pass.setUniform("Projection",projection);pass.setUniform("ProjectionClip",clip);pass.setUniform("ProjectionModes",modes);pass.bindTexture("Sampler0",texture,sampler);}
     }
     void bind(RenderPass pass){
         var sequential=RenderSystem.getSequentialBuffer(mode);

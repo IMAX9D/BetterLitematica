@@ -30,14 +30,15 @@ final class ProjectionGpu implements AutoCloseable {
         var pass=RenderSystem.getDevice().createCommandEncoder().createRenderPass(target.getColorAttachment(),OptionalInt.empty(),target.getDepthAttachment(),OptionalDouble.empty());
         pass.setPipeline(pipeline);return pass;
     }
-    record Surface(Matrix4f view,Matrix4f projection,float opacity,com.mojang.blaze3d.textures.GpuTexture texture,boolean intensity,boolean wrong){
+    record Surface(Matrix4f view,Matrix4f projection,float opacity,com.mojang.blaze3d.textures.GpuTexture texture,boolean intensity,boolean wrong,ProjectionClip clip){
         void bind(RenderPass pass){
             pass.setUniform("ProjectionView",view);pass.setUniform("ProjectionProjection",projection);pass.setUniform("ProjectionColor",1f,1f,1f,opacity);
+            pass.setUniform("ViewInverse",clip.inverse());pass.setUniform("CameraPos",clip.x(),clip.y(),clip.z());pass.setUniform("LayerClip",clip.axis(),clip.from(),clip.to(),clip.feather());pass.setUniform("Fade",.75f,2.5f);
             pass.setUniform("TextureMode",intensity?1:0);pass.setUniform("SurfaceTint",wrong?1:0);pass.bindSampler("Sampler0",texture);
         }
     }
     static Surface surface(Matrix4f view,Matrix4f projection,float opacity,Identifier texture,boolean intensity,boolean wrong){
-        return new Surface(new Matrix4f(RenderSystem.getModelViewMatrix()).mul(view),new Matrix4f(projection),opacity,MinecraftClient.getInstance().getTextureManager().getTexture(texture).getGlTexture(),intensity,wrong);
+        return new Surface(new Matrix4f(RenderSystem.getModelViewMatrix()).mul(view),new Matrix4f(projection),opacity,MinecraftClient.getInstance().getTextureManager().getTexture(texture).getGlTexture(),intensity,wrong,ProjectionClip.current);
     }
     void bind(RenderPass pass){
         var sequential=RenderSystem.getSequentialBuffer(mode);

@@ -43,7 +43,7 @@ abstract class MenuScreen extends UiScreen {
         building=true;clearWidgets();body.clear();footer.clear();navigation.clear();captions.clear();hints.clear();settingIds.clear();settingActions.clear();fieldMotion.clear();contentHeight=0;
         innerWidth=Math.max(160,Math.min(width-48,wide?680:440));left=(width-innerWidth)/2;
         int panelHeight=Math.min(height-20,preferredHeight());panelTop=(height-panelHeight)/2;panelBottom=panelTop+panelHeight;
-        bodyTop=panelTop+(description.isEmpty()?40:58);bodyBottom=panelBottom-56;
+        bodyTop=panelTop+(description.isEmpty()?40:58);bodyBottom=panelBottom-footerHeight()-7;
         buildMenu();describeSettings();back=showBack()?fixed(backLabel(),innerWidth-76,76,this::onClose):null;building=false;position();
         if(previousFocus!=null)for(var item:body)if(item.y==previousFocus.y&&item.widget.getX()==previousFocus.widget.getX()&&item.widget instanceof OverlayTextField field&&field.getMessage().equals(previousFocus.widget.getMessage())){field.setCursorPosition(Math.min(cursor,field.getValue().length()));field.setHighlightPos(Math.min(anchor,field.getValue().length()));setFocused(field);break;}
     }
@@ -70,6 +70,7 @@ abstract class MenuScreen extends UiScreen {
     protected boolean showBack(){return true;}
     protected String backLabel(){return parent==null?"返回游戏":"返回";}
     protected int preferredHeight(){return wide?560:430;}
+    protected int footerHeight(){return 49;}
     protected final void refresh(){init();}
     protected String heading(){return title.getString();}
     protected String statusLine(){return "";}
@@ -120,6 +121,13 @@ abstract class MenuScreen extends UiScreen {
         caption(label,x,y,w);
         var field=new OverlayTextField(x+6,0,w-12,label);field.setMaxLength(max);field.setValue(value);addBody(field,y+14);return field;
     }
+    /** A search field keeps its accessible name without a separate caption row. */
+    protected final EditBox searchAt(String value,int x,int y,int w,int max){
+        return searchAt("名称、ID 或拼音",value,x,y,w,max);
+    }
+    protected final EditBox searchAt(String placeholder,String value,int x,int y,int w,int max){
+        var field=new OverlayTextField(x+6,0,w-12,"搜索",true);field.placeholder(placeholder);field.setMaxLength(max);field.setValue(value);addBody(field,y);hint(field,placeholder);return field;
+    }
     protected final void addBody(AbstractWidget widget,int y){body.add(new Item(widget,y));contentHeight=Math.max(contentHeight,y+widget.getHeight());addRenderableWidget(widget);if(!building)position();}
     protected final void clearRows(int row){int y=row*26;body.removeIf(item->{if(item.y>=y){removeWidget(item.widget);return true;}return false;});captions.removeIf(c->c.y>=y);contentHeight=0;for(var item:body)contentHeight=Math.max(contentHeight,item.y+item.widget.getHeight());for(var caption:captions)contentHeight=Math.max(contentHeight,caption.y+14);}
     protected final int listRows(int start){return Math.max(1,(bodyBottom-bodyTop-start*26)/26);}
@@ -136,8 +144,9 @@ abstract class MenuScreen extends UiScreen {
     protected final Button fixed(String text,int x,int w,Runnable action){return footerButton(text,x,w,action,Look.STANDARD);}
     /** The page's one committing action (load, save); drawn solid so it is never mistaken for Back. */
     protected final Button fixedAction(String text,int x,int w,Runnable action){return footerButton(text,x,w,action,Look.ACCENT);}
-    private Button footerButton(String text,int x,int w,Runnable action,Look look){var b=new MenuButton(left+x,panelBottom-41,w,text,()->runAction(action),look,buttonMotion("footer:"+x+":"+w));footer.add(b);addRenderableWidget(b);return b;}
-    protected final <T extends AbstractWidget> T fixedControl(T widget,int x){widget.setX(left+x);widget.setY(panelBottom-41);footer.add(widget);addRenderableWidget(widget);return widget;}
+    private int footerControlY(int height){return footerHeight()<49?panelBottom-footerHeight()+(footerHeight()-height)/2:panelBottom-41;}
+    private Button footerButton(String text,int x,int w,Runnable action,Look look){var b=new MenuButton(left+x,footerControlY(20),w,text,()->runAction(action),look,buttonMotion("footer:"+x+":"+w));footer.add(b);addRenderableWidget(b);return b;}
+    protected final <T extends AbstractWidget> T fixedControl(T widget,int x){widget.setX(left+x);widget.setY(footerControlY(widget.getHeight()));footer.add(widget);addRenderableWidget(widget);return widget;}
     protected int scrollLeft(){return left;}
     protected int scrollRight(){return left+innerWidth;}
     protected int scrollTop(){return bodyTop;}
@@ -227,7 +236,7 @@ abstract class MenuScreen extends UiScreen {
         String name=menu.heading();return name.equals(heading())?"":name;
     }
     private void renderCanvas(GuiGraphicsExtractor ctx,int mouseX,int mouseY,float delta,IndependentUi ui){
-        double l=left-14,r=left+innerWidth+14,radius=UiTheme.PANEL_RADIUS,footerTop=panelBottom-49;
+        double l=left-14,r=left+innerWidth+14,radius=UiTheme.PANEL_RADIUS,footerTop=panelBottom-footerHeight();
         ui.elevation(l,panelTop,r,panelBottom,radius);
         ui.roundRect(l,panelTop,r,panelBottom,radius,UiTheme.PANEL);
         // Footer band: same silhouette, square top edge, one tone deeper.
@@ -257,7 +266,7 @@ abstract class MenuScreen extends UiScreen {
         if(maxScroll()>0){int track=bodyBottom-scrollTop(),thumb=Math.max(20,track*track/Math.max(1,contentHeight-(scrollTop()-bodyTop)));int y=scrollTop()+(track-thumb)*scroll/Math.max(1,maxScroll());ui.roundRect(scrollRight()+6,scrollTop(),scrollRight()+8,bodyBottom,1,UiMotion.alpha(UiTheme.TRACK,.8));ui.roundRect(scrollRight()+6,y,scrollRight()+8,y+thumb,1,UiTheme.THUMB);}
         for(var widget:footer)widget.extractRenderState(ctx,mouseX,mouseY,delta);
         String status=displayedStatus();
-        if(!status.isEmpty()){int color=statusColor();double sy=panelBottom-15;ui.roundRect(left,sy+ui.lineHeight()/2-1.5,left+3,sy+ui.lineHeight()/2+1.5,1.5,color==UiTheme.MUTED?UiTheme.ACCENT:color);ui.text(status,left+8,sy,innerWidth-8,color);}
+        if(!status.isEmpty()){int color=statusColor();boolean compact=footerHeight()<49;double sx=left+(compact?88:0),sy=compact?footerTop+(footerHeight()-ui.lineHeight())/2-.5:panelBottom-15;ui.roundRect(sx,sy+ui.lineHeight()/2-1.5,sx+3,sy+ui.lineHeight()/2+1.5,1.5,color==UiTheme.MUTED?UiTheme.ACCENT:color);ui.text(status,sx+8,sy,innerWidth-(compact?184:8),color);}
         // Tooltips wait for a short rest on one control so sweeping the pointer across icons stays quiet.
         AbstractWidget resting=null;
         for(var entry:hints.entrySet())if(entry.getKey().visible&&entry.getKey().isMouseOver(mouseX,mouseY)){resting=entry.getKey();break;}

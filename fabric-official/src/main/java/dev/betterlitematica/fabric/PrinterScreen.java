@@ -1,5 +1,4 @@
 package dev.betterlitematica.fabric;
-
 import dev.betterlitematica.core.PrinterRange;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
@@ -7,7 +6,6 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import java.util.*;
 import java.util.function.*;
-
 /** One shared printer session covers every enabled placement. */
 final class PrinterScreen extends MenuScreen {
     private final long sessionEpoch;
@@ -49,7 +47,6 @@ final class PrinterScreen extends MenuScreen {
             var control=setting(switch(mode){case PRINT->SettingId.PRINTER_PRINT;case MINE->SettingId.PRINTER_MINE;case FILL->SettingId.PRINTER_FILL;case DRAIN->SettingId.PRINTER_DRAIN;case BEDROCK->SettingId.PRINTER_BEDROCK;},buttonAt(mode.label()+"："+(mode.mixed(draft)?"部分":enabled?"开":"关"),x,56,w,()->{read();draft=WheelModes.toggled(draft,mode);refresh();},true,enabled));
             hint(control,mode==WheelModes.BEDROCK?SettingHelp.text(SettingId.PRINTER_BEDROCK):"切换"+mode.label()+"模式；可直接保存并开始施工。");
             if(mode.mixed(draft)){var active=new ArrayList<String>();if(draft.breakWrong)active.add("错误方块");if(draft.breakExtra)active.add("多余方块");if(draft.breakState)active.add("错误状态");hint(control,String.join(" · ",active));}
-
         }
         cycleScope(SettingId.PRINTER_PRINT_SCOPE,"打印范围",0,4,88,()->draft.printScope,v->draft.printScope=v);
         cycleScope(SettingId.PRINTER_FILL_SCOPE,"填充范围",1,4,88,()->draft.fillScope,v->draft.fillScope=v);
@@ -66,7 +63,6 @@ final class PrinterScreen extends MenuScreen {
         hint(fields.get("位置冷却 / tick"),"同一位置再次尝试前的等待时间");
         toggle(SettingId.PRINTER_HUD,"状态 HUD",0,222,()->draft.hud,v->draft.hud=v);
         toggle(SettingId.PRINTER_NEARBY_HUD,"周围待建 HUD",1,222,()->draft.missingHud,v->draft.missingHud=v);
-
     }
     private void settingsPage(){
         setting(SettingId.PRINTER_SHAPE,buttonAt("范围形状："+switch(draft.shape){case SPHERE->"球形";case OCTAHEDRON->"八面体";case CUBE->"立方体";},cellX(0,2),56,cellWidth(2),()->{read();draft.shape=PrinterRange.Shape.values()[(draft.shape.ordinal()+1)%3];refresh();},true,false));
@@ -155,7 +151,7 @@ final class PrinterScreen extends MenuScreen {
     private void read(){discardConfirmed=false;notice="";invalidField=null;try{for(var reader:readers)reader.run();draft.validate();error="";}catch(RuntimeException e){error=Objects.toString(e.getMessage(),"设置无效");focusInvalidField();throw new IllegalArgumentException(error);}}
     private void save(){if(sessionEpoch!=controller.sessionEpoch())throw new IllegalStateException("世界已切换");read();try{controller.printer().configure(PrinterSettings.read(draft.snapshot()));draft=PrinterSettings.read(controller.options().printer.snapshot());rawInputs.clear();invalidInputs.clear();discardConfirmed=false;}catch(RuntimeException e){error=Objects.toString(e.getMessage(),"设置无效");focusInvalidField();throw e;}}
     private void commit(){save();super.onClose();}
-    private boolean dirty(){return !invalidInputs.isEmpty()||!draft.snapshot().equals(controller.options().printer.snapshot());}
+    private boolean dirty(){return !invalidInputs.isEmpty()||!draft.draftSnapshot().equals(controller.options().printer.snapshot());}
     private String exitLabel(){return discardConfirmed?"确认放弃":dirty()?"放弃":"返回";}
     private void discard(){onClose();}
     @Override public void onClose(){if(sessionEpoch!=controller.sessionEpoch()){ClientUi.setScreen(minecraft,null);return;}if(dirty()&&!discardConfirmed){discardConfirmed=true;notice="再次返回将放弃未保存的更改";refresh();return;}super.onClose();}

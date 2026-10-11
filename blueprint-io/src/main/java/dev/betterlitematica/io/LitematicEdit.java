@@ -8,9 +8,14 @@ import java.util.*;
 /** Edits the original lossless NBT tree, never the preview cache. Exports are always new files. */
 public final class LitematicEdit {
     public record Result(long changed, long removedBlockEntities, long removedTicks) {}
+    public record Prepared(Map<String,Object> root,Result result) {}
     private LitematicEdit() {}
     public static Result replace(Path source, Path output, BlockStateSpec from, BlockStateSpec to,
                                  boolean matchBlockType, Vec3i onlyPosition, Cancellation cancel) throws IOException {
+        var prepared=prepare(source,from,to,matchBlockType,onlyPosition,cancel);NbtWriter.writeNew(output,prepared.root(),cancel);return prepared.result();
+    }
+    /** Prepare a private replacement tree so callers can attach render metadata before publication. */
+    public static Prepared prepare(Path source,BlockStateSpec from,BlockStateSpec to,boolean matchBlockType,Vec3i onlyPosition,Cancellation cancel)throws IOException{
         Map<String,Object> root=SourceVersions.litematic(SchematicFormats.canonical(NbtReader.read(source,SchematicImporter.SOURCE_LIMITS,cancel),cancel),cancel);
         int version=NbtReader.integer(root,"Version");if(version!=5&&version!=6)throw new IOException("不支持的 litematic 版本");
         var regions=NbtReader.compound(root.get("Regions"),"Regions");
@@ -69,7 +74,7 @@ public final class LitematicEdit {
         }
         root.put("Regions",regions);var metadata=root.containsKey("Metadata")?NbtReader.compound(root.get("Metadata"),"Metadata"):new LinkedHashMap<String,Object>();
         metadata.put("TimeModified",System.currentTimeMillis());metadata.put("TotalBlocks",Math.toIntExact(totalBlocks));metadata.put("TotalVolume",Math.toIntExact(totalVolume));root.put("Metadata",metadata);
-        NbtWriter.writeNew(output,root,cancel);return new Result(changed,removedEntities,removedTicks);
+        cancel.check();return new Prepared(root,new Result(changed,removedEntities,removedTicks));
     }
     /** Vanilla fluid identities are independent of level, facing and other ordinary properties. */
     private static String fluid(BlockStateSpec state)throws IOException{

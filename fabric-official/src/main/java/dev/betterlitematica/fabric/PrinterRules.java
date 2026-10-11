@@ -1,5 +1,4 @@
 package dev.betterlitematica.fabric;
-
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CandleBlock;
@@ -20,7 +19,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.SlabType;
 import java.util.*;
-
 /** Placement prediction is the authority; unsupported target states are never reported as placed. */
 final class PrinterRules {
     private PrinterRules(){}
@@ -31,7 +29,7 @@ final class PrinterRules {
     private static <T extends Comparable<T>> BlockState copyProperty(BlockState target,BlockState source,net.minecraft.world.level.block.state.properties.Property<T> property){return target.hasProperty(property)?target.setValue(property,source.getValue(property)):target;}
     static boolean pendingCoral(BlockState actual,BlockState wanted){var substitute=coralSubstitute(wanted);return substitute!=null&&substitute.equals(actual);}
     static boolean observerReady(net.minecraft.core.BlockPos start,java.util.function.Function<net.minecraft.core.BlockPos,BlockState> expected,java.util.function.Function<net.minecraft.core.BlockPos,BlockState> actual){
-        var seen=new HashSet<net.minecraft.core.BlockPos>();var pos=start.immutable();for(int i=0;i<64;i++){if(!seen.add(pos))return false;var state=expected.apply(pos);if(state==null)return false;if(!state.is(Blocks.OBSERVER))return true;pos=pos.relative(state.getValue(ObserverBlock.FACING));var wanted=expected.apply(pos);if(wanted==null||!wanted.equals(actual.apply(pos)))return false;}return false;
+        var seen=new HashSet<net.minecraft.core.BlockPos>();var pos=start.immutable();for(int i=0;i<64;i++){if(!seen.add(pos))return false;var state=expected.apply(pos);if(state==null)return false;if(!state.is(Blocks.OBSERVER))return true;pos=pos.relative(state.getValue(ObserverBlock.FACING));var wanted=expected.apply(pos);if(wanted==null||!constructionMatches(actual.apply(pos),wanted))return false;}return false;
     }
     static BlockState cycleDirection(BlockState state){
         if(state.hasProperty(BlockStateProperties.FACING))return state.cycle(BlockStateProperties.FACING);if(state.hasProperty(BlockStateProperties.HORIZONTAL_FACING))return state.cycle(BlockStateProperties.HORIZONTAL_FACING);if(state.hasProperty(BlockStateProperties.AXIS))return state.cycle(BlockStateProperties.AXIS);if(state.hasProperty(BlockStateProperties.ROTATION_16))return state.setValue(BlockStateProperties.ROTATION_16,(state.getValue(BlockStateProperties.ROTATION_16)+4)%16);return state;
@@ -64,9 +62,26 @@ final class PrinterRules {
         String target=BuiltInRegistries.BLOCK.getKey(wanted.getBlock()).toString(),source=BuiltInRegistries.BLOCK.getKey(actual.getBlock()).toString();
         int colon=target.indexOf(':');return target.substring(colon+1).startsWith("stripped_")&&source.equals(target.substring(0,colon+1)+target.substring(colon+10));
     }
+    /** Leaf distance is world-computed; player placement always produces persistent leaves. */
+    static boolean constructionMatches(BlockState actual,BlockState wanted){
+        if(actual==null||wanted==null||actual.getBlock()!=wanted.getBlock())return false;
+        return constructionState(actual,wanted).equals(wanted);
+    }
+    /** Shared world comparison for rendering, nearby highlights and the full verifier. */
+    static dev.betterlitematica.core.Comparison comparison(boolean loaded,BlockState actual,BlockState wanted){
+        if(!loaded||actual==null||wanted==null)return dev.betterlitematica.core.Comparison.UNKNOWN;
+        if(constructionMatches(actual,wanted)||wanted.isAir()&&actual.isAir())return dev.betterlitematica.core.Comparison.MATCH;
+        if(actual.isAir())return dev.betterlitematica.core.Comparison.MISSING;
+        if(wanted.isAir())return dev.betterlitematica.core.Comparison.EXTRA;
+        return actual.getBlock()==wanted.getBlock()?dev.betterlitematica.core.Comparison.WRONG_STATE:dev.betterlitematica.core.Comparison.WRONG_BLOCK;
+    }
+    private static BlockState constructionState(BlockState actual,BlockState wanted){
+        return actual.getBlock() instanceof net.minecraft.world.level.block.LeavesBlock
+            ?actual.setValue(net.minecraft.world.level.block.LeavesBlock.DISTANCE,wanted.getValue(net.minecraft.world.level.block.LeavesBlock.DISTANCE)).setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT,wanted.getValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT)):actual;
+    }
     static boolean placementMatches(BlockState predicted,BlockState wanted){
         if(predicted==null||predicted.getBlock()!=wanted.getBlock())return false;
-        BlockState normalized=predicted;
+        BlockState normalized=constructionState(predicted,wanted);
         // A subsequent use action completes only these explicit, monotonic multi-step states.
         if(wanted.hasProperty(BlockStateProperties.WATERLOGGED))normalized=normalized.setValue(BlockStateProperties.WATERLOGGED,wanted.getValue(BlockStateProperties.WATERLOGGED));
         if(wanted.hasProperty(BlockStateProperties.SLAB_TYPE)&&wanted.getValue(BlockStateProperties.SLAB_TYPE)==SlabType.DOUBLE)normalized=normalized.setValue(BlockStateProperties.SLAB_TYPE,SlabType.DOUBLE);

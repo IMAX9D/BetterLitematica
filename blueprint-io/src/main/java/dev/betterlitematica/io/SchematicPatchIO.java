@@ -17,6 +17,10 @@ public final class SchematicPatchIO {
         try{write(source,output,patch,cancel);return new Source(output,true);}catch(IOException|RuntimeException e){Files.deleteIfExists(output);throw e;}
     }
     public static void write(Path source,Path output,SchematicEdits.Snapshot patch,Cancellation cancel)throws IOException{
+        NbtWriter.writeNew(output,prepare(source,patch,cancel),cancel);
+    }
+    /** Prepare a private draft tree; optional metadata can be attached before the new file commits. */
+    public static Map<String,Object> prepare(Path source,SchematicEdits.Snapshot patch,Cancellation cancel)throws IOException{
         if(!SchematicImporter.sha256(source,cancel).equals(patch.metadata().sourceSha256()))throw new IOException("投影文件已被外部修改，请保留草稿后重新载入");
         var root=SourceVersions.litematic(SchematicFormats.canonical(NbtReader.read(source,SchematicImporter.SOURCE_LIMITS,cancel),cancel),cancel);
         if(!SchematicImporter.sha256(source,cancel).equals(patch.metadata().sourceSha256()))throw new IOException("读取时投影文件已改变");
@@ -48,7 +52,7 @@ public final class SchematicPatchIO {
         }
         root.put("Regions",regions);var metadata=root.containsKey("Metadata")?NbtReader.compound(root.get("Metadata"),"Metadata"):new LinkedHashMap<String,Object>();
         if(metadata.get("TotalBlocks") instanceof Number value)metadata.put("TotalBlocks",Math.toIntExact(value.longValue()+blockDelta));metadata.put("TimeModified",System.currentTimeMillis());root.put("Metadata",metadata);
-        NbtWriter.writeNew(output,root,cancel);
+        cancel.check();return root;
     }
     private static BlockStateSpec state(Object value)throws IOException{
         var tag=NbtReader.compound(value,"BlockState");var properties=new TreeMap<String,String>();if(tag.containsKey("Properties"))for(var entry:NbtReader.compound(tag.get("Properties"),"Properties").entrySet()){if(!(entry.getValue() instanceof String text))throw new IOException("无效方块属性");properties.put(entry.getKey(),text);}return new BlockStateSpec(NbtReader.string(tag,"Name",""),properties);

@@ -5,11 +5,9 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 import java.util.*;
 import java.util.function.Consumer;
-
 /** A clipped, virtual single-column directory viewport. */
 final class BrowserGrid extends ButtonWidget {
     public int getX(){return x;} public int getY(){return y;} public void setX(int value){x=value;} public void setY(int value){y=value;}
-
     private static final int COLUMNS=1,ROW=30,GAP=5;
     private final Consumer<SessionIo.FileEntry> choose,open;
     private List<SessionIo.FileEntry> entries=List.of();
@@ -23,6 +21,8 @@ final class BrowserGrid extends ButtonWidget {
     void entries(List<SessionIo.FileEntry> next,String empty){boolean unchanged=entries.equals(next);entries=List.copyOf(next);this.empty=empty;if(!unchanged){scroll=0;hovered=-1;dragging=false;}}
     void selected(String path){selected=path==null?"":path;}
     String selectedPath(){return selected;}
+    /** Hover only advertises a preview target; selection and loading remain explicit. */
+    SessionIo.FileEntry previewHovered(){return visible&&active&&!dragging&&hovered>=0&&hovered<entries.size()&&System.nanoTime()-hoverStart>=350_000_000L&&!entries.get(hovered).directory()?entries.get(hovered):null;}
     double scrollOffset(){return scroll;}
     private int cardWidth(){return (width-10-(COLUMNS-1)*GAP)/COLUMNS;}
     private int content(){return ((entries.size()+COLUMNS-1)/COLUMNS)*ROW;}
@@ -64,9 +64,10 @@ final class BrowserGrid extends ButtonWidget {
     }
     private final Map<Integer,UiMotion> motion=new LinkedHashMap<>();
     private UiMotion motion(int index){if(motion.size()>128)motion.clear();return motion.computeIfAbsent(index,key->new UiMotion());}
+    void trackHover(double x,double y,long now){int next=hit(x,y);if(next!=hovered){hovered=next;hoverStart=now;}}
     @Override public void renderButton(MatrixStack legacyMatrices,int mouseX,int mouseY,float delta){LegacyGuiContext ctx=new LegacyGuiContext(legacyMatrices);
         var ui=IndependentUi.INSTANCE;int hover=hit(mouseX,mouseY),w=cardWidth();long now=System.nanoTime();
-        if(hover!=hovered){hovered=hover;hoverStart=now;}
+        trackHover(mouseX,mouseY,now);
         ui.clip(getX(),getY(),getX()+width,getY()+height);
         try{
             if(entries.isEmpty())ui.text(empty,getX()+4,getY()+6,width-8,UiTheme.SECONDARY);

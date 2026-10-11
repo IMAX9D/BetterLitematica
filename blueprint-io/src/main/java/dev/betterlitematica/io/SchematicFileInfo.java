@@ -10,11 +10,12 @@ public record SchematicFileInfo(String name,String author,String description,int
     public SchematicFileInfo {preview=preview.clone();}
     @Override public int[] preview(){return preview.clone();}
     private static final Set<String> HEADER=Set.of("Version","MinecraftDataVersion","DataVersion","Metadata","Regions","Width","Height","Length","size","Schematic");
+    private static final Set<String> METADATA=Set.of("Name","Author","Description","TotalBlocks","TotalVolume","PreviewImageData");
     public static SchematicFileInfo read(Path source,Cancellation cancel)throws IOException{
         var root=NbtReader.readPartial(source,new NbtReader.Limits(512L<<20,8L<<20,64,4_000_000),cancel,(path,type)->{
             if(path.size()==1)return !HEADER.contains(path.get(0));
             int start=path.get(0).equals("Schematic")?1:0;if(path.size()<=start)return false;String first=path.get(start);
-            if(first.equals("Metadata"))return false;
+            if(first.equals("Metadata"))return path.size()>start+1&&!METADATA.contains(path.get(start+1));
             if(first.equals("Regions"))return path.size()>start+2&&!Set.of("Size","Position","x","y","z").contains(path.get(path.size()-1));
             return !HEADER.contains(first);
         });
@@ -24,6 +25,10 @@ public record SchematicFileInfo(String name,String author,String description,int
     }
     private static long number(Map<String,Object> data,String key,long fallback)throws IOException{Object value=data.get(key);if(value==null)return fallback;if(!(value instanceof Number number))throw new IOException("Invalid metadata "+key);return number.longValue();}
     public static void export(Path source,Path output,String format,String name,String author,String description,int[] preview,Cancellation cancel)throws IOException{
+        NbtWriter.writeNew(output,prepareExport(source,format,name,author,description,preview,cancel),cancel);
+    }
+    /** Private export tree, ready for optional metadata attachments before atomic publication. */
+    public static Map<String,Object> prepareExport(Path source,String format,String name,String author,String description,int[] preview,Cancellation cancel)throws IOException{
         if(name==null||name.isBlank()||name.length()>120||author==null||author.length()>120||description==null||description.length()>2048)throw new IOException("元信息长度无效");
         if(!Set.of("litematic","schem","nbt").contains(format))throw new IOException("无效输出格式");
         Map<String,Object> root=NbtReader.read(source,SchematicImporter.SOURCE_LIMITS,cancel);
@@ -31,6 +36,6 @@ public record SchematicFileInfo(String name,String author,String description,int
         if(!same){if(format.equals("litematic"))root=SourceVersions.litematic(SchematicFormats.canonical(root,cancel),cancel);else root=new LinkedHashMap<>(SchematicFormats.exportSingle(SchematicDocument.takeSource(root,cancel),format,cancel));}
         Map<String,Object> target=root;if(root.containsKey("Schematic")){target=NbtReader.compound(root.get("Schematic"),"Schematic");root.put("Schematic",target);}
         var metadata=target.containsKey("Metadata")?NbtReader.compound(target.get("Metadata"),"Metadata"):new LinkedHashMap<String,Object>();metadata.put("Name",name);metadata.put("Author",author);metadata.put("Description",description);metadata.put("TimeModified",System.currentTimeMillis());
-        if(preview!=null){int side=(int)Math.sqrt(preview.length);if(preview.length>1_048_576||side*side!=preview.length)throw new IOException("Invalid preview");metadata.put("PreviewImageData",preview.clone());}target.put("Metadata",metadata);NbtWriter.writeNew(output,root,cancel);
+        if(preview!=null){int side=(int)Math.sqrt(preview.length);if(preview.length>1_048_576||side*side!=preview.length)throw new IOException("Invalid preview");metadata.put("PreviewImageData",preview.clone());}target.put("Metadata",metadata);cancel.check();return root;
     }
 }

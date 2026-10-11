@@ -16,7 +16,7 @@ final class PrinterRules {
     private static <T extends Comparable<T>> BlockState copyProperty(BlockState target,BlockState source,net.minecraft.state.property.Property<T> property){return target.contains(property)?target.with(property,source.get(property)):target;}
     static boolean pendingCoral(BlockState actual,BlockState wanted){var substitute=coralSubstitute(wanted);return substitute!=null&&substitute.equals(actual);}
     static boolean observerReady(net.minecraft.util.math.BlockPos start,java.util.function.Function<net.minecraft.util.math.BlockPos,BlockState> expected,java.util.function.Function<net.minecraft.util.math.BlockPos,BlockState> actual){
-        var seen=new HashSet<net.minecraft.util.math.BlockPos>();var pos=start.toImmutable();for(int i=0;i<64;i++){if(!seen.add(pos))return false;var state=expected.apply(pos);if(state==null)return false;if(!state.isOf(Blocks.OBSERVER))return true;pos=pos.offset(state.get(ObserverBlock.FACING));var wanted=expected.apply(pos);if(wanted==null||!wanted.equals(actual.apply(pos)))return false;}return false;
+        var seen=new HashSet<net.minecraft.util.math.BlockPos>();var pos=start.toImmutable();for(int i=0;i<64;i++){if(!seen.add(pos))return false;var state=expected.apply(pos);if(state==null)return false;if(!state.isOf(Blocks.OBSERVER))return true;pos=pos.offset(state.get(ObserverBlock.FACING));var wanted=expected.apply(pos);if(wanted==null||!constructionMatches(actual.apply(pos),wanted))return false;}return false;
     }
     static BlockState cycleDirection(BlockState state){
         if(state.contains(Properties.FACING))return state.cycle(Properties.FACING);if(state.contains(Properties.HORIZONTAL_FACING))return state.cycle(Properties.HORIZONTAL_FACING);if(state.contains(Properties.AXIS))return state.cycle(Properties.AXIS);if(state.contains(Properties.ROTATION))return state.with(Properties.ROTATION,(state.get(Properties.ROTATION)+4)%16);return state;
@@ -49,9 +49,26 @@ final class PrinterRules {
         String target=Registries.BLOCK.getId(wanted.getBlock()).toString(),source=Registries.BLOCK.getId(actual.getBlock()).toString();
         int colon=target.indexOf(':');return target.substring(colon+1).startsWith("stripped_")&&source.equals(target.substring(0,colon+1)+target.substring(colon+10));
     }
+    /** Leaf distance is world-computed; player placement always produces persistent leaves. */
+    static boolean constructionMatches(BlockState actual,BlockState wanted){
+        if(actual==null||wanted==null||actual.getBlock()!=wanted.getBlock())return false;
+        return constructionState(actual,wanted).equals(wanted);
+    }
+    /** Shared world comparison for rendering, nearby highlights and the full verifier. */
+    static dev.betterlitematica.core.Comparison comparison(boolean loaded,BlockState actual,BlockState wanted){
+        if(!loaded||actual==null||wanted==null)return dev.betterlitematica.core.Comparison.UNKNOWN;
+        if(constructionMatches(actual,wanted)||wanted.isAir()&&actual.isAir())return dev.betterlitematica.core.Comparison.MATCH;
+        if(actual.isAir())return dev.betterlitematica.core.Comparison.MISSING;
+        if(wanted.isAir())return dev.betterlitematica.core.Comparison.EXTRA;
+        return actual.getBlock()==wanted.getBlock()?dev.betterlitematica.core.Comparison.WRONG_STATE:dev.betterlitematica.core.Comparison.WRONG_BLOCK;
+    }
+    private static BlockState constructionState(BlockState actual,BlockState wanted){
+        return actual.getBlock() instanceof LeavesBlock
+            ?actual.with(LeavesBlock.DISTANCE,wanted.get(LeavesBlock.DISTANCE)).with(LeavesBlock.PERSISTENT,wanted.get(LeavesBlock.PERSISTENT)):actual;
+    }
     static boolean placementMatches(BlockState predicted,BlockState wanted){
         if(predicted==null||predicted.getBlock()!=wanted.getBlock())return false;
-        BlockState normalized=predicted;
+        BlockState normalized=constructionState(predicted,wanted);
         // A subsequent use action completes only these explicit, monotonic multi-step states.
         if(wanted.contains(Properties.WATERLOGGED))normalized=normalized.with(Properties.WATERLOGGED,wanted.get(Properties.WATERLOGGED));
         if(wanted.contains(Properties.SLAB_TYPE)&&wanted.get(Properties.SLAB_TYPE)==SlabType.DOUBLE)normalized=normalized.with(Properties.SLAB_TYPE,SlabType.DOUBLE);

@@ -201,8 +201,10 @@ final class PrinterEngine implements AutoCloseable {
             BlockState current=client.level.getBlockState(pos),wanted=in&&sample.state()!=null?sample.state():Blocks.AIR.defaultBlockState();
             if(s.containerFill&&s.print&&(scope&1)!=0&&!PrinterRules.filtered(wanted,s.skip)
                 &&!(s.skipWaterlogged&&wanted.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED)&&wanted.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED)))containers.observe(pos,wanted,current,ticks);
-            actual[i]=Block.getId(current);expected[i]=Block.getId(wanted);
-            if((s.print||mining(s))&&!s.fill&&!s.fluid&&!s.bedrock&&current==wanted){flags[i]=PrinterDiscovery.KNOWN;continue;}
+            boolean matches=PrinterRules.constructionMatches(current,wanted);
+            // Matching dynamic properties must not produce a state-break job; keep the actual observation intact.
+            actual[i]=Block.getId(current);expected[i]=matches?actual[i]:Block.getId(wanted);
+            if((s.print||mining(s))&&!s.fill&&!s.fluid&&!s.bedrock&&matches){flags[i]=PrinterDiscovery.KNOWN;continue;}
             int f=PrinterDiscovery.KNOWN;if(wanted.isAir())f|=PrinterDiscovery.WANTED_AIR;if(current.isAir())f|=PrinterDiscovery.ACTUAL_AIR;
             if(current.isAir()||current.canBeReplaced()&&s.replace&&PrinterRules.filtered(current,s.replaceable))f|=PrinterDiscovery.REPLACEABLE;
             if(current.getBlock()==wanted.getBlock())f|=PrinterDiscovery.SAME_BLOCK;

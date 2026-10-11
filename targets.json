@@ -6,8 +6,8 @@
       "java": 17,
       "mappingMode": "yarn",
       "yarn": "1.18.1+build.22",
-      "fabricApi": "0.46.6+1.18",
-      "loader": "0.19.5",
+      "fabricApi": "0.44.0+1.18",
+      "loader": "0.15.0",
       "overlays": [
         "1.20",
         "1.19.4",
@@ -26,8 +26,8 @@
       "java": 17,
       "mappingMode": "yarn",
       "yarn": "1.18.2+build.4",
-      "fabricApi": "0.77.0+1.18.2",
-      "loader": "0.19.5",
+      "fabricApi": "0.47.8+1.18.2",
+      "loader": "0.15.0",
       "overlays": [
         "1.20",
         "1.19.4",
@@ -37,15 +37,16 @@
         "1.19",
         "1.18.2"
       ],
-      "bundledJoml": true
+      "bundledJoml": true,
+      "fabricApiId": "fabric"
     },
     {
       "minecraft": "1.19",
       "java": 17,
       "mappingMode": "yarn",
       "yarn": "1.19+build.4",
-      "fabricApi": "0.58.0+1.19",
-      "loader": "0.19.5",
+      "fabricApi": "0.55.1+1.19",
+      "loader": "0.15.0",
       "overlays": [
         "1.20",
         "1.19.4",
@@ -63,7 +64,7 @@
       "mappingMode": "yarn",
       "yarn": "1.19.1+build.6",
       "fabricApi": "0.58.5+1.19.1",
-      "loader": "0.19.5",
+      "loader": "0.15.0",
       "overlays": [
         "1.20",
         "1.19.4",
@@ -80,39 +81,42 @@
       "mappingMode": "yarn",
       "yarn": "1.19.2+build.28",
       "fabricApi": "0.77.0+1.19.2",
-      "loader": "0.19.5",
+      "loader": "0.15.0",
       "overlays": [
         "1.20",
         "1.19.4",
         "1.19.3",
         "1.19.2"
       ],
-      "bundledJoml": true
+      "bundledJoml": true,
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.19.3",
       "java": 17,
       "mappingMode": "yarn",
       "yarn": "1.19.3+build.5",
-      "fabricApi": "0.76.1+1.19.3",
-      "loader": "0.19.5",
+      "fabricApi": "0.76.0+1.19.3",
+      "loader": "0.15.0",
       "overlays": [
         "1.20",
         "1.19.4",
         "1.19.3"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.19.4",
       "java": 17,
       "mappingMode": "yarn",
       "yarn": "1.19.4+build.2",
-      "fabricApi": "0.87.2+1.19.4",
-      "loader": "0.19.5",
+      "fabricApi": "0.76.0+1.19.4",
+      "loader": "0.15.0",
       "overlays": [
         "1.20",
         "1.19.4"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.20",
@@ -120,33 +124,33 @@
       "mappingMode": "yarn",
       "yarn": "1.20+build.1",
       "fabricApi": "0.83.0+1.20",
-      "loader": "0.19.5",
+      "loader": "0.15.0",
       "overlays": [
         "1.20"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.20.1",
       "java": 17,
       "mappingMode": "yarn",
       "yarn": "1.20.1+build.10",
-      "fabricApi": "0.92.2+1.20.1",
-      "loader": "0.18.4",
-      "overlays": [
-        "review-1.20.1"
-      ],
-      "artifactVersion": "0.4.3-review.1"
+      "fabricApi": "0.83.0+1.20.1",
+      "loader": "0.15.0",
+      "overlays": [],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.20.2",
       "java": 17,
       "mappingMode": "yarn",
       "yarn": "1.20.2+build.4",
-      "fabricApi": "0.91.6+1.20.2",
-      "loader": "0.19.5",
+      "fabricApi": "0.91.1+1.20.2",
+      "loader": "0.15.0",
       "overlays": [
         "1.20.2"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.20.3",
@@ -154,61 +158,65 @@
       "mappingMode": "yarn",
       "yarn": "1.20.3+build.1",
       "fabricApi": "0.91.1+1.20.3",
-      "loader": "0.19.5",
+      "loader": "0.15.0",
       "overlays": [
         "1.20.2",
         "1.20.3"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.20.4",
       "java": 17,
       "mappingMode": "yarn",
       "yarn": "1.20.4+build.3",
-      "fabricApi": "0.97.3+1.20.4",
-      "loader": "0.19.5",
+      "fabricApi": "0.91.1+1.20.4",
+      "loader": "0.15.0",
       "overlays": [
         "1.20.2",
         "1.20.3",
         "1.20.4"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.20.5",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.20.5+build.1",
-      "fabricApi": "0.97.8+1.20.5",
-      "loader": "0.19.5",
+      "fabricApi": "0.97.5+1.20.5",
+      "loader": "0.15.10",
       "overlays": [
         "1.20.2",
         "1.20.3",
         "1.20.4",
         "1.20.5"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.20.6",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.20.6+build.3",
-      "fabricApi": "0.100.8+1.20.6",
-      "loader": "0.19.5",
+      "fabricApi": "0.97.8+1.20.6",
+      "loader": "0.15.10",
       "overlays": [
         "1.20.2",
         "1.20.3",
         "1.20.4",
         "1.20.5",
         "1.20.6"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.21",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.21+build.9",
-      "fabricApi": "0.102.0+1.21",
-      "loader": "0.19.5",
+      "fabricApi": "0.100.1+1.21",
+      "loader": "0.15.11",
       "overlays": [
         "1.20.2",
         "1.20.3",
@@ -216,15 +224,16 @@
         "1.20.5",
         "1.20.6",
         "1.21"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.21.1",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.21.1+build.3",
-      "fabricApi": "0.116.17+1.21.1",
-      "loader": "0.19.5",
+      "fabricApi": "0.102.0+1.21.1",
+      "loader": "0.15.11",
       "overlays": [
         "1.20.2",
         "1.20.3",
@@ -233,7 +242,8 @@
         "1.20.6",
         "1.21",
         "1.21.1"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.21.2",
@@ -241,7 +251,7 @@
       "mappingMode": "yarn",
       "yarn": "1.21.2+build.1",
       "fabricApi": "0.106.1+1.21.2",
-      "loader": "0.19.5",
+      "loader": "0.16.7",
       "overlays": [
         "1.20.2",
         "1.20.3",
@@ -251,15 +261,16 @@
         "1.21",
         "1.21.1",
         "1.21.2"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.21.3",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.21.3+build.2",
-      "fabricApi": "0.114.1+1.21.3",
-      "loader": "0.19.5",
+      "fabricApi": "0.106.1+1.21.3",
+      "loader": "0.16.8",
       "overlays": [
         "1.20.2",
         "1.20.3",
@@ -270,15 +281,16 @@
         "1.21.1",
         "1.21.2",
         "1.21.3"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.21.4",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.21.4+build.8",
-      "fabricApi": "0.119.4+1.21.4",
-      "loader": "0.19.5",
+      "fabricApi": "0.110.5+1.21.4",
+      "loader": "0.16.9",
       "overlays": [
         "1.20.2",
         "1.20.3",
@@ -290,15 +302,16 @@
         "1.21.2",
         "1.21.3",
         "1.21.4"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.21.5",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.21.5+build.1",
-      "fabricApi": "0.128.2+1.21.5",
-      "loader": "0.19.5",
+      "fabricApi": "0.119.5+1.21.5",
+      "loader": "0.16.10",
       "overlays": [
         "1.20.2",
         "1.20.3",
@@ -311,15 +324,16 @@
         "1.21.3",
         "1.21.4",
         "1.21.5"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.21.6",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.21.6+build.1",
-      "fabricApi": "0.128.2+1.21.6",
-      "loader": "0.19.5",
+      "fabricApi": "0.127.0+1.21.6",
+      "loader": "0.16.13",
       "overlays": [
         "1.20.2",
         "1.20.3",
@@ -333,15 +347,16 @@
         "1.21.4",
         "1.21.5",
         "1.21.6"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.21.7",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.21.7+build.8",
-      "fabricApi": "0.129.0+1.21.7",
-      "loader": "0.19.5",
+      "fabricApi": "0.128.1+1.21.7",
+      "loader": "0.16.13",
       "overlays": [
         "1.20.2",
         "1.20.3",
@@ -356,15 +371,16 @@
         "1.21.5",
         "1.21.6",
         "1.21.7"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.21.8",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.21.8+build.1",
-      "fabricApi": "0.136.1+1.21.8",
-      "loader": "0.19.5",
+      "fabricApi": "0.129.0+1.21.8",
+      "loader": "0.16.13",
       "overlays": [
         "1.20.2",
         "1.20.3",
@@ -380,15 +396,16 @@
         "1.21.6",
         "1.21.7",
         "1.21.8"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.21.9",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.21.9+build.1",
-      "fabricApi": "0.134.1+1.21.9",
-      "loader": "0.19.5",
+      "fabricApi": "0.133.14+1.21.9",
+      "loader": "0.17.0",
       "overlays": [
         "1.20.2",
         "1.20.3",
@@ -405,15 +422,16 @@
         "1.21.7",
         "1.21.8",
         "1.21.9"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.21.10",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.21.10+build.3",
-      "fabricApi": "0.138.4+1.21.10",
-      "loader": "0.19.5",
+      "fabricApi": "0.134.1+1.21.10",
+      "loader": "0.17.0",
       "overlays": [
         "1.20.2",
         "1.20.3",
@@ -431,15 +449,16 @@
         "1.21.8",
         "1.21.9",
         "1.21.10"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.21.11",
       "java": 21,
       "mappingMode": "yarn",
       "yarn": "1.21.11+build.6",
-      "fabricApi": "0.141.6+1.21.11",
-      "loader": "0.19.5",
+      "fabricApi": "0.139.4+1.21.11",
+      "loader": "0.17.3",
       "overlays": [
         "1.20.2",
         "1.20.3",
@@ -458,72 +477,78 @@
         "1.21.9",
         "1.21.10",
         "1.21.11"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "26.1",
       "java": 25,
       "mappingMode": "official",
       "yarn": null,
-      "fabricApi": "0.145.1+26.1",
-      "loader": "0.19.5",
+      "fabricApi": "0.144.0+26.1",
+      "loader": "0.18.4",
       "overlays": [
         "26.1"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "26.1.1",
       "java": 25,
       "mappingMode": "official",
       "yarn": null,
-      "fabricApi": "0.145.4+26.1.1",
-      "loader": "0.19.5",
+      "fabricApi": "0.144.4+26.1",
+      "loader": "0.18.4",
       "overlays": [
         "26.1",
         "26.1.1"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "26.1.2",
       "java": 25,
       "mappingMode": "official",
       "yarn": null,
-      "fabricApi": "0.155.3+26.1.2",
-      "loader": "0.19.5",
+      "fabricApi": "0.145.4+26.1.2",
+      "loader": "0.18.4",
       "overlays": [
         "26.1",
         "26.1.1",
         "26.1.2"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "26.2",
       "java": 25,
       "mappingMode": "official",
       "yarn": null,
-      "fabricApi": "0.161.0+26.2",
-      "loader": "0.19.5",
+      "fabricApi": "0.152.1+26.2",
+      "loader": "0.18.4",
       "overlays": [
         "26.1",
         "26.1.1",
         "26.1.2",
         "26.2"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "26.3",
       "java": 25,
       "mappingMode": "official",
       "yarn": null,
-      "fabricApi": "0.162.0+26.3",
-      "loader": "0.19.5",
+      "fabricApi": "0.160.5+26.3",
+      "loader": "0.19.3",
       "overlays": [
         "26.1",
         "26.1.1",
         "26.1.2",
         "26.2",
         "26.3"
-      ]
+      ],
+      "fabricApiId": "fabric-api"
     }
   ]
 }

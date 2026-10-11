@@ -51,7 +51,7 @@ final class BlockDisplayFilterScreen extends MenuScreen {
     @Override protected void buildMenu(){var placement=controller.placement(id);if(placement==null){label("投影已移除",0);return;}
         addBody(new OverlayLabel(left,innerWidth,placement.name()),0);
         var modes=BlockDisplayFilter.Mode.values();String[] names={"关闭","黑名单","白名单"};for(int i=0;i<modes.length;i++){var value=modes[i];tabAt(names[i],cellX(i,3),24,cellWidth(3),()->{if(mode==value)return;mode=value;selected=mode==BlockDisplayFilter.Mode.WHITELIST?whitelist:blacklist;grid=null;discardArmed=false;refresh();},mode==value);}
-        var search=fieldAt("搜索",query,left,54,innerWidth-134,128);search.setEditable(!off());
+        var search=searchAt(query,left,68,innerWidth-134,128);search.setEditable(!off());
         int half=(126-6)/2;
         tabAt("投影内",left+innerWidth-126,68,half,()->{if(!selectedOnly)return;selectedOnly=false;refresh();refilter(true);},!selectedOnly).active=!off();
         tabAt("已选",left+innerWidth-half,68,half,()->{if(selectedOnly)return;selectedOnly=true;refresh();refilter(true);},selectedOnly).active=!off();
@@ -83,6 +83,6 @@ final class BlockDisplayFilterScreen extends MenuScreen {
         discardArmed=true;refresh();
     }
     @Override protected void updateMenu(){if(syncSource())refilter(true);if(controller.placement(id)==null){error="投影已移除";if(grid!=null)grid.active=false;if(save!=null)save.active=false;if(selectResults!=null)selectResults.active=false;if(clear!=null)clear.active=false;}}
-    @Override public boolean keyPressed(int key,int scan,int modifiers){if((key==257||key==335)&&getFocused() instanceof net.minecraft.client.gui.widget.TextFieldWidget){runAction(this::save);return true;}if(getFocused()==grid&&grid!=null&&grid.keyPressed(key,scan,modifiers))return true;return super.keyPressed(key,scan,modifiers);}
+    @Override public boolean keyPressed(int key,int scan,int modifiers){if((key==257||key==335)&&getFocused() instanceof net.minecraft.client.gui.widget.TextFieldWidget){return true;}if(getFocused()==grid&&grid!=null&&grid.keyPressed(key,scan,modifiers))return true;return super.keyPressed(key,scan,modifiers);}
     @Override public boolean mouseReleased(double x,double y,int button){boolean owned=grid!=null&&grid.mouseReleased(0,0,button);return super.mouseReleased(x,y,button)||owned;}
 }

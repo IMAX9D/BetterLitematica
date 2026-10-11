@@ -22,8 +22,9 @@ final class SettingsSearchScreen extends MenuScreen {
     }
     @Override protected void buildMenu(){
         if(index==null){index=new ArrayList<>();collect(Area.PRINTER,new String[]{"施工","通用","策略","过滤","性能","高亮"});collect(Area.BEDROCK,new String[]{"常规","规则","方向","区域"});collect(Area.OPTIONS,new String[]{"交互","显示"});var found=java.util.EnumSet.noneOf(SettingId.class);for(var entry:index)if(!found.add(entry.id()))throw new IllegalStateException("设置索引重复："+entry.id());for(var id:SettingId.values())if(!found.contains(id))throw new IllegalStateException("设置未加入搜索："+id);}
-        var field=fieldAt("名称、说明或拼音",query,left,0,innerWidth,128);field.setChangedListener(v->{query=v;rows();});
-        list=new OverlayList(left,innerWidth,Math.max(80,bodyBottom-bodyTop-54),id->{var e=index.get(Integer.parseInt(id));var target=page(e.area(),e.page(),true);client.setScreen(target);target.focusSetting(e.id());});addBody(list,46);rows();
+        // The frame and focus ring extend beyond the editable rectangle; leave them inside the body clip.
+        var field=searchAt("名称、说明或拼音",query,left,6,innerWidth,128);field.setChangedListener(v->{query=v;rows();});
+        list=new OverlayList(left,innerWidth,Math.max(80,bodyBottom-bodyTop-38),id->{var e=index.get(Integer.parseInt(id));var target=page(e.area(),e.page(),true);client.setScreen(target);target.focusSetting(e.id());});addBody(list,38);rows();
     }
     private void rows(){if(list!=null){var rows=new ArrayList<OverlayList.Row>();for(int i=0;i<index.size();i++){var e=index.get(i);if(SearchText.matches(e.label()+" "+e.area().label+" "+e.section()+" "+e.description(),query))rows.add(new OverlayList.Row(Integer.toString(i),e.label()+" · "+e.area().label+" / "+e.section(),true));}list.rows(rows,null);}}
 }

@@ -59,8 +59,6 @@ public final class BetterLitematicaClient implements ClientModInitializer {
     static BuildingInteractions interactions;
     public static void finishProjectionFrame(){ProjectionDraw.flush();var controller=activeController;if(controller!=null)controller.capturePreview();}
     public static boolean useProjection(){return interactions!=null&&interactions.use();}
-    public static boolean attackProjection(){return interactions!=null&&interactions.attack();}
-    public static boolean preserveProjectionBlocks(){return interactions!=null&&interactions.claimsAttack();}
     public static boolean pickProjection(){return interactions!=null&&interactions.pick();}
     public static boolean scrollTool(double amount){return interactions!=null&&interactions.scroll(amount);}
     public static boolean preservePrinterBreaking(){return interactions!=null&&interactions.preservePrinterBreaking();}
@@ -71,6 +69,7 @@ public final class BetterLitematicaClient implements ClientModInitializer {
         try{PrinterColdWarmup.initialize();}catch(RuntimeException e){LOGGER.warn("Printer read-only startup preparation unavailable",e);}
         PasteChunks.initialize();ClientLifecycleEvents.CLIENT_STARTED.register(mc->LegacyPayloads.initialize());
         Minecraft client=Minecraft.getInstance();ProjectionController controller=new ProjectionController(client);activeController=controller;modeWheelInput=new ModeWheelInput(client,controller);
+        BugReports.register(client,controller);
         interactions=new BuildingInteractions(client,controller);
         ClientTickEvents.START_CLIENT_TICK.register(mc->{UiTexture.collect();modeWheelInput.tick();menuOpen.tick(mc.level,mc.getConnection(),ClientUi.screen(mc));});
         // Shortcut transitions are captured by inputEvent, including taps between ticks.

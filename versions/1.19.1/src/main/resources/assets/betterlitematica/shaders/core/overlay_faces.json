@@ -1,5 +1,5 @@
 {
-  "vertex": "position_color",
+  "vertex": "betterlitematica_overlay_faces",
   "fragment": "betterlitematica_overlay_faces",
   "attributes": [
     "Position",
@@ -77,6 +77,16 @@
       "count": 1,
       "values": [
         0
+      ]
+    },
+    {
+      "name": "NearFade",
+      "type": "float",
+      "count": 3,
+      "values": [
+        0,
+        0,
+        1
       ]
     }
   ],

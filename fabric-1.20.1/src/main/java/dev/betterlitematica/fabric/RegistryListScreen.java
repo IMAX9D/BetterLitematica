@@ -20,8 +20,8 @@ final class RegistryListScreen extends MenuScreen {
     }
     @Override protected boolean showBack(){return false;}
     @Override protected void buildMenu(){
-        var field=fieldAt("搜索",query,left,0,innerWidth,128);field.setChangedListener(v->{query=v;rows();});
-        list=new OverlayList(left,innerWidth,Math.max(80,bodyBottom-bodyTop-54),id->{if(!selected.remove(id))selected.add(id);discardConfirmed=false;rows();});addBody(list,46);rows();
+        var field=searchAt(query,left,6,innerWidth,128);field.setChangedListener(v->{query=v;rows();});
+        list=new OverlayList(left,innerWidth,Math.max(80,bodyBottom-bodyTop-38),id->{if(!selected.remove(id))selected.add(id);discardConfirmed=false;rows();});addBody(list,38);rows();
         fixedAction("保存",0,90,()->{save.accept(List.copyOf(selected));super.close();});exit=fixed(exitLabel(),innerWidth-88,88,this::close);
     }
     private void rows(){if(list!=null)list.rows(candidates.stream().filter(r->SearchText.matches(r.id()+" "+r.name(),query)).sorted(Comparator.comparingInt(r->SearchText.rank(r.name(),r.id(),query))).map(r->new OverlayList.Row(r.id(),r.name()+" · "+r.id(),selected.contains(r.id()))).toList(),null);}

@@ -9,14 +9,17 @@ import net.minecraft.client.render.*;
 
 /** Each overlay owns its draw state, including the entity mask for through-wall inspection. */
 final class OverlayLayers extends RenderLayer {
-    private final boolean face,through;
+    private final boolean face,through,near;
     private final RenderPipeline pipeline;
     private static final RenderLayer[] LINES={new OverlayLayers(false,false),new OverlayLayers(false,true)};
     private static final RenderLayer[] FACES={new OverlayLayers(true,false),new OverlayLayers(true,true)};
-    private OverlayLayers(boolean face,boolean through){
+    private OverlayLayers(boolean face,boolean through){this(face,through,false);}
+    private OverlayLayers(boolean face,boolean through,boolean near){
         super("betterlitematica_overlay_"+face+"_"+through,32768,false,face,()->{},()->{});
-        this.face=face;this.through=through;pipeline=ProjectionShaders.overlay(face,through);
+        this.near=near;this.face=face;this.through=through;pipeline=ProjectionShaders.overlay(face,through);
     }
+    private static final RenderLayer[] NEAR_LINES={new OverlayLayers(false,false,true),new OverlayLayers(false,true,true)},NEAR_FACES={new OverlayLayers(true,false,true),new OverlayLayers(true,true,true)};
+    static RenderLayer nearLines(boolean through){return NEAR_LINES[through?1:0];}static RenderLayer nearFaces(boolean through){return NEAR_FACES[through?1:0];}
     static RenderLayer lines(boolean through){return LINES[through?1:0];}
     static RenderLayer faces(boolean through){return FACES[through?1:0];}
     @Override public Framebuffer getTarget(){return MinecraftClient.getInstance().getFramebuffer();}
@@ -36,7 +39,7 @@ final class OverlayLayers extends RenderLayer {
                     pass.setUniform("LineWidth",RenderSystem.getShaderLineWidth());pass.setUniform("ScreenSize",(float)getTarget().textureWidth,(float)getTarget().textureHeight);
                     pass.setUniform("FogShape",fog.shape().getId());pass.setUniform("FogStart",fog.start());pass.setUniform("FogEnd",fog.end());pass.setUniform("FogColor",fog.red(),fog.green(),fog.blue(),fog.alpha());
                 }
-                EntityOverlayMask.bind(pass,through);pass.setVertexBuffer(0,vertices);pass.setIndexBuffer(indices,indexType);pass.drawIndexed(0,parameters.indexCount());
+                pass.setUniform("NearFade",near?1f:0f,near?3f:0f,near?.18f:1f);EntityOverlayMask.bind(pass,through);pass.setVertexBuffer(0,vertices);pass.setIndexBuffer(indices,indexType);pass.drawIndexed(0,parameters.indexCount());
             }
         }
     }

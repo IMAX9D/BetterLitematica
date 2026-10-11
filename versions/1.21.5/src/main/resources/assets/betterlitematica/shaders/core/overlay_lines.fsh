@@ -14,11 +14,16 @@ void rejectEntity() {
     }
 }
 #moj_import <minecraft:fog.glsl>
+// x: distance where only z of the opacity remains, y: distance of full opacity. y<=x disables.
+uniform vec3 NearFade;
+float nearFade(float distance){return NearFade.y>NearFade.x?mix(NearFade.z,1.0,smoothstep(NearFade.x,NearFade.y,distance)):1.0;}
 uniform float FogStart;
 uniform float FogEnd;
 uniform vec4 FogColor;
 in float vertexDistance;
 void main() {
     rejectEntity();
-    fragColor = linear_fog(vertexColor * ColorModulator, vertexDistance, FogStart, FogEnd, FogColor);
+    vec4 color = vertexColor * ColorModulator;
+    color.a *= nearFade(vertexDistance);
+    fragColor = linear_fog(color, vertexDistance, FogStart, FogEnd, FogColor);
 }
