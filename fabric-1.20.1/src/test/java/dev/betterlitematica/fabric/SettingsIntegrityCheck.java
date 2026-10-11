@@ -9,6 +9,7 @@ import java.util.*;
 /** Executable adapter check. No game launch or runtime test dependency is needed. */
 public final class SettingsIntegrityCheck {
     public static void main(String[] args)throws Exception {
+        verifyDraftComparison();
         var ids=EnumSet.allOf(SettingId.class);
         for(var id:ids){var definition=SettingHelp.require(id);check(!definition.label().isBlank()&&!definition.description().isBlank(),"Missing help: "+id);}
         for(var id:PrinterReason.Id.values()){
@@ -46,6 +47,34 @@ public final class SettingsIntegrityCheck {
             System.out.println("Settings verified: "+ids.size()+" complete descriptions, "+checked[0]+" explicitly bound controls, "+PrinterReason.Id.values().length+" wording-independent reason IDs.");
         }
     }
+    private static void verifyDraftComparison()throws Exception {
+        // The review overlay owns this fix until promotion; other adapters still use their original settings.
+        java.lang.reflect.Method printerDraft,bedrockDraft;
+        try{printerDraft=PrinterSettings.class.getDeclaredMethod("draftSnapshot");bedrockDraft=BedrockSettings.class.getDeclaredMethod("draftSnapshot");}
+        catch(NoSuchMethodException notPromoted){return;}
+        var printer=new PrinterSettings();var saved=printer.snapshot();
+        for(int millis:new int[]{0,1,15,99,10001}){
+            printer.highlightMillis=millis;
+            check(!printerDraft.invoke(printer).equals(saved),"Invalid printer draft must remain comparable");
+            rejects(printer::snapshot,"Invalid highlight duration was saved");
+        }
+        printer.highlightMillis=1500;
+        check(printerDraft.invoke(printer).equals(saved),"Restoring a field must clear its draft difference");
+        for(double range:new double[]{-1,257,Double.NaN,Double.POSITIVE_INFINITY}){
+            printer.range=range;printerDraft.invoke(printer);
+            rejects(printer::snapshot,"Invalid printer range was saved");
+        }
+        var bedrock=new BedrockSettings();var bedrockSaved=bedrock.snapshot();
+        for(int timeout:new int[]{0,1,19,1201}){
+            bedrock.timeoutTicks=timeout;
+            check(!bedrockDraft.invoke(bedrock).equals(bedrockSaved),"Invalid bedrock draft must remain comparable");
+            rejects(bedrock::snapshot,"Invalid bedrock timeout was saved");
+        }
+        bedrock.timeoutTicks=120;bedrock.breakDirections.clear();bedrockDraft.invoke(bedrock);
+        rejects(bedrock::snapshot,"Empty bedrock directions were saved");
+        System.out.println("Draft regression: incomplete printer and bedrock values remain editable; invalid saves are rejected.");
+    }
     private static String name(MethodInvocationTree call){var method=call.getMethodSelect();return method instanceof MemberSelectTree member?member.getIdentifier().toString():method.toString();}
     private static void check(boolean valid,String message){if(!valid)throw new AssertionError(message);}
+    private static void rejects(Runnable action,String message){try{action.run();}catch(IllegalArgumentException expected){return;}throw new AssertionError(message);}
 }
