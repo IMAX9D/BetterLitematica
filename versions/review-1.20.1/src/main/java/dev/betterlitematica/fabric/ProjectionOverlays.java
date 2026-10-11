@@ -111,11 +111,95 @@ final class ProjectionOverlays {
         void clear(){source=List.of();prepared=List.of();sorted=List.of();eye=null;}
     }
     private static final java.util.ArrayList<PreparedBox> nearbyMissing=new java.util.ArrayList<>(),nearbyErrors=new java.util.ArrayList<>();
-    static void clearCaches(){nearbyOrder.clear();releaseVerificationIndex();errorSlots=new int[256];errorAlpha=new float[256];errorCount=0;nearbyMissing.clear();nearbyErrors.clear();}
+    static void clearCaches(){nearbyOrder.clear();outlineSource=null;outlineClip=null;outline=null;outlineActive=false;if(outlinePending!=null)outlinePending.cancel(false);outlinePending=null;pendingSource=null;pendingClip=null;releaseVerificationIndex();errorSlots=new int[256];errorAlpha=new float[256];errorCount=0;nearbyMissing.clear();nearbyErrors.clear();}
+    /**
+     * Construction highlights are drawn as the silhouette of each kind's cells: only edges where the region bends,
+     * so a run of missing blocks reads as one outlined shape instead of a lattice of frames. The outline is
+     * recomputed when the highlighted cells or the visible layer change, never per frame; very large sets fall
+     * back to per-box frames.
+     */
+    private static final int OUTLINE_CELLS=16384;
+    private static List<dev.betterlitematica.core.HighlightCuboids.Box> outlineSource;private static double[] outlineClip;
+    private static List<dev.betterlitematica.core.HighlightOutline.Segment> outline;
+    private static int[] outlineDraw=new int[256],outlineColor=new int[256];private static float[] outlineAlpha=new float[256];
+    private static int outlineMissing,outlineErrors;private static boolean outlineActive;
+    private static java.util.concurrent.CompletableFuture<List<dev.betterlitematica.core.HighlightOutline.Segment>> outlinePending;
+    private static List<dev.betterlitematica.core.HighlightCuboids.Box> pendingSource;private static double[] pendingClip;
+    /**
+     * Outlines are computed on the highlight worker from the immutable box list. Only a result matching the current
+     * request is accepted; until then the previous outline stays on screen (per-box frames before the first one).
+     */
+    private static List<dev.betterlitematica.core.HighlightOutline.Segment> outline(List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,double[] clip){
+        if(outlinePending!=null&&outlinePending.isDone()){
+            try{var result=outlinePending.join();if(pendingSource==boxes&&java.util.Arrays.equals(pendingClip,clip)){outline=result;outlineSource=boxes;outlineClip=pendingClip;}}
+            catch(RuntimeException e){BetterLitematicaClient.LOGGER.warn("Highlight outline failed",e);outlineSource=boxes;outlineClip=clip.clone();outline=null;}
+            outlinePending=null;pendingSource=null;pendingClip=null;
+        }
+        if(!(boxes==outlineSource&&java.util.Arrays.equals(clip,outlineClip))&&outlinePending==null){
+            var request=clip.clone();pendingSource=boxes;pendingClip=request;
+            outlinePending=java.util.concurrent.CompletableFuture.supplyAsync(()->dev.betterlitematica.core.HighlightOutline.of(clipCells(boxes,request),OUTLINE_CELLS),INDEXER);
+        }
+        return outlineSource==null?null:outline;
+    }
+    /** Clip to whole cells of the visible layer first, so the cut itself is outlined. */
+    private static List<dev.betterlitematica.core.HighlightCuboids.Box> clipCells(List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,double[] clip){
+        int axis=(int)clip[0];if(axis<0)return boxes;
+        long from=(long)Math.ceil(clip[1]),to=(long)Math.floor(clip[2])-1;var clipped=new java.util.ArrayList<dev.betterlitematica.core.HighlightCuboids.Box>(boxes.size());
+        for(var box:boxes){int[] min={box.min().x(),box.min().y(),box.min().z()},max={box.max().x(),box.max().y(),box.max().z()};
+            long lo=Math.max(min[axis],from),hi=Math.min(max[axis],to);if(lo>hi)continue;min[axis]=(int)lo;max[axis]=(int)hi;
+            clipped.add(new dev.betterlitematica.core.HighlightCuboids.Box(new dev.betterlitematica.core.Vec3i(min[0],min[1],min[2]),new dev.betterlitematica.core.Vec3i(max[0],max[1],max[2]),box.group()));}
+        return clipped;
+    }
+    private static double segmentDistance(dev.betterlitematica.core.HighlightOutline.Segment s,net.minecraft.util.math.Vec3d p){
+        double[] a={s.x(),s.y(),s.z()};double[] q={p.x,p.y,p.z};double t=Math.max(a[s.axis()],Math.min(a[s.axis()]+s.length(),q[s.axis()]));a[s.axis()]=t;
+        double x=a[0]-q[0],y=a[1]-q[1],z=a[2]-q[2];return x*x+y*y+z*z;
+    }
+    private static Box segmentBox(dev.betterlitematica.core.HighlightOutline.Segment s){
+        double[] min={s.x(),s.y(),s.z()},max={s.x(),s.y(),s.z()};max[s.axis()]+=s.length();return new Box(min[0]-.01,min[1]-.01,min[2]-.01,max[0]+.01,max[1]+.01,max[2]+.01);
+    }
+    private static void prepareOutline(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.HighlightOutline.Segment> segments,PrinterSettings settings,int extraColor){
+        var camera=context.camera().getPos();var origin=client.player.getCameraPosVec(context.tickDelta());
+        var look=net.minecraft.util.math.Vec3d.fromPolar(context.camera().getPitch(),context.camera().getYaw());
+        double range=settings.highlightRange,rangeSquared=range*range;float pulse=NearbyProjectionHighlights.alpha(System.nanoTime());
+        var kept=new java.util.ArrayList<Integer>();
+        for(int i=0;i<segments.size();i++){var s=segments.get(i);if(segmentDistance(s,origin)>rangeSquared||context.frustum()!=null&&!context.frustum().isVisible(segmentBox(s)))continue;kept.add(i);}
+        // The limit counts boxes; an outlined box has about four visible edges.
+        if(settings.highlightLimit>0&&kept.size()>settings.highlightLimit*4){kept.sort(java.util.Comparator.comparingDouble(i->segmentDistance(segments.get(i),origin)));kept.subList(settings.highlightLimit*4,kept.size()).clear();}
+        if(outlineDraw.length<kept.size()){outlineDraw=new int[kept.size()];outlineColor=new int[kept.size()];outlineAlpha=new float[kept.size()];}
+        outlineMissing=0;outlineErrors=0;int n=0;
+        // Missing first, then wrong and extra, matching the two draw passes.
+        for(int pass=0;pass<2;pass++)for(int i:kept){var s=segments.get(i);var kind=NEARBY_KINDS[s.group()];boolean missing=kind==NearbyProjectionHighlights.Kind.MISSING;if(missing!=(pass==0))continue;
+            float alpha;
+            if(missing){double[] m={s.x(),s.y(),s.z()};m[s.axis()]+=s.length()*.5;double dx=m[0]-camera.x,dy=m[1]-camera.y,dz=m[2]-camera.z,length=Math.sqrt(dx*dx+dy*dy+dz*dz);
+                alpha=HighlightFades.missing(Math.sqrt(segmentDistance(s,origin)),range,length<1e-6?1:(dx*look.x+dy*look.y+dz*look.z)/length);}
+            else alpha=pulse;
+            if(alpha<=0)continue;
+            outlineDraw[n]=i;outlineColor[n]=missing?NearbyProjectionHighlights.MISSING_COLOR:kind==NearbyProjectionHighlights.Kind.WRONG?NearbyProjectionHighlights.WRONG_COLOR:extraColor;outlineAlpha[n]=alpha;n++;
+            if(missing)outlineMissing++;else outlineErrors++;
+        }
+    }
+    private static void drawOutline(MinecraftClient client,WorldRenderContext context,PrinterSettings settings,boolean errors){
+        int from=errors?outlineMissing:0,to=errors?outlineMissing+outlineErrors:outlineMissing;
+        if(from>=to||context.matrixStack()==null||outline==null)return;
+        var matrices=context.matrixStack();var camera=context.camera().getPos();
+        var buffers=client.getBufferBuilders().getEntityVertexConsumers();var layer=OverlayLayers.nearLines(settings.highlightOnTop);
+        matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);
+        try{var vertices=buffers.getBuffer(layer);var entry=matrices.peek();
+            for(int k=from;k<to;k++){var s=outline.get(outlineDraw[k]);int color=outlineColor[k];float r=((color>>>16)&255)/255f,g=((color>>>8)&255)/255f,b=(color&255)/255f,a=outlineAlpha[k];
+                // Nudge the line off the block faces toward the empty side so it never z-fights them.
+                float[] p={s.x(),s.y(),s.z()};p[(s.axis()+1)%3]+=s.du()*.003f;p[(s.axis()+2)%3]+=s.dv()*.003f;
+                float[] q=p.clone();q[s.axis()]+=s.length();float nx=s.axis()==0?1:0,ny=s.axis()==1?1:0,nz=s.axis()==2?1:0;
+                vertices.vertex(entry.getPositionMatrix(),p[0],p[1],p[2]).color(r,g,b,a).normal(entry.getNormalMatrix(),nx,ny,nz).next();
+                vertices.vertex(entry.getPositionMatrix(),q[0],q[1],q[2]).color(r,g,b,a).normal(entry.getNormalMatrix(),nx,ny,nz).next();
+            }
+        }finally{matrices.pop();buffers.draw(layer);}
+    }
     /** One selection for both passes preserves the shared limit and their draw order. */
     static void prepareNearby(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,PrinterSettings settings,int extraColor,double[] clip){
-        nearbyMissing.clear();nearbyErrors.clear();
+        nearbyMissing.clear();nearbyErrors.clear();outlineActive=false;
         if(client.player==null||context.matrixStack()==null)return;
+        var segments=outline(boxes,clip);
+        if(segments!=null){outlineActive=true;prepareOutline(client,context,segments,settings,extraColor);return;}
         var camera=context.camera().getPos();var origin=client.player.getCameraPosVec(context.tickDelta());
         var look=net.minecraft.util.math.Vec3d.fromPolar(context.camera().getPitch(),context.camera().getYaw());
         double rangeSquared=settings.highlightRange*(double)settings.highlightRange;int selected=0;
@@ -147,6 +231,7 @@ final class ProjectionOverlays {
         return HighlightFades.missing(Math.sqrt(x*x+y*y+z*z),range,alignment);
     }
     static void drawNearby(MinecraftClient client,WorldRenderContext context,PrinterSettings settings,boolean errors){
+        if(outlineActive){drawOutline(client,context,settings,errors);return;}
         var boxes=errors?nearbyErrors:nearbyMissing;
         if(boxes.isEmpty()||context.matrixStack()==null)return;
         var matrices=context.matrixStack();var camera=context.camera().getPos();
