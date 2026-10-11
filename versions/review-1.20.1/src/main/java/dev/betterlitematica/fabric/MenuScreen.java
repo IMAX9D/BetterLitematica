@@ -122,7 +122,10 @@ abstract class MenuScreen extends Screen {
     }
     /** A search field keeps its accessible name without a separate caption row. */
     protected final TextFieldWidget searchAt(String value,int x,int y,int w,int max){
-        var field=new OverlayTextField(x+6,0,w-12,"搜索",true);field.setMaxLength(max);field.setText(value);addBody(field,y);return field;
+        return searchAt("名称、ID 或拼音",value,x,y,w,max);
+    }
+    protected final TextFieldWidget searchAt(String placeholder,String value,int x,int y,int w,int max){
+        var field=new OverlayTextField(x+6,0,w-12,"搜索",true);field.placeholder(placeholder);field.setMaxLength(max);field.setText(value);addBody(field,y);hint(field,placeholder);return field;
     }
     protected final void addBody(ClickableWidget widget,int y){body.add(new Item(widget,y));contentHeight=Math.max(contentHeight,y+widget.getHeight());addDrawableChild(widget);if(!building)position();}
     protected final void clearRows(int row){int y=row*26;body.removeIf(item->{if(item.y>=y){remove(item.widget);return true;}return false;});captions.removeIf(c->c.y>=y);contentHeight=0;for(var item:body)contentHeight=Math.max(contentHeight,item.y+item.widget.getHeight());for(var caption:captions)contentHeight=Math.max(contentHeight,caption.y+14);}

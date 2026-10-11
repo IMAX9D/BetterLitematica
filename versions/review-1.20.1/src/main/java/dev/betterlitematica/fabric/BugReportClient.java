@@ -10,11 +10,13 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.regex.Pattern;
+import java.util.function.Supplier;
 
 /** User-initiated feedback only. A persisted, immutable request makes an ambiguous timeout safe to retry. */
 final class BugReportClient {
     static final URI API=URI.create("https://forum.imax9d.dpdns.org/api/mods/betterlitematica/v1/");
     static final int DESCRIPTION_CHARS=3000;
+    private static final int PRIVACY_VERSION=2;
     record Draft(String title,String description,String contact,boolean logs,boolean crash,boolean previousSession) {
         static final Draft EMPTY=new Draft("","","",true,true,false);
         Draft(String title,String description,String contact,boolean logs,boolean crash){this(title,description,contact,logs,crash,false);}
@@ -28,6 +30,9 @@ final class BugReportClient {
     private static final Gson JSON=new GsonBuilder().setPrettyPrinting().create();
     private final Path game,folder;
     private final URI api;
+    private final Supplier<String> playerName;
+    private final long startedAt;
+    private long previousStart;
     private final ExecutorService worker=Executors.newSingleThreadExecutor(r->{var t=new Thread(r,"betterlitematica-feedback");t.setDaemon(true);return t;});
     private final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NEVER).build();
     private volatile View view=new View(true,"正在读取反馈草稿…",false,null,0);
@@ -37,13 +42,21 @@ final class BugReportClient {
 
     BugReportClient(Path game){this(game,API);}
     /** Non-public endpoint injection is for local contract checks; the game always uses the fixed HTTPS origin. */
-    BugReportClient(Path game,URI api){
-        this.game=game;this.folder=game.resolve("config/betterlitematica/feedback");this.api=api;
+    BugReportClient(Path game,URI api){this(game,api,()->"",java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime());}
+    BugReportClient(Path game,URI api,Supplier<String> playerName,long startedAt){
+        this.game=game;this.folder=game.resolve("config/betterlitematica/feedback");this.api=api;this.playerName=playerName;this.startedAt=startedAt;
         loading=CompletableFuture.supplyAsync(()->{
             String warning="";Receipt receipt=null;
+            try {
+                var session=read("session.json");if(session!=null){long previous=session.get("startedAt").getAsLong();if(previous>0&&previous<startedAt)previousStart=previous;}
+                var current=new JsonObject();current.addProperty("startedAt",startedAt);write("session.json",current);
+            }catch(Exception e){warning="无法确认上次启动时间，旧崩溃报告不会自动附带。";}
             try { var data=read("draft.json");if(data!=null)draft=readDraft(data); }
             catch(Exception e){warning="旧反馈草稿无法读取，可填写新问题。";}
-            try {var data=read("pending.json");if(data!=null){var candidate=new Pending(readDraft(data.getAsJsonObject("draft")),data.get("body").getAsString());validateBody(candidate.body);pending=candidate;if(!draft.hasContent())draft=pending.draft;}}
+            try {var data=read("pending.json");if(data!=null){var candidate=new Pending(readDraft(data.getAsJsonObject("draft")),data.get("body").getAsString());validateBody(candidate.body);if(!draft.hasContent())draft=candidate.draft;
+                if(data.has("privacyVersion")&&data.get("privacyVersion").getAsInt()==PRIVACY_VERSION)pending=candidate;
+                else warning="旧版待提交附件需重新清理；再次提交将生成新报告。";
+            }}
             catch(Exception e){warning="旧提交记录无法读取，可填写新问题。";}
             try {var data=read("receipt.json");if(data!=null)receipt=receipt(data);}
             catch(Exception e){warning="上次反馈回执无法读取。";}
@@ -55,7 +68,10 @@ final class BugReportClient {
     View view(){return view;}
     boolean retrying(Draft value){return pending!=null&&pending.draft.equals(value);}
     void saveDraft(Draft value){draft=value;worker.execute(()->{try{write("draft.json",JSON.toJsonTree(value).getAsJsonObject());}catch(IOException e){if(!view.busy)view=new View(false,"草稿未能保存到本地，请勿丢失已填写内容。",true,view.receipt,view.retryAt);}});}
-    CompletableFuture<String> attachmentNote(Draft value){return CompletableFuture.supplyAsync(()->{try{boolean report=!value.crash||latestCrash()!=null;boolean archive=!value.previousSession||latestArchive()!=null;return !report?"未找到崩溃报告，可照常提交日志和问题描述。":!archive?"未找到上次日志，将附带本次启动日志。":"";}catch(IOException e){return "附带文件暂时无法读取，可关闭对应选项。";}},worker);}
+    CompletableFuture<String> attachmentNote(Draft value){return CompletableFuture.supplyAsync(()->{try{
+        if(pending!=null&&pending.draft.equals(value)){var diagnostics=JsonParser.parseString(pending.body).getAsJsonObject().getAsJsonObject("diagnostics");return diagnostics!=null&&diagnostics.has("attachment_note")?diagnostics.get("attachment_note").getAsString():"";}
+        String note=value.crash?crashSelection(value).note:"";if(value.logs&&value.previousSession&&latestArchive()==null)note=notes(note,"未找到上次日志，将附带本次启动日志。");return note;
+    }catch(IOException e){return "附带文件暂时无法读取，可关闭对应选项。";}},worker);}
     CompletableFuture<Attachments> preview(Draft value){return CompletableFuture.supplyAsync(()->{try{if(pending!=null&&pending.draft.equals(value)){var body=JsonParser.parseString(pending.body).getAsJsonObject();return new Attachments(body.get("logs").getAsString(),body.get("crash_report").getAsString(),"");}return attachments(value);}catch(IOException e){throw new CompletionException(new IOException("附带内容读取失败，请关闭对应选项后重试。"));}},worker);}
     void submit(Draft value,JsonObject environment){
         if(view.busy||System.currentTimeMillis()<view.retryAt)return;
@@ -73,7 +89,7 @@ final class BugReportClient {
                     body.addProperty("logs",files.logs);body.addProperty("crash_report",files.crash);
                     if(!files.note.isEmpty())body.getAsJsonObject("diagnostics").addProperty("attachment_note",files.note);
                     fitBody(body);var candidate=new Pending(value,JSON.toJson(body));validateBody(candidate.body);
-                    var saved=new JsonObject();saved.add("draft",JSON.toJsonTree(value));saved.addProperty("body",candidate.body);
+                    var saved=new JsonObject();saved.add("draft",JSON.toJsonTree(value));saved.addProperty("body",candidate.body);saved.addProperty("privacyVersion",PRIVACY_VERSION);
                     // Disk persistence happens before POST, even on the first attempt.
                     write("pending.json",saved);pending=candidate;
                 }
@@ -181,12 +197,31 @@ final class BugReportClient {
     }
     private Attachments attachments(Draft value)throws IOException {
         String log="",report="",note="";
-        if(value.logs){Path archive=value.previousSession?latestArchive():null,file=archive==null?game.resolve("logs/latest.log"):archive;
-            if(Files.isRegularFile(file))log=tailBounded(sanitize(archive==null?tail(file,128*1024):gzipTail(file,128*1024)),80*1024);else note="未找到日志文件。";
+        var identities=new LinkedHashSet<String>();String current=playerName.get();if(current!=null&&!current.isBlank())identities.add(current);
+        Path archive=value.previousSession?latestArchive():null,file=archive==null?game.resolve("logs/latest.log"):archive;
+        // Historical login names also clean a crash-only report; this does not attach the log.
+        if((value.logs||value.crash)&&Files.isRegularFile(file))identities.addAll(logIdentities(file,archive!=null));
+        if(value.logs){
+            if(Files.isRegularFile(file))log=archive==null?tail(file,128*1024):gzipTail(file,128*1024);else note="未找到日志文件。";
             if(value.previousSession&&archive==null)note="未找到上次日志，将附带本次启动日志。";
         }
-        if(value.crash){Path latest=latestCrash();if(latest!=null)report=excerptBounded(sanitize(crashExcerpt(latest,64*1024)),40*1024);else note=note.isEmpty()?"未找到崩溃报告。":note+" 未找到崩溃报告。";}
-        return new Attachments(log,report,note);
+        if(value.crash){var selection=crashSelection(value);if(selection.file!=null)report=crashExcerpt(selection.file,64*1024);note=notes(note,selection.note);}
+        identities.addAll(identities(log+"\n"+report));
+        return new Attachments(tailBounded(sanitize(log,identities),80*1024),excerptBounded(sanitize(report,identities),40*1024),note);
+    }
+    private static String notes(String first,String next){return first.isEmpty()?next:next.isEmpty()?first:first+" "+next;}
+    private record CrashSelection(Path file,String note){}
+    private CrashSelection crashSelection(Draft value)throws IOException {
+        Path latest=latestCrash();if(latest==null)return new CrashSelection(null,"未找到崩溃报告，可照常提交日志和问题描述。");
+        long time=Files.getLastModifiedTime(latest).toMillis(),lower=value.previousSession?previousStart:startedAt;
+        if(lower==0||time<lower||value.previousSession&&time>=startedAt){String date=java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(java.time.ZoneId.systemDefault()).format(java.time.Instant.ofEpochMilli(time));return new CrashSelection(null,"崩溃报告（"+date+"）不属于所选运行，未附带。");}
+        return new CrashSelection(latest,"");
+    }
+    private static Set<String> logIdentities(Path file,boolean compressed)throws IOException {
+        var names=new LinkedHashSet<String>();String carry="";long total=0;byte[] buffer=new byte[8192];
+        try(var raw=Files.newInputStream(file);var stream=compressed?new java.util.zip.GZIPInputStream(raw):raw){
+            int count;while((count=stream.read(buffer))>=0){total+=count;if(total>64L*1024*1024)throw new IOException();String text=carry+new String(buffer,0,count,StandardCharsets.UTF_8);var login=LOGIN_PLAYER.matcher(text);while(login.find()){names.add(login.group(1));if(names.size()>128)throw new IOException();}carry=text.substring(Math.max(0,text.length()-128));}
+        }return names;
     }
     private Path latestArchive()throws IOException {return newest(game.resolve("logs"),"*.log.gz");}
     private Path latestCrash()throws IOException {Path managed=newest(game.resolve("crash-reports"),"crash-*.txt"),nativeCrash=newest(game,"hs_err_pid*.log");return managed==null?nativeCrash:nativeCrash!=null&&Files.getLastModifiedTime(nativeCrash).compareTo(Files.getLastModifiedTime(managed))>0?nativeCrash:managed;}
@@ -217,20 +252,32 @@ final class BugReportClient {
         try(var stream=new RandomAccessFile(file.toFile(),"r")){long start=Math.max(0,stream.length()-maximum);stream.seek(start);byte[] data=new byte[(int)Math.min(maximum,stream.length()-start)];stream.readFully(data);String text=new String(data,StandardCharsets.UTF_8);if(start>0){int line=text.indexOf('\n');text=line<0?"":text.substring(line+1);}return text;}
     }
     private static final Pattern PRIVATE_LINE=Pattern.compile("(?i)(\\[CHAT\\]|chat message|logged in with entity|connecting to|server address|server ip|session id|--accessToken|--uuid|\\bjoined the game\\b|all players:|player count:|entity name:|player name:|access[_-]?token|authorization|api[_-]?key|password|secret)");
-    static String sanitize(String input){
+    private static final Pattern PLAYER=Pattern.compile("(?im)(?<![A-Za-z0-9_])([A-Za-z0-9_]{1,16})(?=\\s+(?:joined the game|left the game|lost connection|logged in with entity)|加入了游戏|退出了游戏)");
+    private static final Pattern COMMAND_PLAYER=Pattern.compile("\\[([A-Za-z0-9_]{1,16}):\\s");
+    private static final Pattern LOGIN_PLAYER=Pattern.compile("(?im)Setting user:\\s*([A-Za-z0-9_]{1,16})(?![A-Za-z0-9_])");
+    private static Set<String> identities(String input){
+        var result=new LinkedHashSet<String>();var setting=LOGIN_PLAYER.matcher(input);while(setting.find()&&result.size()<128)result.add(setting.group(1));
+        for(var pattern:List.of(PLAYER,COMMAND_PLAYER)){var found=pattern.matcher(input);while(found.find()&&result.size()<128)result.add(found.group(1));}return result;
+    }
+    static String sanitize(String input){return sanitize(input,List.of());}
+    static String sanitize(String input,Collection<String> knownPlayers){
+        if(input.isEmpty())return "";
+        var names=new LinkedHashSet<String>(knownPlayers);names.addAll(identities(input));String user=System.getProperty("user.name","");if(!user.isBlank())names.add(user);
+        String alternatives=names.stream().filter(name->!name.isBlank()).sorted(Comparator.comparingInt(String::length).reversed()).map(Pattern::quote).collect(java.util.stream.Collectors.joining("|"));
+        Pattern identity=alternatives.isEmpty()?null:Pattern.compile("(?i)(?<![A-Za-z0-9_])(?:"+alternatives+")(?![A-Za-z0-9_])");
         StringBuilder clean=new StringBuilder();
         for(String line:input.replace("\r","").split("\n",-1)){
             if(PRIVATE_LINE.matcher(line).find())continue;
             line=line.replaceAll("(?i)\\bsk-[A-Za-z0-9_-]{16,}","[密钥已隐藏]")
                 .replaceAll("(?i)Bearer\\s+[A-Za-z0-9._~+/-]+","Bearer [已隐藏]")
                 .replaceAll("(?i)((?:access[_-]?token|api[_-]?key|password|authorization|secret)\\s*[=:]\\s*[\"']?)[^\\s\"'&,;]+","$1[已隐藏]")
-                .replaceAll("[A-Za-z]:[\\\\/].*","[本地路径已隐藏]")
+                .replaceAll("(?i)\\b(?:https?://|file:/+)[^\\s\"<>]+","[网址已隐藏]")
+                .replaceAll("(?<![A-Za-z])[A-Za-z]:[\\\\/].*","[本地路径已隐藏]")
                 .replaceAll("(?<![\\w.])/(?:home|Users|data|opt|var|tmp)/.*","[本地路径已隐藏]")
                 .replaceAll("\\\\\\\\[^\\s]+.*","[本地路径已隐藏]")
-                .replaceAll("https?://[^\\s\"<>]+","[网址已隐藏]")
                 .replaceAll("(?<![\\w.])(?:\\d{1,3}\\.){3}\\d{1,3}(?::\\d+)?","[网络地址已隐藏]")
                 .replaceAll("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}","[标识已隐藏]");
-            String user=System.getProperty("user.name","");if(!user.isBlank())line=line.replace(user,"[用户名已隐藏]");
+            if(identity!=null)line=identity.matcher(line).replaceAll("[用户名已隐藏]");
             clean.append(line).append('\n');
         }
         return clean.toString();

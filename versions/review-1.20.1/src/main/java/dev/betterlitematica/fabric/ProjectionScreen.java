@@ -48,7 +48,7 @@ final class ProjectionScreen extends MenuScreen {
         tile(Kind.VERSIONS,"项目版本",right,tw,1,2,()->client.setScreen(new ProjectScreen(this,controller)),false);
         tile(Kind.SETTINGS,"设置与快捷键",right,tw,0,3,()->client.setScreen(new OptionsScreen(this,controller)),false);
         if(controller.hasDraftRecovery())tile(Kind.RESTORE,"恢复编辑",right,tw,1,3,()->client.setScreen(new DraftRecoveryScreen(this,controller)),true);
-        var feedback=fixed("提交 Bug",0,76,()->client.setScreen(new BugReportScreen(this,controller)));
+        var feedback=fixed("问题反馈",0,76,()->client.setScreen(new BugReportScreen(this,controller)));
         hint(feedback,"描述问题并提交给维护者，可选择附带日志或崩溃报告。");
         snapshot=snapshot();
     }

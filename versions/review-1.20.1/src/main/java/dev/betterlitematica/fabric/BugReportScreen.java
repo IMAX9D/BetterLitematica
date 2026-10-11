@@ -19,7 +19,7 @@ final class BugReportScreen extends MenuScreen {
     private CompletableFuture<BugReportClient.Attachments> previewing;
     private CompletableFuture<String> attachmentNote;
 
-    BugReportScreen(Screen parent,ProjectionController controller){super("提交 Bug","描述遇到的问题，点击提交即可。",parent,controller,true);service=BugReports.service();if(service.view().receipt()!=null)lastReceipt=service.view().receipt().id();}
+    BugReportScreen(Screen parent,ProjectionController controller){super("问题反馈","描述遇到的问题，点击提交即可。",parent,controller,true);service=BugReports.service();if(service.view().receipt()!=null)lastReceipt=service.view().receipt().id();}
     @Override protected int preferredHeight(){return 380;}
     @Override protected void buildMenu(){
         var state=service.view();
@@ -38,7 +38,7 @@ final class BugReportScreen extends MenuScreen {
         crashToggle=buttonAt("附带崩溃报告："+(draft.crash()?"开":"关"),cellX(1,3),toggleY,third,()->{edit(new BugReportClient.Draft(draft.title(),draft.description(),draft.contact(),draft.logs(),!draft.crash()));refresh();},true,false);
         preview=buttonAt("查看附带内容",cellX(2,3),toggleY,third,this::preview,true,false);
         hint(logToggle,draft.previousSession()?"附带上次运行的日志；聊天、密钥、地址和个人路径会被移除。":"附带清理后的最新日志尾部；聊天、密钥、地址和个人路径会被移除。");
-        hint(crashToggle,"附带最近一次崩溃报告；提交前可查看清理后的内容。");hint(preview,"查看将附带的日志或崩溃报告。");
+        hint(crashToggle,"仅附带所选运行期间的崩溃报告，旧报告不附带；可查看清理后的内容。");hint(preview,"查看将附带的日志或崩溃报告。");
         caption(BugReports.versionSummary(),left,toggleY+30,innerWidth);
         hint(titleInput,"可留空；报告标题将取问题描述的第一行。");hint(contactInput,"仅在希望维护者联系你时填写。");
         submit=fixedAction("提交",0,94,()->{localMessage="";submitted=true;edited=false;service.submit(draft,BugReports.environment(controller));});
@@ -54,7 +54,8 @@ final class BugReportScreen extends MenuScreen {
         buttonAt("刷新处理状态",cellX(1,2),132,cellWidth(2),()->{localMessage="";service.query(receipt);},!service.view().busy(),false);
         var next=fixedAction("提交新问题",0,112,()->{if(draft.hasContent()){showReceipt=false;}else{service.newDraft();draft=defaults();service.saveDraft(draft);description=null;showReceipt=false;}localMessage="";attachmentNote=service.attachmentNote(draft);refresh();});next.active=!service.view().busy();
     }
-    private BugReportClient.Draft defaults(){return new BugReportClient.Draft("","","",true,true,parent instanceof net.minecraft.client.gui.screen.TitleScreen);}
+    private boolean previousSession(){return BugReports.previousSession(parent instanceof net.minecraft.client.gui.screen.TitleScreen);}
+    private BugReportClient.Draft defaults(){return new BugReportClient.Draft("","","",true,true,previousSession());}
     private void edit(BugReportClient.Draft value){boolean attachmentChanged=value.logs()!=draft.logs()||value.crash()!=draft.crash();draft=new BugReportClient.Draft(value.title(),value.description(),value.contact(),value.logs(),value.crash(),draft.previousSession());edited=true;editedAt=System.nanoTime();localMessage="";if(attachmentChanged)attachmentNote=service.attachmentNote(draft);}
     private void preview(){localMessage="正在读取附带内容…";previewing=service.preview(draft);}
     private void updateControls(){
@@ -69,6 +70,7 @@ final class BugReportScreen extends MenuScreen {
     @Override protected void updateMenu(){
         if(!loaded&&service.loading().isDone()){
             var saved=service.draft();draft=saved.hasContent()?saved:defaults();
+            if(saved.hasContent()&&!service.retrying(saved))draft=new BugReportClient.Draft(saved.title(),saved.description(),saved.contact(),saved.logs(),saved.crash(),previousSession());
             // A blank legacy draft may contain the old attachment defaults; it is a new report.
             if(!draft.equals(saved))service.saveDraft(draft);
             loaded=true;description=null;attachmentNote=service.attachmentNote(draft);refresh();

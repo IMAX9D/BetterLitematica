@@ -8,8 +8,11 @@ import net.minecraft.client.MinecraftClient;
 /** Capture only explicit, non-identifying runtime fields; never serialize the player's full configuration. */
 final class BugReports {
     private static BugReportClient service;
+    private static boolean enteredWorld;
     private BugReports(){}
     static void register(MinecraftClient client,ProjectionController controller){
+        // Persist the launch boundary even if the player never opens the feedback form.
+        service();net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register((handler,sender,mc)->enteredWorld=true);
         net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((mc,screen,width,height)->{
             if(screen instanceof net.minecraft.client.gui.screen.TitleScreen){
                 var window=mc.getWindow();var viewport=dev.betterlitematica.core.UiViewport.fit(window.getFramebufferWidth(),window.getFramebufferHeight(),window.getScaledWidth(),window.getScaledHeight(),window.getScaleFactor());
@@ -18,7 +21,8 @@ final class BugReports {
             }
         });
     }
-    static synchronized BugReportClient service(){if(service==null)service=new BugReportClient(MinecraftClient.getInstance().runDirectory.toPath());return service;}
+    static boolean previousSession(boolean titleScreen){return titleScreen&&!enteredWorld;}
+    static synchronized BugReportClient service(){if(service==null){var client=MinecraftClient.getInstance();service=new BugReportClient(client.runDirectory.toPath(),BugReportClient.API,()->client.getSession().getUsername(),java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime());}return service;}
     private static String version(String id){return FabricLoader.getInstance().getModContainer(id).map(mod->mod.getMetadata().getVersion().getFriendlyString()).orElse("unknown");}
     static String versionSummary(){return "Minecraft "+SharedConstants.getGameVersion().getName()+"  ·  BetterLitematica "+version("betterlitematica");}
     static JsonObject environment(ProjectionController controller){

@@ -49,7 +49,7 @@ final class PrinterRules {
         String target=Registries.BLOCK.getId(wanted.getBlock()).toString(),source=Registries.BLOCK.getId(actual.getBlock()).toString();
         int colon=target.indexOf(':');return target.substring(colon+1).startsWith("stripped_")&&source.equals(target.substring(0,colon+1)+target.substring(colon+10));
     }
-    /** Leaf distance is recomputed from the world, not chosen by a placement action. */
+    /** Leaf distance is world-computed; player placement always produces persistent leaves. */
     static boolean constructionMatches(BlockState actual,BlockState wanted){
         if(actual==null||wanted==null||actual.getBlock()!=wanted.getBlock())return false;
         return constructionState(actual,wanted).equals(wanted);
@@ -64,7 +64,7 @@ final class PrinterRules {
     }
     private static BlockState constructionState(BlockState actual,BlockState wanted){
         return actual.getBlock() instanceof LeavesBlock
-            ?actual.with(LeavesBlock.DISTANCE,wanted.get(LeavesBlock.DISTANCE)):actual;
+            ?actual.with(LeavesBlock.DISTANCE,wanted.get(LeavesBlock.DISTANCE)).with(LeavesBlock.PERSISTENT,wanted.get(LeavesBlock.PERSISTENT)):actual;
     }
     static boolean placementMatches(BlockState predicted,BlockState wanted){
         if(predicted==null||predicted.getBlock()!=wanted.getBlock())return false;

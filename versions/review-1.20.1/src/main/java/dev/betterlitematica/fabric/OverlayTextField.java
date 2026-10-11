@@ -7,11 +7,12 @@ import net.minecraft.text.Text;
 
 /** Vanilla editing/clipboard model only; all measurement, painting and pointer selection use our outline font. */
 final class OverlayTextField extends TextFieldWidget {
-    private int anchor,start;private boolean pointerSelecting;private final boolean search;
+    private int anchor,start;private boolean pointerSelecting;private final boolean search;private String placeholder="";
     OverlayTextField(int x,int y,int width,String label){this(x,y,width,label,false);}
     OverlayTextField(int x,int y,int width,String label,boolean search){super(null,x,y,width,20,Text.literal(label));this.search=search;setDrawsBackground(false);}
     private int textX(){return getX()+(search?18:0);}
     private int textWidth(){return Math.max(1,getWidth()-(search?18:0));}
+    void placeholder(String value){placeholder=value;}
     @Override public void setSelectionEnd(int position){anchor=Math.max(0,Math.min(getText().length(),position));super.setSelectionEnd(position);}
     int selectionAnchor(){return anchor;}
     @Override public boolean mouseClicked(double x,double y,int button){
@@ -37,7 +38,8 @@ final class OverlayTextField extends TextFieldWidget {
         try{
             int lo=Math.max(start,Math.min(cursor,anchor)),hi=Math.min(end,Math.max(cursor,anchor));
             if(lo<hi)ui.rect(textX()+ui.measure(text.substring(start,lo)),getY()+2,textX()+ui.measure(text.substring(start,hi)),getY()+getHeight()-2,UiTheme.SELECTION);
-            ui.rawText(shown,textX(),y,active?UiTheme.TEXT:UiTheme.DISABLED_TEXT);
+            if(text.isEmpty()&&!placeholder.isEmpty())ui.rawText(ui.fittingText(placeholder,Math.max(1,textWidth()-2)),textX(),y,active?UiTheme.MUTED:UiTheme.DISABLED_TEXT);
+            else ui.rawText(shown,textX(),y,active?UiTheme.TEXT:UiTheme.DISABLED_TEXT);
             if(isFocused()&&(System.nanoTime()/500_000_000L)%2==0){double x=textX()+ui.measure(text.substring(start,cursor));ui.rect(x,getY()+3,x+0.7,getY()+getHeight()-3,UiTheme.FOCUS);}
         }finally{ui.unclip();}
     }

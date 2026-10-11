@@ -33,7 +33,7 @@ final class OptionsScreen extends MenuScreen {
             setting(SettingId.OPTIONS_COMPATIBILITY,button("模组共存",0,2,7,()->client.setScreen(new CompatibilityScreen(this,controller))));
         }else{
             int w=180,right=left+w+18,rw=innerWidth-w-18;
-            search=settingAction(searchAt(query,left,54,w,100));search.setChangedListener(v->{query=v;rows();});
+            search=settingAction(searchAt("名称或拼音",query,left,54,w,100));search.setChangedListener(v->{query=v;rows();});
             double offset=list==null?0:list.scrollOffset();list=new OverlayList(left,w,Math.max(40,bodyBottom-bodyTop-88),id->{selected=id;recording=false;refresh();});rows();list.scrollOffset(offset);addBody(list,88);
             chord=settingAction(fieldAt(InputBindings.label(selected),drafts.getOrDefault(selected,s.keys.get(selected)),right,40,rw,120));chord.setChangedListener(v->drafts.put(selected,v));chord.setEditable(!recording);
             settingAction(buttonAt(recording?(selected.equals("wheel")?"按下按键…":"按下组合键…"):"录入按键",right,92,rw,()->{recording=true;pressed.clear();if(Screen.hasControlDown())pressed.add("CTRL");if(Screen.hasAltDown())pressed.add("ALT");if(Screen.hasShiftDown())pressed.add("SHIFT");setFocused(null);refresh();},true,recording));
