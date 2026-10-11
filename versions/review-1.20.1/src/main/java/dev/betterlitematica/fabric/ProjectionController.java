@@ -69,6 +69,23 @@ final class ProjectionController implements AutoCloseable {
     private int ticks, buildTurn, materialTurn;
     private final ProjectionComposite composite=new ProjectionComposite();
     private final RenderResources gpuResources=new RenderResources(1L<<30,65536,65536,8L<<20,8192,1);
+    { gpuResources.distanceOrdered(true); }
+    private long usableVram=-1;
+    /** Player budget, or for "自动" part of the memory the graphics driver reports (previous 1 GiB when it reports none). */
+    private void applyRenderBudget(){
+        int choice=options.display.renderBudget();long bytes;
+        if(choice<0)bytes=Long.MAX_VALUE>>2;else if(choice>0)bytes=(long)choice<<30;
+        else{if(usableVram<0)usableVram=detectUsableVram();bytes=usableVram>0?Math.max(1L<<30,Math.min(8L<<30,usableVram)):1L<<30;}
+        int objects=(int)Math.max(65536,Math.min(1<<20,bytes/(16L<<10)));
+        gpuResources.resize(bytes,objects);
+    }
+    private static long detectUsableVram(){
+        try{var caps=org.lwjgl.opengl.GL.getCapabilities();
+            if(caps.GL_NVX_gpu_memory_info)return org.lwjgl.opengl.GL11.glGetInteger(0x9048)*1024L*2/5;
+            if(caps.GL_ATI_meminfo){int[] free=new int[4];org.lwjgl.opengl.GL11.glGetIntegerv(0x87FC,free);return free[0]*1024L*3/5;}
+        }catch(RuntimeException|LinkageError unavailable){}
+        return 0;
+    }
     private boolean gpuReleaseFailure;
     private void releaseGpu(int limit,long deadline){try{gpuResources.drain(limit,deadline);gpuReleaseFailure=false;}catch(RuntimeException e){if(!gpuReleaseFailure)BetterLitematicaClient.LOGGER.error("GPU resource release will retry",e);gpuReleaseFailure=true;}}
     private ProjectionScene scene=new ProjectionScene(List.of());
@@ -266,7 +283,7 @@ final class ProjectionController implements AutoCloseable {
             ||(options.printer.highlights&&options.printer.highlightOnTop&&(!nearbyHighlights.boxes().isEmpty()||!printer.actionMarks(System.nanoTime()).isEmpty()));
     }
     void render(WorldRenderContext context) {
-        gpuResources.nextFrame();
+        applyRenderBudget();gpuResources.nextFrame();
         if(renderChanges.takeAll()){for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldAllChanged();}
         else{var changes=renderChanges.drain(64);if(!changes.isEmpty())for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldChanged(changes);}
         boolean show=rendering&&!temporarilyHidden&&options.display.projection;

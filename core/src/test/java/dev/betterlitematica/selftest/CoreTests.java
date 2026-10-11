@@ -65,6 +65,7 @@ public final class CoreTests {
             test("per-placement display filters and legacy settings migration",()->{checks+=BlockDisplayFilterChecks.run();});
             test("spatial highlight index equals a stable full sort",()->{checks+=HighlightBoxIndexChecks.run();});
             test("layer moves rebuild only sections whose membership changed",()->{checks+=LayerRefreshChecks.run();});
+            test("distance-ordered residency keeps the nearest meshes",()->{checks+=DistanceResidencyChecks.run();});
             test("complete bounded directory search and cancellation",()->{checks+=DirectorySearchChecks.run(temp);});
             test("draft persistence ordering and failure recovery",()->{checks+=DraftRecoveryChecks.run(temp.resolve("recovery"));});
             test("finite material batches avoid needless switches without starvation",()->{checks+=PrinterBatchChecks.run();});

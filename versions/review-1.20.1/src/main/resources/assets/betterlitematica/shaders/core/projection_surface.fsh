@@ -3,10 +3,8 @@ uniform sampler2D Sampler0;
 uniform vec4 ColorModulator;
 uniform int TextureMode;
 uniform int SurfaceTint;
-// x,y: near clear and near full distance; z,w: far fade start and end. All zero disables both.
-uniform vec4 Fade;
-// Opacity factor and saturation kept at the far end.
-uniform vec2 FarFloor;
+// x: near clear distance, y: near full distance. Zero disables the fade.
+uniform vec2 Fade;
 in vec2 texCoord;
 in vec4 vertexColor;
 in float vertexDistance;
@@ -31,12 +29,8 @@ void main(){
     // so a discarded fragment lets the world and farther projection surfaces show through.
     float near=Fade.y>Fade.x?smoothstep(Fade.x,Fade.y,vertexDistance):1.0;
     if(near<=0.0)discard;
-    float far=Fade.w>Fade.z?smoothstep(Fade.z,Fade.w,vertexDistance):0.0;
     // A restrained blue wash keeps textures readable while distinguishing the projection.
     vec3 hologram=SurfaceTint==1?mix(t.rgb,vec3(1.0,0.12,0.10),0.48):mix(t.rgb,vec3(0.32,0.65,1.0),0.18);
     vec3 rgb=hologram*ColorModulator.rgb;
-    // Distance recedes gently; wrong-block red keeps its full saturation.
-    float grey=dot(rgb,vec3(0.2126,0.7152,0.0722));
-    if(SurfaceTint!=1)rgb=mix(rgb,vec3(grey),far*(1.0-FarFloor.y));
-    fragColor=vec4(rgb,ColorModulator.a*near*layerFade*mix(1.0,FarFloor.x,far));
+    fragColor=vec4(rgb,ColorModulator.a*near*layerFade);
 }

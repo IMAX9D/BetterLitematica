@@ -31,8 +31,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private static final int MAX_PART_VERTICES=16384,MAX_BLOCK_QUADS=512;
     private static final int BLOCKS_PER_FRAME=8192,UPLOAD_BYTES_PER_FRAME=2*1024*1024,MAX_COMPLETED_PER_FRAME=32;
     private static final int QUERY_RADIUS=512,MAX_CANDIDATES=32768;
-    /** Blocks: surfaces nearer than NEAR_CLEAR are removed, fully back by NEAR_FULL; far ones keep FAR_OPACITY and FAR_SATURATION. */
-    private static final float NEAR_CLEAR=.75f,NEAR_FULL=2.5f,FAR_FADE_START=48f,FAR_FADE_END=160f,FAR_OPACITY=.6f,FAR_SATURATION=.65f;
+    /** Blocks: surfaces nearer than NEAR_CLEAR are removed and fully back by NEAR_FULL. */
+    private static final float NEAR_CLEAR=.75f,NEAR_FULL=2.5f;
     private static final long BUILD_NANOS=4_000_000,MAX_ACTIVE_SECTION_BYTES=8L<<20;
     /** Decoding threads and requests kept in flight; the streamer's queue still bounds memory. */
     private static final int DECODE_THREADS=Math.max(2,Math.min(4,Runtime.getRuntime().availableProcessors()-2)),PREFETCH_IN_FLIGHT=32;
@@ -55,7 +55,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private SchematicEdits edits;
     private final WeightedLru<SectionKey,PackedSection> editedSections=new WeightedLru<>(16L<<20,PackedSection::estimatedBytes,value->{});
     // Keep meshes across camera turns; evict cold meshes only under actual memory pressure.
-    private final WeightedLru<SectionKey,Mesh> meshes=new WeightedLru<>(512L<<20,32768,Mesh::bytes,Mesh::close);
+    // The shared render budget decides residency (nearest first); this cache only bounds bookkeeping.
+    private final WeightedLru<SectionKey,Mesh> meshes=new WeightedLru<>(Long.MAX_VALUE>>2,MAX_CANDIDATES*2,Mesh::bytes,Mesh::close);
     private final MeshRefresh<SectionKey> worldRefresh=new MeshRefresh<>(4096);
     private final BufferBuilder builder=new BufferBuilder(MAX_PART_VERTICES*24);
     private final QuadVisibility.Builder ownership=new QuadVisibility.Builder();
@@ -92,6 +93,16 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private final LinkedHashSet<LayerRange> unsettledLayers=new LinkedHashSet<>();private boolean unsettledOverflow;private long layerChangedAt;
     private LayerRange semantic=LayerRange.ALL;private int capAxis=-1,clipAxis=-1;private long capLo,capHi;private double clipFrom,clipTo,clipFade;
     private static final int FOLLOW_SPAN=6;
+    private Vec3d distanceOrigin=Vec3d.ZERO;
+    /** Squared distance from the viewer to a section's centre; the residency key under budget pressure. */
+    private double sectionDistance(SectionKey key){
+        Box box=boundsCache.get(key);return distance(box!=null?box:bounds(key));
+    }
+    private double distance(Box box){double x=(box.minX+box.maxX)*.5-distanceOrigin.x,y=(box.minY+box.maxY)*.5-distanceOrigin.y,z=(box.minZ+box.maxZ)*.5-distanceOrigin.z;return x*x+y*y+z*z;}
+    /** Off-screen sections around the viewer keep loading while they can still displace farther meshes. */
+    private boolean surroundingAllowed(){
+        return resources.distanceOrdered()?meshes.size()<MAX_CANDIDATES*2-1024:resources.warm()&&meshes.usedBytes()<meshes.capacity()*3/4&&meshes.size()<24576;
+    }
     private static final int MAX_UNSETTLED_LAYERS=256;private static final long LAYER_SETTLE_NANOS=300_000_000L;
     private float opacity=0.45f;
     void opacity(float value){opacity=value;}
@@ -311,7 +322,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         boolean refreshAllPriorities=!resourcesVisible;
         boolean budgetChanged=visibilityDirty||!resourcesVisible;resourcesVisible=true;
         try{
-            Vec3d camera=context.camera().getPos();Vec3i local=new Vec3i(MathHelper.floor(camera.x),MathHelper.floor(camera.y),MathHelper.floor(camera.z));
+            Vec3d camera=context.camera().getPos();distanceOrigin=camera;Vec3i local=new Vec3i(MathHelper.floor(camera.x),MathHelper.floor(camera.y),MathHelper.floor(camera.z));
             int radius=Math.min(QUERY_RADIUS,Math.max(16,client.options.getViewDistance().getValue()*16));
             if(query!=null&&query.isDone()){
                 QueryResult result=query.join();query=null;
@@ -320,6 +331,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                     boundsCache.keySet().retainAll(members);worldBases.keySet().retainAll(members);failed.retainAll(members);visibilityDirty=true;nextWorkProbe=0;
                     visibleSet.retainAll(members);deferred.clear();budgetSaturated=false;
                     candidates=result.keys();candidateSet=result.membership();entityCandidates=result.entities();lastCamera=result.camera();lastRadius=radius;boundsCursor=0;
+                    // Residency follows distance from the viewer: refresh it whenever the nearby set is recomputed.
+                    meshes.forEach((key,mesh)->mesh.resources().distance(candidateSet.contains(key)?distance(mesh.bounds()):Double.POSITIVE_INFINITY));
                     if(job!=null&&!members.contains(job.key))discardJob();
                 }
             }
@@ -374,11 +387,11 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             // Once per frame: later attempts in the same frame only build what has arrived.
             prefetchedThisFrame=true;
             frameMissingWork=prefetch(visibleKeys,buildCursor,deadline,false);
-            boolean warm=resources.warm()&&meshes.usedBytes()<meshes.capacity()*3/4&&meshes.size()<24576;
+            boolean warm=surroundingAllowed();
             if(warm&&stream.queuedJobs()<16)frameMissingWork|=prefetch(candidates,surroundingCursor,deadline,true);
             }
             if(schedule)missingWork|=frameMissingWork;
-            boolean warm=resources.warm()&&meshes.usedBytes()<meshes.capacity()*3/4&&meshes.size()<24576;
+            boolean warm=surroundingAllowed();
             if(schedule&&!missingWork)nextWorkProbe=Long.MAX_VALUE;
             if(schedule&&missingWork){
                 nextWorkProbe=workNow+50_000_000L;
@@ -420,6 +433,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             int at=(start+visited)%keys.size();SectionKey key=keys.get(at);
             if(System.nanoTime()>=deadline)return null;
             if(surrounding&&visibleSet.contains(key)||key.equals(coolingKey)&&System.nanoTime()<coolingUntil)continue;
+            // Under a full budget a section farther than every resident mesh would only be rejected: skip it.
+            if(!resources.admits(sectionDistance(key)))continue;
             if(holesOnly&&meshes.contains(key)||!needsMesh(key)||failed.contains(key)||deferred.contains(key))continue;
             var section=section(key);if(section==null)continue;
             Job next=prepare(key,section);if(next!=null){if(surrounding)surroundingCursor=at+1;else buildCursor=at+1;return next;}
@@ -558,7 +573,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             PackedSection data=section(neighbor);if(data==null){stream.request(neighbor);ready=false;}else neighbors[side.ordinal()]=data;
         }
         next.neighborhood=new SectionNeighborhood(section,neighbors[Direction.WEST.ordinal()],neighbors[Direction.EAST.ordinal()],neighbors[Direction.DOWN.ordinal()],neighbors[Direction.UP.ordinal()],neighbors[Direction.NORTH.ordinal()],neighbors[Direction.SOUTH.ordinal()]);
-        if(!ready)return null;int demand=visibleSet.contains(key)?RenderResources.VISIBLE:RenderResources.NEARBY;next.resources=meshes.contains(key)?resources.beginReplacement(demand):resources.begin(demand);if(next.resources==null)waitingRevision=resources.revision();return next.resources==null?null:next;
+        if(!ready)return null;int demand=visibleSet.contains(key)?RenderResources.VISIBLE:RenderResources.NEARBY;double distance=sectionDistance(key);next.resources=meshes.contains(key)?resources.beginReplacement(demand,distance):resources.begin(demand,distance);if(next.resources==null)waitingRevision=resources.revision();return next.resources==null?null:next;
     }
     static boolean hidesFace(BlockState state,BlockState neighbor,Direction side){
         if(neighbor.isAir())return false;
@@ -626,8 +641,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         shader.getUniformOrDefault("CameraPos").set((float)camera.x,(float)camera.y,(float)camera.z);
         shader.getUniformOrDefault("ViewInverse").set(new Matrix4f(context.matrixStack().peek().getPositionMatrix()).invert());
         shader.getUniformOrDefault("LayerClip").set((float)clipAxis,(float)Math.max(-1e9,clipFrom),(float)Math.min(1e9,clipTo),(float)clipFade);
-        float farEnd=Math.max(FAR_FADE_START+16,Math.min(FAR_FADE_END,client.options.getViewDistance().getValue()*16f));
-        shader.getUniformOrDefault("Fade").set(NEAR_CLEAR,NEAR_FULL,FAR_FADE_START,farEnd);shader.getUniformOrDefault("FarFloor").set(FAR_OPACITY,FAR_SATURATION);
+        shader.getUniformOrDefault("Fade").set(NEAR_CLEAR,NEAR_FULL);
         try{
             RenderSystem.setShader(ProjectionShaders::surface);RenderSystem.setShaderTexture(0,SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
             RenderSystem.setShaderColor(1,1,1,opacity);RenderSystem.disableBlend();RenderSystem.enableDepthTest();RenderSystem.depthMask(true);RenderSystem.disableCull();RenderSystem.enablePolygonOffset();RenderSystem.polygonOffset(-1f,-1f);
