@@ -199,21 +199,22 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     void worldBlockChanged(BlockPos pos,BlockState actual){
         var world=new Vec3i(pos.getX(),pos.getY(),pos.getZ());
         if(!layer.contains(world))return;
-        boolean changed=false;int raw=Block.getRawIdFromState(actual);boolean loaded=WorldChunks.loaded(client.world,pos);
+        boolean changed=false;boolean loaded=WorldChunks.loaded(client.world,pos);
         var parts=layout.at(world,64);if(parts==null){worldAllChanged();return;}
         for(var part:parts){
             var local=part.local(world);var key=part.section(local);int cell=part.cell(local);
             var mesh=meshes.get(key);var active=job!=null&&job.key.equals(key)?job:null;
             changed|=failed.remove(key)|deferred.remove(key);
             int expected=mesh==null?-1:mesh.cells.state(cell);
-            if(expected>=0){mesh.mask.set(cell,loaded&&raw==expected);mesh.wrong.set(cell,wrongBlock(loaded,actual,Block.getStateFromRawId(expected)));}
-            boolean rebuild=mesh!=null&&mesh.omitted.get(cell)&&!(loaded&&expected>=0&&raw==expected);
+            boolean complete=expected>=0&&completedBlock(loaded,actual,Block.getStateFromRawId(expected));
+            if(expected>=0){mesh.mask.set(cell,complete);mesh.wrong.set(cell,wrongBlock(loaded,actual,Block.getStateFromRawId(expected)));}
+            boolean rebuild=mesh!=null&&mesh.omitted.get(cell)&&!complete;
             if(active!=null){
                 int id=active.section.globalId(cell);var state=active.states.resolve(id);
                 if(!active.states.unresolvedState(id)){
-                    boolean complete=completedBlock(loaded,actual,state);active.mask.set(cell,complete);active.wrong.set(cell,wrongBlock(loaded,actual,state));
+                    boolean activeComplete=completedBlock(loaded,actual,state);active.mask.set(cell,activeComplete);active.wrong.set(cell,wrongBlock(loaded,actual,state));
                     // A build may already have skipped this cell while it was complete.
-                    if(!complete&&active.omitted.get(cell))rebuild=true;
+                    if(!activeComplete&&active.omitted.get(cell))rebuild=true;
                 }
             }
             if(rebuild){worldRefresh.changed(key);changed=true;}
@@ -233,8 +234,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     }
     private void wakeWorldRefresh(){nextWorkProbe=0;budgetSaturated=false;waitingRevision=-1;}
     private boolean needsMesh(SectionKey key){var mesh=meshes.get(key);return mesh==null||worldRefresh.stale(key,mesh.worldRevision());}
-    static boolean completedBlock(boolean loaded,BlockState actual,BlockState expected){return loaded&&actual!=null&&actual==expected;}
-    static boolean wrongBlock(boolean loaded,BlockState actual,BlockState expected){return loaded&&actual!=null&&expected!=null&&!actual.isAir()&&!expected.isAir()&&actual!=expected;}
+    static boolean completedBlock(boolean loaded,BlockState actual,BlockState expected){return PrinterRules.comparison(loaded,actual,expected)==dev.betterlitematica.core.Comparison.MATCH;}
+    static boolean wrongBlock(boolean loaded,BlockState actual,BlockState expected){var comparison=PrinterRules.comparison(loaded,actual,expected);return comparison==dev.betterlitematica.core.Comparison.WRONG_BLOCK||comparison==dev.betterlitematica.core.Comparison.WRONG_STATE;}
     private static final PackedSection ANALYSIS_AIR=PackedSection.fromGlobalIds(new int[4096]);
     PackedSection analysisSection(SectionKey key){stream.drain();return section(key);}
     int sample(SectionKey key,int position){stream.drain();return sampleRaw(key,position);}

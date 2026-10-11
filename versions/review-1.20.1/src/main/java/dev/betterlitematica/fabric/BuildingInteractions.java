@@ -103,7 +103,7 @@ final class BuildingInteractions {
     private void easyPlace(ProjectionController.Target target){
         if(client.interactionManager==null)return;double reach=client.interactionManager.getReachDistance();
         var at=target.position();BlockPos pos=new BlockPos(at.x(),at.y(),at.z());if(!WorldChunks.loaded(client.world,pos))return;
-        var existing=client.world.getBlockState(pos);if(existing.equals(target.state()))return;
+        var existing=client.world.getBlockState(pos);if(PrinterRules.constructionMatches(existing,target.state()))return;
         boolean doubleSlab=target.state().contains(Properties.SLAB_TYPE)&&target.state().get(Properties.SLAB_TYPE)==SlabType.DOUBLE;
         if(!existing.isReplaceable()&&!(doubleSlab&&existing.getBlock()==target.state().getBlock()))return;
         // Do not target projection blocks behind a real wall.

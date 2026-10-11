@@ -78,9 +78,13 @@ final class NearbyProjectionHighlights {
         return chunkScan!=null&&chunkScan.hasNext()?chunkScan.next():null;
     }
     static Kind classify(ProjectionController.PrinterSample wanted,BlockState actual){
-        if(wanted==null||!wanted.inside()||wanted.state()==null||actual==null||actual==wanted.state())return null;
-        if(wanted.state().isAir())return actual.isAir()?null:Kind.EXTRA;
-        return actual.isAir()?Kind.MISSING:Kind.WRONG;
+        if(wanted==null||!wanted.inside())return null;
+        return switch(PrinterRules.comparison(true,actual,wanted.state())){
+            case MATCH,UNKNOWN->null;
+            case EXTRA->Kind.EXTRA;
+            case MISSING->Kind.MISSING;
+            case WRONG_BLOCK,WRONG_STATE->Kind.WRONG;
+        };
     }
     private boolean inRange(BlockPos pos){return layer.contains(vector(pos))&&PrinterReach.distanceSquared(eye,pos)<=reach*reach;}
     void changed(BlockPos pos,BlockState state){

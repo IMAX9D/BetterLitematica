@@ -67,6 +67,7 @@ public final class BetterLitematicaClient implements ClientModInitializer {
         try{PrinterColdWarmup.initialize();}catch(RuntimeException e){LOGGER.warn("Printer read-only startup preparation unavailable",e);}
         ProjectionShaders.register();
         MinecraftClient client=MinecraftClient.getInstance();ProjectionController controller=new ProjectionController(client);activeController=controller;modeWheelInput=new ModeWheelInput(client,controller);
+        BugReports.register(client,controller);
         interactions=new BuildingInteractions(client,controller);
         ClientTickEvents.START_CLIENT_TICK.register(mc->{modeWheelInput.tick();menuOpen.tick(mc.world,mc.getNetworkHandler(),mc.currentScreen);});
         // Shortcut transitions are captured by inputEvent, including taps between ticks.
