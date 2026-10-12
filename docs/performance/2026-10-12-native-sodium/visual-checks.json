@@ -1,0 +1,58 @@
+[
+  {
+    "height": 65,
+    "first": "sodium-embedding-20261012\\incremental-65\\preflight.png",
+    "second": "demand-budget-20261012\\baseline-65\\preflight.png",
+    "size": [
+      720,
+      1280,
+      3
+    ],
+    "differentPixels": 43,
+    "differentPercent": 0.004665798611111111,
+    "meanChannelDifference": 1.5552662037037038e-05,
+    "maximumChannelDifference": 1
+  },
+  {
+    "height": 65,
+    "first": "sodium-embedding-20261012\\incremental-65\\preflight.png",
+    "second": "sodium-embedding-20261012\\incremental-sodium-65\\preflight.png",
+    "size": [
+      720,
+      1280,
+      3
+    ],
+    "differentPixels": 7404,
+    "differentPercent": 0.8033854166666666,
+    "meanChannelDifference": 0.004850983796296296,
+    "maximumChannelDifference": 65
+  },
+  {
+    "height": 40,
+    "first": "sodium-embedding-20261012\\incremental-40\\preflight.png",
+    "second": "demand-budget-20261012\\baseline-40\\preflight.png",
+    "size": [
+      720,
+      1280,
+      3
+    ],
+    "differentPixels": 65,
+    "differentPercent": 0.007052951388888888,
+    "meanChannelDifference": 2.8935185185185186e-05,
+    "maximumChannelDifference": 6
+  },
+  {
+    "height": 40,
+    "first": "sodium-embedding-20261012\\incremental-40\\preflight.png",
+    "second": "sodium-embedding-20261012\\incremental-sodium-40\\preflight.png",
+    "size": [
+      720,
+      1280,
+      3
+    ],
+    "differentPixels": 50213,
+    "differentPercent": 5.448459201388889,
+    "meanChannelDifference": 0.07854383680555556,
+    "maximumChannelDifference": 79
+  }
+]

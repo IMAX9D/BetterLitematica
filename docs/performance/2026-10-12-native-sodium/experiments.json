@@ -1,0 +1,202 @@
+[
+  {
+    "run": "native-65",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.11.jar",
+    "modSha256": "5106c4525ad237ded8d436123217de03b616fa81283aae4ccaaa9dbaa1991b22",
+    "frames": 16877,
+    "fps": 188.16430909285577,
+    "low1": 27.723228998300684,
+    "p99": 25.53094800000005,
+    "over50": 16
+  },
+  {
+    "run": "native-40",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.11.jar",
+    "modSha256": "5106c4525ad237ded8d436123217de03b616fa81283aae4ccaaa9dbaa1991b22",
+    "frames": 14045,
+    "fps": 156.5063430360495,
+    "low1": 25.898493591160612,
+    "p99": 26.386383999999826,
+    "over50": 22
+  },
+  {
+    "run": "cached-65",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.12.jar",
+    "modSha256": "c534f5199fc4dc6d3fba7fc55a89f5faf383c33495fcbf4a8f2b6fd34b99faa5",
+    "frames": 17278,
+    "fps": 192.52045379118954,
+    "low1": 27.788137648812906,
+    "p99": 24.04435799999997,
+    "over50": 17
+  },
+  {
+    "run": "cached-40",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.12.jar",
+    "modSha256": "c534f5199fc4dc6d3fba7fc55a89f5faf383c33495fcbf4a8f2b6fd34b99faa5",
+    "frames": 14405,
+    "fps": 160.53000841663126,
+    "low1": 26.97274920825215,
+    "p99": 25.421047999999725,
+    "over50": 25
+  },
+  {
+    "run": "graph-65",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.13.jar",
+    "modSha256": "090ff106716c3ef308d97f3477b069b4eff88db6827071d3c097dc2b8af222de",
+    "frames": 19590,
+    "fps": 218.30705391501564,
+    "low1": 29.434390405890483,
+    "p99": 21.935173000000017,
+    "over50": 26
+  },
+  {
+    "run": "graph-40",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.13.jar",
+    "modSha256": "090ff106716c3ef308d97f3477b069b4eff88db6827071d3c097dc2b8af222de",
+    "frames": 16281,
+    "fps": 181.4581234523711,
+    "low1": 28.386454374068755,
+    "p99": 22.814680000000042,
+    "over50": 23
+  },
+  {
+    "run": "graph-sodium-65",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.13.jar",
+    "modSha256": "090ff106716c3ef308d97f3477b069b4eff88db6827071d3c097dc2b8af222de",
+    "frames": 36849,
+    "fps": 410.80821485547233,
+    "low1": 86.1307765361745,
+    "p99": 8.19238399999997,
+    "over50": 1
+  },
+  {
+    "run": "context-65",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.14.jar",
+    "modSha256": "a3a9d81c2ae2f388759b3c3dadf549a4d567adee5dff73a8e4822fd5aac21ebb",
+    "frames": 19682,
+    "fps": 219.44700661070672,
+    "low1": 29.30558337561197,
+    "p99": 21.735846999999985,
+    "over50": 17
+  },
+  {
+    "run": "sparse-65",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.15.jar",
+    "modSha256": "2ceb700465123a7f5f3a816701766b52357c3b6908546a14ba4d971654958f73",
+    "frames": 31784,
+    "fps": 354.1652345979137,
+    "low1": 24.06846360756343,
+    "p99": 31.777808999999984,
+    "over50": 65
+  },
+  {
+    "run": "sparse-40",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.15.jar",
+    "modSha256": "2ceb700465123a7f5f3a816701766b52357c3b6908546a14ba4d971654958f73",
+    "frames": 22795,
+    "fps": 254.0063792718778,
+    "low1": 23.906440008031304,
+    "p99": 31.589236000000003,
+    "over50": 43
+  },
+  {
+    "run": "sparse-sodium-65",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.15.jar",
+    "modSha256": "2ceb700465123a7f5f3a816701766b52357c3b6908546a14ba4d971654958f73",
+    "frames": 37071,
+    "fps": 413.2832876343386,
+    "low1": 91.63263168918212,
+    "p99": 7.730990000000013,
+    "over50": 0
+  },
+  {
+    "run": "incremental-65",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.16.jar",
+    "modSha256": "511093506b32f30662f602498f98002e5cc1ba24281fa9791fcb0d86f8caf4cf",
+    "frames": 63393,
+    "fps": 706.7780220806627,
+    "low1": 40.59012770243181,
+    "p99": 17.947404000000006,
+    "over50": 25
+  },
+  {
+    "run": "incremental-40",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.16.jar",
+    "modSha256": "511093506b32f30662f602498f98002e5cc1ba24281fa9791fcb0d86f8caf4cf",
+    "frames": 41876,
+    "fps": 466.6128432087415,
+    "low1": 38.312788199719755,
+    "p99": 18.61485,
+    "over50": 22
+  },
+  {
+    "run": "gpu-65",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.17.jar",
+    "modSha256": "ac88a8db3d23fb22b4c8e631d222845779b51a011e840288c78ab4dd71a18c19",
+    "frames": 64741,
+    "fps": 721.3785572419496,
+    "low1": 40.962157073259945,
+    "p99": 17.890399999999985,
+    "over50": 22
+  },
+  {
+    "run": "bounded-65",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.18.jar",
+    "modSha256": "905c36484e7e2bae0e9cfc60aa54cbc86a11c4cb8e30310cda86f92172cc5520",
+    "frames": 57947,
+    "fps": 645.6556233463814,
+    "low1": 38.98715433089913,
+    "p99": 18.725812000000012,
+    "over50": 31
+  },
+  {
+    "run": "bounded-40",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.18.jar",
+    "modSha256": "905c36484e7e2bae0e9cfc60aa54cbc86a11c4cb8e30310cda86f92172cc5520",
+    "frames": 38938,
+    "fps": 433.90777657834735,
+    "low1": 35.49490477467903,
+    "p99": 19.612152,
+    "over50": 27
+  },
+  {
+    "run": "pruned-65",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.19.jar",
+    "modSha256": "f65ca64a502a603c41d7f8a45293d9bbe22ed925af0c7b7071dc8895e48950a8",
+    "frames": 57829,
+    "fps": 644.3581422178568,
+    "low1": 39.023729541371694,
+    "p99": 18.50509600000001,
+    "over50": 27
+  },
+  {
+    "run": "pruned-40",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.19.jar",
+    "modSha256": "f65ca64a502a603c41d7f8a45293d9bbe22ed925af0c7b7071dc8895e48950a8",
+    "frames": 41217,
+    "fps": 459.27367074068496,
+    "low1": 37.760146034667635,
+    "p99": 19.09956799999999,
+    "over50": 18
+  },
+  {
+    "run": "incremental-sodium-65",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.16.jar",
+    "modSha256": "511093506b32f30662f602498f98002e5cc1ba24281fa9791fcb0d86f8caf4cf",
+    "frames": 37636,
+    "fps": 419.5813379594454,
+    "low1": 87.82212725319083,
+    "p99": 8.077655000000012,
+    "over50": 0
+  },
+  {
+    "run": "incremental-sodium-40",
+    "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.16.jar",
+    "modSha256": "511093506b32f30662f602498f98002e5cc1ba24281fa9791fcb0d86f8caf4cf",
+    "frames": 34619,
+    "fps": 385.7351549646221,
+    "low1": 83.62219943349936,
+    "p99": 8.525538000000001,
+    "over50": 1
+  }
+]

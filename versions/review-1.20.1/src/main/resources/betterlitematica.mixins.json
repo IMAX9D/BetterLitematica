@@ -32,7 +32,13 @@
     "MultipartModelAccessor",
     "WeightedModelAccessor",
     "TerrainChunkInfoAccessor",
-    "TerrainLayerIndexMixin"
+    "TerrainLayerIndexMixin",
+    "TerrainVisibilityGraphMixin",
+    "TerrainFrustumAccessor",
+    "TerrainVisibilitySetAccessor",
+    "TerrainFrustumCacheMixin",
+    "TerrainDataClearMixin",
+    "TerrainDataPublishMixin"
   ],
   "injectors": {
     "defaultRequire": 1

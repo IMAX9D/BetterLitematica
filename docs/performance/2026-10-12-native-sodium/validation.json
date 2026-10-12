@@ -1,0 +1,19 @@
+{
+  "selectedArtifact": "betterlitematica-fabric-1.20.1-0.4.4-review.16.jar",
+  "sha256": "511093506b32f30662f602498f98002e5cc1ba24281fa9791fcb0d86f8caf4cf",
+  "build": "passed; source rebuilt to a byte-identical JAR",
+  "mixinTargets": 24,
+  "placementChecks": 1014,
+  "settingsDescriptions": 97,
+  "settingsControls": 35,
+  "reasonIds": 37,
+  "graphChecks": 885,
+  "frustumChecks": 480384,
+  "indexChecks": 33,
+  "productionNativeHooksPresent": 5,
+  "productionSodiumHooksAbsent": 5,
+  "otherRendererCombinations": "not tested",
+  "manualGameplay": "not tested",
+  "printingThroughput": "not tested",
+  "allVersions": "not propagated"
+}

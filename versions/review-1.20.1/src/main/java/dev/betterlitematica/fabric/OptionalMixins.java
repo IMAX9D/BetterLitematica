@@ -9,8 +9,8 @@ public final class OptionalMixins implements IMixinConfigPlugin {
     public boolean shouldApplyMixin(String target,String mixin){
         var loader=FabricLoader.getInstance();
         // Replacement terrain renderers own their submission lists and do not use this vanilla-only fast path.
-        if(mixin.endsWith(".TerrainLayerIndexMixin")||mixin.endsWith(".TerrainChunkInfoAccessor"))
-            return !loader.isModLoaded("sodium")&&!loader.isModLoaded("iris")&&!loader.isModLoaded("canvas")&&!loader.isModLoaded("vulkanmod");
+        if(mixin.substring(mixin.lastIndexOf('.')+1).startsWith("Terrain"))
+            return !Boolean.getBoolean("betterlitematica.disableTerrainOptimizations")&&!loader.isModLoaded("sodium")&&!loader.isModLoaded("iris")&&!loader.isModLoaded("canvas")&&!loader.isModLoaded("vulkanmod")&&!loader.isModLoaded("optifabric");
         // Optional targets can arrive in JVM internal or binary class-name form.
         target=target.replace('/','.');
         if(mixin.endsWith(".ExternalMinerMixin"))return loader.isModLoaded(target.startsWith("me.z7087.")?"blockminer":"bedrockminer");

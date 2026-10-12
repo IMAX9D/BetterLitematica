@@ -1,0 +1,24 @@
+{
+  "baseline": "betterlitematica-fabric-1.20.1-0.4.4-review.7.jar",
+  "candidate": "betterlitematica-fabric-1.20.1-0.4.4-review.16.jar",
+  "modifiedClasses": [
+    "dev/betterlitematica/fabric/OptionalMixins.class",
+    "dev/betterlitematica/fabric/mixin/TerrainLayerIndexMixin.class"
+  ],
+  "addedClasses": [
+    "dev/betterlitematica/fabric/SectionVisibilityGraph$1.class",
+    "dev/betterlitematica/fabric/SectionVisibilityGraph.class",
+    "dev/betterlitematica/fabric/TerrainDataUpdates.class",
+    "dev/betterlitematica/fabric/TerrainDirtyUpdates.class",
+    "dev/betterlitematica/fabric/TerrainExpandedBounds.class",
+    "dev/betterlitematica/fabric/TerrainFrustumCache.class",
+    "dev/betterlitematica/fabric/TerrainRenderLists.class",
+    "dev/betterlitematica/fabric/mixin/TerrainDataClearMixin.class",
+    "dev/betterlitematica/fabric/mixin/TerrainDataPublishMixin.class",
+    "dev/betterlitematica/fabric/mixin/TerrainFrustumAccessor.class",
+    "dev/betterlitematica/fabric/mixin/TerrainFrustumCacheMixin.class",
+    "dev/betterlitematica/fabric/mixin/TerrainVisibilityGraphMixin.class",
+    "dev/betterlitematica/fabric/mixin/TerrainVisibilitySetAccessor.class"
+  ],
+  "deletedClasses": []
+}

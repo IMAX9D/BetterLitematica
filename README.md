@@ -99,11 +99,17 @@
 
 临时拦截项：精确／灵活／快速放置、放置网格与限制、假潜行放置、放置后点击、放置前取块、手持补货、自动换工具，以及快速／按住／周期点击。对应配置键：`TWEAK_ACCURATE_BLOCK_PLACEMENT`、`TWEAK_AFTER_CLICKER`、`TWEAK_FAKE_SNEAK_PLACEMENT`、`TWEAK_FAST_BLOCK_PLACEMENT`、`TWEAK_FAST_LEFT_CLICK`、`TWEAK_FAST_RIGHT_CLICK`、`TWEAK_FLEXIBLE_BLOCK_PLACEMENT`、`TWEAK_HOLD_USE`、`TWEAK_PERIODIC_USE`、`TWEAK_PERIODIC_HOLD_USE`、`TWEAK_PLACEMENT_GRID`、`TWEAK_PLACEMENT_LIMIT`、`TWEAK_PLACEMENT_RESTRICTION`、`TWEAK_PLACEMENT_REST_FIRST`、`TWEAK_PLACEMENT_REST_HAND`、`TWEAK_PICK_BEFORE_PLACE`、`TWEAK_HAND_RESTOCK`、`TWEAK_TOOL_SWITCH`。
 
+1.20.1 的本轮开发构建还提供原版地形区段的遍历与缓存优化。检测到 Sodium、Iris、Canvas、VulkanMod 或 OptiFabric 时，不加载这些地形优化钩子，由对应渲染器继续负责地形；不改写对方的配置。未捆绑 Sodium 模组文件，参考算法的来源及许可见 [第三方说明](THIRD_PARTY_NOTICES.md)。
+
+如遇未知渲染器冲突，可在启动器的 JVM 参数中加入 `-Dbetterlitematica.disableTerrainOptimizations=true`，关闭这组原版地形优化。已有 Sodium 组合已做真实路线验证；其他渲染器目前仅设置了自动避让，不能据此宣称全部兼容。
+
 ## 源码结构与构建
 
 1.20.1 渲染审查版本的实测结果见 [星空树投影性能对照](docs/performance/2026-10-11-1.20.1/README.md)，包含两个高度的折线图、逐帧数据、早期回退记录和测量限制。后续 [帧时间尖峰优化复测](docs/performance/2026-10-12-1.20.1/README.md) 记录了 review.7 的长帧改善与仍未消除的尖峰。
 
 `core/` 提供数据模型与算法，`blueprint-io/` 负责投影读写，`runtime/` 负责缓存与后台调度；`fabric-1.20.1/`、`fabric-official/` 和 `versions/` 负责各游戏版本的适配。
+
+[原生优化与 Sodium 对照](docs/performance/2026-10-12-native-sodium/README.md) 记录了 review.16 的逐帧实测：全程平均帧率领先，但长帧和 40% 高度的密集投影视角仍落后于 Sodium 组合，尚未达到全面超越的目标。
 
 构建需要 **JDK 25 或更高版本**。Windows 使用 `./scripts/build.ps1`，Linux/macOS 使用 `bash scripts/build.sh`，默认构建 1.20.1；指定其他版本时追加任务，例如 `:fabric-1.21.11:build`。全部版本分别使用 `-AllVersions` 或 `--all`。
 

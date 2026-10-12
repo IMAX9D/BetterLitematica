@@ -1,0 +1,255 @@
+[
+  {
+    "megabytes": 2762.2074584960938,
+    "kind": "[I",
+    "stack": [
+      "net.minecraft.world.chunk.PalettedContainer.method_44345",
+      "net.minecraft.world.chunk.PalettedContainer.method_38302",
+      "net.minecraft.class_2841$$Lambda$7335+0x000001e5d8e65c60.1904784319.apply",
+      "com.mojang.serialization.Encoder$1.encode",
+      "com.mojang.serialization.Codec$2.encode",
+      "com.mojang.serialization.Encoder.encodeStart",
+      "net.minecraft.world.ChunkSerializer.serialize",
+      "net.minecraft.server.world.ThreadedAnvilChunkStorage.save",
+      "net.minecraft.server.world.ThreadedAnvilChunkStorage.save",
+      "net.minecraft.server.world.ThreadedAnvilChunkStorage.unloadChunks",
+      "net.minecraft.server.world.ThreadedAnvilChunkStorage.tick",
+      "net.minecraft.server.world.ServerChunkManager.method_12127",
+      "net.minecraft.server.world.ServerWorld.tick",
+      "net.minecraft.server.MinecraftServer.tickWorlds",
+      "net.minecraft.server.MinecraftServer.tick",
+      "net.minecraft.server.integrated.IntegratedServer.method_3748"
+    ]
+  },
+  {
+    "megabytes": 960.8805541992188,
+    "kind": "[I",
+    "stack": [
+      "net.minecraft.world.chunk.PalettedContainer.method_44345",
+      "net.minecraft.world.chunk.PalettedContainer.method_38302",
+      "net.minecraft.class_2841$$Lambda$7335+0x000001e5d8e65c60.1904784319.apply",
+      "com.mojang.serialization.Encoder$1.encode",
+      "com.mojang.serialization.Codec$2.encode",
+      "com.mojang.serialization.Encoder.encodeStart",
+      "net.minecraft.world.ChunkSerializer.serialize",
+      "net.minecraft.server.world.ThreadedAnvilChunkStorage.save",
+      "net.minecraft.server.world.ThreadedAnvilChunkStorage.method_18843",
+      "net.minecraft.class_3898$$Lambda$8102+0x000001e5d8fc5640.1855952402.accept",
+      "java.util.concurrent.CompletableFuture$UniAccept.tryFire",
+      "java.util.concurrent.CompletableFuture$Completion.run",
+      "net.minecraft.server.world.ThreadedAnvilChunkStorage.unloadChunks",
+      "net.minecraft.server.world.ThreadedAnvilChunkStorage.tick",
+      "net.minecraft.server.world.ServerChunkManager.method_12127",
+      "net.minecraft.server.world.ServerWorld.tick"
+    ]
+  },
+  {
+    "megabytes": 393.5780715942383,
+    "kind": "[J",
+    "stack": [
+      "it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap.clone",
+      "net.minecraft.world.chunk.light.SkyLightStorage$Data.copy",
+      "net.minecraft.world.chunk.light.SkyLightStorage$Data.method_15504",
+      "net.minecraft.world.chunk.light.LightStorage.notifyChanges",
+      "net.minecraft.world.chunk.light.ChunkLightProvider.method_15516",
+      "net.minecraft.world.chunk.light.LightingProvider.method_15516",
+      "net.minecraft.server.world.ServerLightingProvider.runTasks",
+      "net.minecraft.server.world.ServerLightingProvider.method_19505",
+      "net.minecraft.class_3227$$Lambda$7244+0x000001e5d8e46e48.1536146449.run",
+      "net.minecraft.util.thread.TaskExecutor.runNext",
+      "net.minecraft.util.thread.TaskExecutor.runWhile",
+      "net.minecraft.util.thread.TaskExecutor.run",
+      "java.util.concurrent.ForkJoinTask$RunnableExecuteAction.exec",
+      "java.util.concurrent.ForkJoinTask.doExec",
+      "java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec",
+      "java.util.concurrent.ForkJoinPool.scan"
+    ]
+  },
+  {
+    "megabytes": 356.53821563720703,
+    "kind": "[J",
+    "stack": [
+      "java.lang.Object.clone",
+      "it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap.clone",
+      "net.minecraft.server.world.ThreadedAnvilChunkStorage.updateHolderMap",
+      "net.minecraft.server.world.ServerChunkManager.tick",
+      "net.minecraft.server.world.ServerChunkManager$MainThreadExecutor.method_16075",
+      "net.minecraft.server.world.ServerChunkManager.executeQueuedTasks",
+      "net.minecraft.server.MinecraftServer.runOneTask",
+      "net.minecraft.server.MinecraftServer.method_16075",
+      "net.minecraft.util.thread.ThreadExecutor.runTasks",
+      "net.minecraft.server.MinecraftServer.runTasksTillTickEnd",
+      "net.minecraft.server.MinecraftServer.runServer",
+      "net.minecraft.server.MinecraftServer.method_29739",
+      "net.minecraft.server.MinecraftServer$$Lambda$7015+0x000001e5d8d96450.1776170206.run",
+      "java.lang.Thread.run"
+    ]
+  },
+  {
+    "megabytes": 313.25433349609375,
+    "kind": "[J",
+    "stack": [
+      "it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap.clone",
+      "net.minecraft.world.chunk.light.SkyLightStorage$Data.copy",
+      "net.minecraft.world.chunk.light.SkyLightStorage$Data.method_15504",
+      "net.minecraft.world.chunk.light.LightStorage.notifyChanges",
+      "net.minecraft.world.chunk.light.ChunkLightProvider.method_15516",
+      "net.minecraft.world.chunk.light.LightingProvider.method_15516",
+      "net.minecraft.server.world.ServerLightingProvider.runTasks",
+      "net.minecraft.server.world.ServerLightingProvider.method_19505",
+      "net.minecraft.class_3227$$Lambda$7244+0x000001e5d8e46e48.1536146449.run",
+      "net.minecraft.util.thread.TaskExecutor.runNext",
+      "net.minecraft.util.thread.TaskExecutor.runWhile",
+      "net.minecraft.util.thread.TaskExecutor.run",
+      "java.util.concurrent.ForkJoinTask$RunnableExecuteAction.exec",
+      "java.util.concurrent.ForkJoinTask.doExec",
+      "java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec",
+      "java.util.concurrent.ForkJoinPool.scan"
+    ]
+  },
+  {
+    "megabytes": 242.95500946044922,
+    "kind": "[I",
+    "stack": [
+      "dev.betterlitematica.core.RenderedCells$Builder.<init>",
+      "dev.betterlitematica.fabric.SectionMesher$Output.<init>",
+      "dev.betterlitematica.fabric.SectionMesher.build",
+      "dev.betterlitematica.fabric.SectionMesher.lambda$submit$0",
+      "dev.betterlitematica.fabric.SectionMesher$$Lambda$8093+0x000001e5d8fc3ac8.1036722857.apply",
+      "dev.betterlitematica.runtime.BoundedTaskPool$Ticket.run",
+      "java.util.concurrent.ThreadPoolExecutor.runWorker",
+      "java.util.concurrent.ThreadPoolExecutor$Worker.run",
+      "java.lang.Thread.run"
+    ]
+  },
+  {
+    "megabytes": 222.41229248046875,
+    "kind": "[J",
+    "stack": [
+      "it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap.clone",
+      "net.minecraft.world.chunk.light.BlockLightStorage$Data.copy",
+      "net.minecraft.world.chunk.light.BlockLightStorage$Data.method_15504",
+      "net.minecraft.world.chunk.light.LightStorage.notifyChanges",
+      "net.minecraft.world.chunk.light.ChunkLightProvider.method_15516",
+      "net.minecraft.world.chunk.light.LightingProvider.method_15516",
+      "net.minecraft.server.world.ServerLightingProvider.runTasks",
+      "net.minecraft.server.world.ServerLightingProvider.method_19505",
+      "net.minecraft.class_3227$$Lambda$7244+0x000001e5d8e46e48.1536146449.run",
+      "net.minecraft.util.thread.TaskExecutor.runNext",
+      "net.minecraft.util.thread.TaskExecutor.runWhile",
+      "net.minecraft.util.thread.TaskExecutor.run",
+      "java.util.concurrent.ForkJoinTask$RunnableExecuteAction.exec",
+      "java.util.concurrent.ForkJoinTask.doExec",
+      "java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec",
+      "java.util.concurrent.ForkJoinPool.scan"
+    ]
+  },
+  {
+    "megabytes": 189.10535430908203,
+    "kind": "[J",
+    "stack": [
+      "java.lang.Object.clone",
+      "it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap.clone",
+      "net.minecraft.world.chunk.light.SkyLightStorage$Data.copy",
+      "net.minecraft.world.chunk.light.SkyLightStorage$Data.method_15504",
+      "net.minecraft.world.chunk.light.LightStorage.notifyChanges",
+      "net.minecraft.world.chunk.light.ChunkLightProvider.method_15516",
+      "net.minecraft.world.chunk.light.LightingProvider.method_15516",
+      "net.minecraft.server.world.ServerLightingProvider.runTasks",
+      "net.minecraft.server.world.ServerLightingProvider.method_19505",
+      "net.minecraft.class_3227$$Lambda$7244+0x000001e5d8e46e48.1536146449.run",
+      "net.minecraft.util.thread.TaskExecutor.runNext",
+      "net.minecraft.util.thread.TaskExecutor.runWhile",
+      "net.minecraft.util.thread.TaskExecutor.run",
+      "java.util.concurrent.ForkJoinTask$RunnableExecuteAction.exec",
+      "java.util.concurrent.ForkJoinTask.doExec",
+      "java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec"
+    ]
+  },
+  {
+    "megabytes": 154.79298400878906,
+    "kind": "[I",
+    "stack": [
+      "it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap.clone",
+      "net.minecraft.world.chunk.light.SkyLightStorage$Data.copy",
+      "net.minecraft.world.chunk.light.SkyLightStorage$Data.method_15504",
+      "net.minecraft.world.chunk.light.LightStorage.notifyChanges",
+      "net.minecraft.world.chunk.light.ChunkLightProvider.method_15516",
+      "net.minecraft.world.chunk.light.LightingProvider.method_15516",
+      "net.minecraft.server.world.ServerLightingProvider.runTasks",
+      "net.minecraft.server.world.ServerLightingProvider.method_19505",
+      "net.minecraft.class_3227$$Lambda$7244+0x000001e5d8e46e48.1536146449.run",
+      "net.minecraft.util.thread.TaskExecutor.runNext",
+      "net.minecraft.util.thread.TaskExecutor.runWhile",
+      "net.minecraft.util.thread.TaskExecutor.run",
+      "java.util.concurrent.ForkJoinTask$RunnableExecuteAction.exec",
+      "java.util.concurrent.ForkJoinTask.doExec",
+      "java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec",
+      "java.util.concurrent.ForkJoinPool.scan"
+    ]
+  },
+  {
+    "megabytes": 137.60137939453125,
+    "kind": "[J",
+    "stack": [
+      "java.util.BitSet.initWords",
+      "java.util.BitSet.<init>",
+      "net.minecraft.client.render.chunk.ChunkOcclusionDataBuilder.<init>",
+      "net.minecraft.client.render.chunk.ChunkBuilder$BuiltChunk$RebuildTask.render",
+      "net.minecraft.client.render.chunk.ChunkBuilder$BuiltChunk$RebuildTask.method_22783",
+      "net.minecraft.client.render.chunk.ChunkBuilder.method_22757",
+      "net.minecraft.class_846$$Lambda$7929+0x000001e5d8f8b518.1877430202.get",
+      "java.util.concurrent.CompletableFuture$AsyncSupply.run",
+      "java.util.concurrent.CompletableFuture$AsyncSupply.exec",
+      "java.util.concurrent.ForkJoinTask.doExec",
+      "java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec",
+      "java.util.concurrent.ForkJoinPool.scan",
+      "java.util.concurrent.ForkJoinPool.runWorker",
+      "java.util.concurrent.ForkJoinWorkerThread.run"
+    ]
+  },
+  {
+    "megabytes": 131.19355010986328,
+    "kind": "[J",
+    "stack": [
+      "java.lang.Object.clone",
+      "it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap.clone",
+      "net.minecraft.world.chunk.light.SkyLightStorage$Data.copy",
+      "net.minecraft.world.chunk.light.SkyLightStorage$Data.method_15504",
+      "net.minecraft.world.chunk.light.LightStorage.notifyChanges",
+      "net.minecraft.world.chunk.light.ChunkLightProvider.method_15516",
+      "net.minecraft.world.chunk.light.LightingProvider.method_15516",
+      "net.minecraft.server.world.ServerLightingProvider.runTasks",
+      "net.minecraft.server.world.ServerLightingProvider.method_19505",
+      "net.minecraft.class_3227$$Lambda$7244+0x000001e5d8e46e48.1536146449.run",
+      "net.minecraft.util.thread.TaskExecutor.runNext",
+      "net.minecraft.util.thread.TaskExecutor.runWhile",
+      "net.minecraft.util.thread.TaskExecutor.run",
+      "java.util.concurrent.ForkJoinTask$RunnableExecuteAction.exec",
+      "java.util.concurrent.ForkJoinTask.doExec",
+      "java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec"
+    ]
+  },
+  {
+    "megabytes": 92.3452377319336,
+    "kind": "[J",
+    "stack": [
+      "java.lang.Object.clone",
+      "it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap.clone",
+      "net.minecraft.world.chunk.light.BlockLightStorage$Data.copy",
+      "net.minecraft.world.chunk.light.BlockLightStorage$Data.method_15504",
+      "net.minecraft.world.chunk.light.LightStorage.notifyChanges",
+      "net.minecraft.world.chunk.light.ChunkLightProvider.method_15516",
+      "net.minecraft.world.chunk.light.LightingProvider.method_15516",
+      "net.minecraft.server.world.ServerLightingProvider.runTasks",
+      "net.minecraft.server.world.ServerLightingProvider.method_19505",
+      "net.minecraft.class_3227$$Lambda$7244+0x000001e5d8e46e48.1536146449.run",
+      "net.minecraft.util.thread.TaskExecutor.runNext",
+      "net.minecraft.util.thread.TaskExecutor.runWhile",
+      "net.minecraft.util.thread.TaskExecutor.run",
+      "java.util.concurrent.ForkJoinTask$RunnableExecuteAction.exec",
+      "java.util.concurrent.ForkJoinTask.doExec",
+      "java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec"
+    ]
+  }
+]
