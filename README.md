@@ -101,6 +101,8 @@
 
 ## 源码结构与构建
 
+1.20.1 渲染审查版本的实测结果见 [星空树投影性能对照](docs/performance/2026-10-11-1.20.1/README.md)，包含两个高度的折线图、逐帧数据、早期回退记录和测量限制。
+
 `core/` 提供数据模型与算法，`blueprint-io/` 负责投影读写，`runtime/` 负责缓存与后台调度；`fabric-1.20.1/`、`fabric-official/` 和 `versions/` 负责各游戏版本的适配。
 
 构建需要 **JDK 25 或更高版本**。Windows 使用 `./scripts/build.ps1`，Linux/macOS 使用 `bash scripts/build.sh`，默认构建 1.20.1；指定其他版本时追加任务，例如 `:fabric-1.21.11:build`。全部版本分别使用 `-AllVersions` 或 `--all`。
