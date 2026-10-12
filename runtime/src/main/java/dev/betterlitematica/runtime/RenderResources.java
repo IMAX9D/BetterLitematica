@@ -33,14 +33,29 @@ public final class RenderResources {
         normalCapacity=capacity-reservedBytes;normalObjects=maxObjects-reservedObjects;normalGroups=maxGroups-reservedGroups;
     }
     public final class Lease {
-        private final int bytes;private Runnable release;private boolean released;
-        private Lease(int bytes){this.bytes=bytes;}
+        private final int bytes,objectCount;private Runnable release;private boolean released;
+        private Lease(int bytes){this(bytes,1);}
+        private Lease(int bytes,int objectCount){this.bytes=bytes;this.objectCount=objectCount;}
         public void attach(Runnable release){if(this.release!=null||released)throw new IllegalStateException("Allocation already assigned");this.release=Objects.requireNonNull(release);}
-        private void dispose(){if(released)return;if(release!=null)release.run();released=true;release=null;used-=bytes;pendingBytes-=bytes;objects--;pendingObjects--;revision++;}
+        private void dispose(){if(released)return;if(release!=null)release.run();released=true;release=null;used-=bytes;pendingBytes-=bytes;objects-=objectCount;pendingObjects-=objectCount;revision++;}
+    }
+    /** Physical storage shared by several mesh groups. Its entire capacity stays charged until deletion. */
+    public final class SharedAllocation implements AutoCloseable {
+        private final int bytes,count;private boolean closed;
+        private SharedAllocation(int bytes,int count){this.bytes=bytes;this.count=count;}
+        @Override public void close(){if(!closed){closed=true;used-=bytes;objects-=count;revision++;}}
+    }
+    public long availableBytes(boolean replacement){return Math.max(0,(replacement?capacity:normalCapacity)-used);}
+    public SharedAllocation reserveShared(int bytes,int count,Group owner,int demand){
+        if(bytes<=0||count<=0||owner.closed||!owner.building)throw new IllegalArgumentException("Invalid shared allocation");
+        long limit=owner.replacement?capacity:normalCapacity;int objectLimit=owner.replacement?maxObjects:normalObjects;
+        if(bytes>limit||count>objectLimit)return null;
+        if(bytes>limit-used||count>objectLimit-objects){request(bytes,count,0,demand,owner.replacement,owner.distance);return null;}
+        used+=bytes;objects+=count;return new SharedAllocation(bytes,count);
     }
     public final class Group implements AutoCloseable {
         private final ArrayList<Lease> allocations=new ArrayList<>();
-        private long bytes,lastVisible=-1000;private int priority=COLD,cursor;
+        private long bytes,ownedBytes,lastVisible=-1000;private int ownedObjects,priority=COLD,cursor;
         private boolean building=true,closed;private Runnable evicted;
         private final boolean replacement;private final long order=sequence++;private double distance=Double.POSITIVE_INFINITY;
         private Group(boolean replacement,double distance){this.replacement=replacement;this.distance=distance;}
@@ -62,8 +77,12 @@ public final class RenderResources {
             if(total>byteLimit-used||sizes.length>objectLimit-objects){request(total,sizes.length,0,demand,replacement,distance);return null;}
             var result=new ArrayList<Lease>(sizes.length);
             for(int size:sizes){var lease=new Lease(size);allocations.add(lease);result.add(lease);}
-            bytes+=total;used+=total;objects+=sizes.length;return result;
+            bytes+=total;ownedBytes+=total;ownedObjects+=sizes.length;used+=total;objects+=sizes.length;return result;
         }
+        public boolean replacement(){return replacement;}
+        public void checkReference(int logicalBytes){if(closed||!building||logicalBytes<1||bytes+logicalBytes>(8L<<20))throw new IllegalArgumentException("Mesh resource limit exceeded");}
+        /** A slice owns its release callback, while the shared page owns the physical byte/object charge. */
+        public void reference(int logicalBytes,Runnable release){checkReference(logicalBytes);var lease=new Lease(0,0);lease.attach(release);allocations.add(lease);bytes+=logicalBytes;}
         public void finish(int priority,Runnable evicted){if(closed||!building)throw new IllegalStateException();this.evicted=Objects.requireNonNull(evicted);building=false;if(builder==this)builder=null;revision++;this.priority=priority;lanes.get(priority).add(this);byDistance.add(this);if(priority==VISIBLE)lastVisible=frame;}
         public void priority(int value){
             if(value<COLD||value>VISIBLE)throw new IllegalArgumentException();if(closed||building)return;
@@ -75,7 +94,7 @@ public final class RenderResources {
             if(closed)return;if(!building)byDistance.remove(this);closed=true;if(!building)lanes.get(priority).remove(this);
             if(building){if(builder==this)builder=null;revision++;}
             if(allocations.isEmpty()){groups--;revision++;}
-            else {pendingBytes+=bytes;pendingObjects+=allocations.size();pendingGroups++;retired.add(this);}
+            else {pendingBytes+=ownedBytes;pendingObjects+=ownedObjects;pendingGroups++;retired.add(this);}
             // Detach the cache entry now; native deletion remains incremental and charged.
             var callback=evicted;evicted=null;if(callback!=null)callback.run();
         }

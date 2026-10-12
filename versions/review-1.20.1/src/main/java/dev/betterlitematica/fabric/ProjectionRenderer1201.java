@@ -43,11 +43,11 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         @Override public void close(){resources.close();}
     }
     private static final class Job {
-        RenderResources.Group resources;final SectionKey key;final PackedSection section;final Vec3i localBase;Vec3i worldBase;ProjectionPages.Origin arena;int shiftX,shiftY,shiftZ;PlacementTransform transform;StateResolver1201 states;Vec3i[] offsets;List<ProjectionScene.Part> overlaps;ProjectionBlockView view;long stalledSince,worldRevision;
+        RenderResources.Group resources;final SectionKey key;final PackedSection section;final Vec3i localBase;Vec3i worldBase;PlacementTransform transform;StateResolver1201 states;Vec3i[] offsets;List<ProjectionScene.Part> overlaps;ProjectionBlockView view;long stalledSince,worldRevision;
         final List<Part> parts=new ArrayList<>();final RenderedCells.Builder cells=new RenderedCells.Builder();final BitSet omitted=new BitSet(4096);QuadVisibility.Mask mask,wrong;long visibilityBytes;SectionNeighborhood neighborhood;int cursor,vertices;long bytes;
         Job(SectionKey key,PackedSection section,Vec3i localBase){this.key=key;this.section=section;this.localBase=localBase;}
     }
-    private final MinecraftClient client;private final RenderResources resources;private final ProjectionPages pages=new ProjectionPages();private final Matrix4f arenaMatrix=new Matrix4f();private boolean frameReady,resourcesVisible;private long waitingRevision=-1;
+    private final MinecraftClient client;private final RenderResources resources;private final ProjectionPages pages;private final Matrix4f arenaMatrix=new Matrix4f();private boolean frameReady,resourcesVisible;private long waitingRevision=-1;
     private final dev.betterlitematica.io.AuxiliaryData details;private final String detailsError;private ProjectionWorld projectionWorld;
     private final Map<BlockPos,net.minecraft.block.entity.BlockEntity> blockEntities=new LinkedHashMap<>();
     private final ProjectionModels specialModels=new ProjectionModels();private final ProjectionEntities entities;private List<ProjectionEntities.Candidate> entityCandidates=List.of();
@@ -112,7 +112,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     @Override public boolean building(){return job!=null;}
     private boolean visible=true,budgetSaturated;
     // Per-frame scheduling state: source requests are queued once per frame, hole search stops once exhausted.
-    private boolean prefetchedThisFrame,frameMissingWork,holesExhausted;
+    private boolean prefetchedThisFrame,frameMissingWork,holesExhausted,visibleRefreshExhausted,surroundingExhausted;
     private final LinkedHashSet<LayerRange> unsettledLayers=new LinkedHashSet<>();private boolean unsettledOverflow;private long layerChangedAt;
     private LayerRange semantic=LayerRange.ALL;private int capAxis=-1,clipAxis=-1;private long capLo,capHi;private double clipFrom,clipTo,clipFade;
     private static final int FOLLOW_SPAN=6;
@@ -142,7 +142,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     void opacity(float value){opacity=value;}
     private int frameUploadBytes,frameUploadLimit=UPLOAD_BYTES_PER_FRAME,drawCalls;private long builtSections,lastBuildNanos;private String failure="";
     ProjectionRenderer1201(MinecraftClient client,LoadCoordinator.Loaded loaded,RenderResources resources){
-        this.client=client;this.resources=resources;resources.concurrentBuilds(true);sourceLease=loaded;details=loaded.details();detailsError=loaded.detailsError();entities=new ProjectionEntities(client,details,resources);stream=loaded.stream();stream.parallelism(DECODE_THREADS);index=loaded.index();place(new Placement(UUID.randomUUID(),"preview","preview.litematic",new PlacementTransform(Vec3i.ZERO,0,false,false),true,false));scene=new ProjectionScene(List.of(this));
+        this.client=client;this.resources=resources;pages=new ProjectionPages(resources);resources.concurrentBuilds(true);sourceLease=loaded;details=loaded.details();detailsError=loaded.detailsError();entities=new ProjectionEntities(client,details,resources);stream=loaded.stream();stream.parallelism(DECODE_THREADS);index=loaded.index();place(new Placement(UUID.randomUUID(),"preview","preview.litematic",new PlacementTransform(Vec3i.ZERO,0,false,false),true,false));scene=new ProjectionScene(List.of(this));
     }
     PlacementTransform transform(){return layout.placement().transform();}
     PlacementLayout layout(){return layout;}
@@ -224,7 +224,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                     var key=new SectionKey(part.index(),x,y,z);
                     changed|=failed.remove(key)|deferred.remove(key);
                     if(meshes.contains(key)||meshing.containsKey(key)||job!=null&&job.key.equals(key)){
-                        worldRefresh.changed(key);changed=true;
+                        worldRefresh.changed(key);localWorldRefreshes++;changed=true;
                     }
                 }
             }
@@ -244,7 +244,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             var task=meshing.get(key);if(task!=null)task.changed.set(cell);
             int expected=mesh==null?-1:mesh.cells.state(cell);
             boolean complete=expected>=0&&completedBlock(loaded,actual,Block.getStateFromRawId(expected));
-            if(expected>=0){mesh.mask.set(cell,complete);mesh.wrong.set(cell,wrongBlock(loaded,actual,Block.getStateFromRawId(expected)));}
+            if(expected>=0){boolean dirty=mesh.mask.set(cell,complete)|mesh.wrong.set(cell,wrongBlock(loaded,actual,Block.getStateFromRawId(expected)));if(dirty&&visibleSet.contains(key))drawRevision++;}
             boolean rebuild=mesh!=null&&mesh.omitted.get(cell)&&!complete;
             if(active!=null){
                 int id=active.section.globalId(cell);var state=active.states.resolve(id);
@@ -254,12 +254,14 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                     if(!activeComplete&&active.omitted.get(cell))rebuild=true;
                 }
             }
-            if(rebuild){worldRefresh.changed(key);changed=true;}
+            if(rebuild){worldRefresh.changed(key);localWorldRefreshes++;changed=true;}
         }
         if(changed)wakeWorldRefresh();
     }
-    void worldAllChanged(){worldRefresh.allChanged();failed.clear();deferred.clear();wakeWorldRefresh();}
+    private long fullWorldRefreshes,localWorldRefreshes;
+    void worldAllChanged(){fullWorldRefreshes++;worldRefresh.allChanged();failed.clear();deferred.clear();wakeWorldRefresh();}
     void worldChunkUnloaded(int x,int z){
+        drawRevision++;
         if(client.world==null)return;
         var box=new PlacementBounds(new Vec3i(x<<4,client.world.getBottomY(),z<<4),new Vec3i((x<<4)+15,client.world.getTopY()-1,(z<<4)+15));int visited=0;
         for(var part:layout.overlapping(box)){var range=MeshRefresh.sourceSections(part,box);if(range==null)continue;
@@ -269,7 +271,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             }
         }
     }
-    private void wakeWorldRefresh(){nextWorkProbe=0;budgetSaturated=false;waitingRevision=-1;}
+    private void wakeWorldRefresh(){nextWorkProbe=0;budgetSaturated=false;waitingRevision=-1;holesExhausted=visibleRefreshExhausted=surroundingExhausted=false;}
     private boolean needsMesh(SectionKey key){var mesh=meshes.get(key);return mesh==null||worldRefresh.stale(key,mesh.worldRevision());}
     static boolean completedBlock(boolean loaded,BlockState actual,BlockState expected){return PrinterRules.comparison(loaded,actual,expected)==dev.betterlitematica.core.Comparison.MATCH;}
     static boolean wrongBlock(boolean loaded,BlockState actual,BlockState expected){var comparison=PrinterRules.comparison(loaded,actual,expected);return comparison==dev.betterlitematica.core.Comparison.WRONG_BLOCK||comparison==dev.betterlitematica.core.Comparison.WRONG_STATE;}
@@ -347,20 +349,20 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     LayerRange layer(){return layer;}
     void visible(boolean value){visible=value;}
     boolean visible(){return visible;}
-    void suspend(){discardJob();frameReady=false;resourcesVisible=false;if(!resources.distanceOrdered())meshes.forEach((key,mesh)->mesh.resources().priority(RenderResources.COLD));entities.suspend();}
+    void suspend(){discardJob();discardMeshing();frameReady=false;resourcesVisible=false;if(!resources.distanceOrdered())meshes.forEach((key,mesh)->mesh.resources().priority(RenderResources.COLD));entities.suspend();}
     void invalidate(){
         discardJob();discardMeshing();palettes.clear();layerRevision++;meshes.close();worldRefresh.clear();editedSections.close();candidates=List.of();candidateSet=Set.of();candidateIndex=Map.of();candidateBoxes=new double[0];candidateArena=new int[0];arenaBoxes=new double[0];candidateVisible=new boolean[0];arenaCull=new byte[0];entityCandidates=List.of();entities.invalidate();visibleKeys.clear();Arrays.fill(lightSprites,null);opaqueStates.clear();failed.clear();deferred.clear();budgetSaturated=false;visibilityDirty=true;nextWorkProbe=0;waitingRevision=-1;visibleSet.clear();queryGeneration++;resolvers.clear();blockEntities.clear();projectionWorld=null;lastCamera=null;failure="";
     }
-    String status(){return "Partial preview (nearby only, max "+MAX_CANDIDATES+" sections) | "+String.format(Locale.ROOT,"mesh=%d, drawn=%d, built=%d, off-thread=%d (%d in flight, %.2f ms avg), pages=%d (%.1f MiB), CPU=%.1f MiB, GPU-est=%.1f MiB, queue=%d, build=%.2f ms, unsupported=%d",
-        meshes.size(),drawCalls,builtSections,meshedSections,meshing.size(),meshedSections==0?0:meshNanos/1e6/meshedSections,pages.pages(),pages.reservedBytes()/1048576.0,stream.cachedBytes()/1048576.0,(meshes.usedBytes()+(job==null?0:job.bytes))/1048576.0,stream.queuedJobs(),lastBuildNanos/1e6,resolvers.values().stream().mapToInt(StateResolver1201::unsupportedCount).sum());}
+    String status(){return "Partial preview (nearby only, max "+MAX_CANDIDATES+" sections) | "+String.format(Locale.ROOT,"mesh=%d, drawn=%d, commands-rebuilt=%d, world-full=%d, world-local=%d, built=%d, off-thread=%d (%d in flight, %.2f ms avg), pages=%d (%.1f MiB), CPU=%.1f MiB, GPU-total=%.1f MiB, queue=%d, build=%.2f ms, unsupported=%d",
+        meshes.size(),drawCalls,commandRebuilds,fullWorldRefreshes,localWorldRefreshes,builtSections,meshedSections,meshing.size(),meshedSections==0?0:meshNanos/1e6/meshedSections,pages.pages(),pages.reservedBytes()/1048576.0,stream.cachedBytes()/1048576.0,resources.usedBytes()/1048576.0,stream.queuedJobs(),lastBuildNanos/1e6,resolvers.values().stream().mapToInt(StateResolver1201::unsupportedCount).sum());}
     String error(){return !failure.isEmpty()?failure:!detailsError.isEmpty()?detailsError:!entities.error().isEmpty()?entities.error():stream.error();}
     void prepareFrame(WorldRenderContext context,boolean active){
         settleLayer();
-        stream.drain();drawCalls=0;lastBuildNanos=0;frameReady=active&&visible&&client.world!=null;prefetchedThisFrame=false;frameMissingWork=false;holesExhausted=false;
+        stream.drain();drawCalls=0;lastBuildNanos=0;frameReady=active&&visible&&client.world!=null;prefetchedThisFrame=false;frameMissingWork=false;holesExhausted=visibleRefreshExhausted=surroundingExhausted=false;
         // Disk workers can finish between frames. Wake builds on admitted data instead of
         // leaving a ready section idle until the fallback polling interval expires.
         if(decodedRevision!=stream.revision()){decodedRevision=stream.revision();nextWorkProbe=0;}
-        if(!frameReady){discardJob();if(resourcesVisible&&!resources.distanceOrdered())meshes.forEach((key,mesh)->mesh.resources().priority(RenderResources.COLD));resourcesVisible=false;entities.prepare(context,List.of(),false);return;}
+        if(!frameReady){discardJob();if(!meshing.isEmpty())discardMeshing();if(resourcesVisible&&!resources.distanceOrdered())meshes.forEach((key,mesh)->mesh.resources().priority(RenderResources.COLD));resourcesVisible=false;entities.prepare(context,List.of(),false);return;}
         // Distance-ordered residency never reads the priority lanes: skip their bookkeeping entirely.
         boolean lanes=!resources.distanceOrdered(),refreshAllPriorities=lanes&&!resourcesVisible;
         boolean budgetChanged=visibilityDirty||!resourcesVisible;resourcesVisible=true;
@@ -376,7 +378,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                     var members=result.membership();budgetChanged=true;refreshAllPriorities=lanes;
                     failed.retainAll(members);visibilityDirty=true;nextWorkProbe=0;
                     visibleSet.retainAll(members);deferred.clear();budgetSaturated=false;
-                    candidates=result.keys();candidateSet=result.membership();candidateIndex=result.indices();candidateBoxes=result.boxes();candidateArena=result.arenaOf();arenaBoxes=result.arenaBoxes();
+                    drawRevision++;candidates=result.keys();candidateSet=result.membership();candidateIndex=result.indices();candidateBoxes=result.boxes();candidateArena=result.arenaOf();arenaBoxes=result.arenaBoxes();
                     candidateVisible=new boolean[candidates.size()];for(var key:visibleSet){Integer at=candidateIndex.get(key);if(at!=null)candidateVisible[at]=true;}arenaCull=new byte[arenaBoxes.length/6];
                     entityCandidates=result.entities();lastCamera=result.camera();lastRadius=radius;
                     // Residency follows distance from the viewer. Re-sorting every resident mesh at once would stall this
@@ -394,7 +396,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             var viewMatrix=context.matrixStack().peek().getPositionMatrix();
             if(visibilityDirty||!camera.equals(lastCullCamera)||!lastCullView.equals(viewMatrix)||!lastCullProjection.equals(context.projectionMatrix())){
             visibilityDirty=false;
-            visibleKeys.clear();boolean visibilityChanged=false;boolean everything=context.frustum()==null;
+            visibleKeys.clear();boolean visibilityChanged=false,newVisibleWork=false;boolean everything=context.frustum()==null;
             if(!everything){cullMatrix.set(context.projectionMatrix()).mul(viewMatrix);cull.set(cullMatrix,false);}
             double cx=camera.x,cy=camera.y,cz=camera.z;
             // Whole arenas first: most are entirely outside or inside, so only boundary arenas test their sections.
@@ -408,19 +410,24 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                 boolean inView=state==INSIDE||state==PARTIAL&&cull.testAab((float)(candidateBoxes[i]-cx)-CULL_MARGIN,(float)(candidateBoxes[i+1]-cy)-CULL_MARGIN,(float)(candidateBoxes[i+2]-cz)-CULL_MARGIN,(float)(candidateBoxes[i+3]-cx)+CULL_MARGIN,(float)(candidateBoxes[i+4]-cy)+CULL_MARGIN,(float)(candidateBoxes[i+5]-cz)+CULL_MARGIN);
                 if(inView)visibleKeys.add(candidates.get(k));
                 if(inView==candidateVisible[k])continue;
-                candidateVisible[k]=inView;var key=candidates.get(k);if(inView)visibleSet.add(key);else visibleSet.remove(key);visibilityChanged=true;
+                candidateVisible[k]=inView;var key=candidates.get(k);if(inView){visibleSet.add(key);newVisibleWork|=needsMesh(key);}else visibleSet.remove(key);visibilityChanged=true;
                 // Camera movement normally changes only a few sections. A membership
                 // refresh or resume still updates every resident mesh, including cold ones.
                 if(lanes&&!refreshAllPriorities){var mesh=meshes.get(key);if(mesh!=null)mesh.resources().priority(inView?RenderResources.VISIBLE:RenderResources.NEARBY);}
             }
-            if(visibilityChanged){budgetChanged=true;deferred.clear();budgetSaturated=false;nextWorkProbe=0;}
+            if(visibilityChanged){
+                drawRevision++;budgetChanged=true;
+                // Camera motion alone does not create work for an already resident, current mesh.
+                if(newVisibleWork||!deferred.isEmpty()||budgetSaturated)nextWorkProbe=0;
+                deferred.clear();budgetSaturated=false;
+            }
             lastCullCamera=camera;lastCullView.set(viewMatrix);lastCullProjection.set(context.projectionMatrix());
             }
             if(budgetChanged){waitingRevision=-1;if(job!=null&&!visibleSet.contains(job.key)&&!resources.warm())discardJob();}
             if(refreshAllPriorities)meshes.forEach((key,mesh)->mesh.resources().priority(visibleSet.contains(key)?RenderResources.VISIBLE:candidateSet.contains(key)?RenderResources.NEARBY:RenderResources.COLD));
             refreshResidency();
             entities.prepare(context,entityCandidates,true);
-        }catch(RuntimeException e){frameReady=false;failure="Renderer paused: "+e;visible=false;discardJob();BetterLitematicaClient.LOGGER.error("Projection visibility failed",e);}
+        }catch(RuntimeException e){frameReady=false;failure="Renderer paused: "+e;visible=false;discardJob();discardMeshing();BetterLitematicaClient.LOGGER.error("Projection visibility failed",e);}
     }
     @Override public RenderScheduler.Work buildFrame(long deadline,int uploadLimit){
         if(!frameReady||System.nanoTime()>=deadline||uploadLimit<=0)return RenderScheduler.Work.NONE;
@@ -452,8 +459,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                 // refreshing a section that is already drawn can wait. Only a section that needs the scene comes back
                 // as a render-thread job.
                 if(job==null&&!budgetSaturated&&!holesExhausted){job=findJob(visibleKeys,deadline,false,true);if(job==null)holesExhausted=true;}
-                if(job==null&&!budgetSaturated)job=findJob(visibleKeys,deadline,false,false);
-                if(job==null&&warm)job=findJob(candidates,deadline,true,false);
+                if(job==null&&!budgetSaturated&&!visibleRefreshExhausted)job=findJob(visibleKeys,deadline,false,false);
+                if(job==null&&warm&&!surroundingExhausted)job=findJob(candidates,deadline,true,false);
                 if(job!=null&&System.nanoTime()<deadline&&frameUploadBytes<frameUploadLimit){
                     int cursorBefore=job.cursor,partsBefore=job.parts.size();
                     build(deadline);
@@ -468,37 +475,36 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                 }
             }
             if(job==null&&frameUploadBytes<frameUploadLimit)frameUploadBytes+=entities.build(entityCandidates,this,scene,deadline,frameUploadLimit-frameUploadBytes);
-            // The first finished section of an attempt may exceed the budget so a large one still makes progress; it then counts as the whole budget.
-            return new RenderScheduler.Work(Math.min(frameUploadBytes,frameUploadLimit),progressed||frameUploadBytes>0);
-        }catch(RuntimeException e){failure="Renderer paused: "+e;visible=false;frameReady=false;discardJob();BetterLitematicaClient.LOGGER.error("Projection renderer failed",e);return new RenderScheduler.Work(Math.min(frameUploadBytes,frameUploadLimit),false);}
+            // Every uploaded part is charged in full; unfinished sections resume next frame.
+            return new RenderScheduler.Work(frameUploadBytes,progressed||frameUploadBytes>0);
+        }catch(RuntimeException e){failure="Renderer paused: "+e;visible=false;frameReady=false;discardJob();discardMeshing();BetterLitematicaClient.LOGGER.error("Projection renderer failed",e);return new RenderScheduler.Work(frameUploadBytes,false);}
         finally{lastBuildNanos+=System.nanoTime()-started;}
     }
     void drawFrame(WorldRenderContext context){
         if(!frameReady)return;
         try{renderMeshes(context,context.camera().getPos(),visibleKeys);entities.render(context,entityCandidates,opacity);}
-        catch(RuntimeException e){failure="Renderer paused: "+e;visible=false;frameReady=false;discardJob();BetterLitematicaClient.LOGGER.error("Projection draw failed",e);}
+        catch(RuntimeException e){failure="Renderer paused: "+e;visible=false;frameReady=false;discardJob();discardMeshing();BetterLitematicaClient.LOGGER.error("Projection draw failed",e);}
     }
     // ---- Off-thread section builds -------------------------------------------------------------------------------
     /** Render-thread record of one build in flight; world events that arrive meanwhile are replayed when it finishes. */
     private static final class MeshTask {
-        final SectionMesher.Input input;final long worldRevision,layerRevision,started=System.nanoTime();final ProjectionPages.Origin arena;final BitSet changed=new BitSet();boolean unloaded;
+        final SectionMesher.Input input;final long worldRevision,layerRevision;BoundedTaskPool.Ticket<SectionMesher.Output> ticket;final ProjectionPages.Origin arena;final BitSet changed=new BitSet();boolean unloaded;
         MeshTask(SectionMesher.Input input,long worldRevision,long layerRevision,ProjectionPages.Origin arena){this.input=input;this.worldRevision=worldRevision;this.layerRevision=layerRevision;this.arena=arena;}
     }
     /** An output whose GPU upload or block entity layers continue over several frames. */
     private static final class Finishing {
-        final SectionMesher.Output out;final MeshTask task;RenderResources.Group group;final ArrayList<Part> parts=new ArrayList<>();long bytes,visibilityBytes,waitingSince;int entity;boolean uploaded;
+        final SectionMesher.Output out;final MeshTask task;RenderResources.Group group;final ArrayList<Part> parts=new ArrayList<>();long bytes,visibilityBytes,waitingSince;int entity,part;boolean uploaded;
         List<ProjectionScene.Part> overlaps;ProjectionBlockView view;
         Finishing(SectionMesher.Output out,MeshTask task){this.out=out;this.task=task;}
     }
     private static final int STARTED=0,WAITING=1,RENDER_THREAD=2,DONE=0,WAIT=1,DROPPED=2,NEXT=3;
-    private final Map<SectionKey,MeshTask> meshing=new HashMap<>();
-    private final java.util.concurrent.ConcurrentLinkedQueue<SectionMesher.Output> meshed=new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private final Map<SectionKey,MeshTask> meshing=new LinkedHashMap<>();
     private volatile long meshGeneration;private volatile boolean closed;
-    private long layerRevision,meshedSections,meshNanos;private Finishing finishing;
+    private long layerRevision,meshedSections,meshNanos,drawRevision,cachedDrawRevision=-1,commandRebuilds;private Finishing finishing;
     private final Map<PlacementTransform,SectionMesher.Palette> palettes=new HashMap<>();
     private final BufferBuilder specialBuilder=new BufferBuilder(4096);
     private net.minecraft.client.world.ClientWorld meshWorld;private SectionMesher.World meshWorldView;
-    private static final int MAX_MESHING=SectionMesher.THREADS*3;
+    private static final int MAX_MESHING=SectionMesher.MAX_IN_FLIGHT;
     private final SectionMesher.Geometry geometry=new SectionMesher.Geometry(){
         @Override public BakedModel model(BlockState state){return client.getBlockRenderManager().getModel(state);}
         @Override public BakedModel marker(){return client.getBlockRenderManager().getModel(StateResolver1201.marker());}
@@ -519,17 +525,20 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     }
     private SectionMesher.Palette palette(int region){
         var t=layout.part(region).transform();var linear=new PlacementTransform(Vec3i.ZERO,t.quarterTurns(),t.mirrorX(),t.mirrorZ());
-        return palettes.computeIfAbsent(linear,k->new SectionMesher.Palette(metadata().palette().size()));
+        return palettes.computeIfAbsent(linear,k->{var result=new SectionMesher.Palette(metadata().palette().size());var state=StateResolver1201.marker();
+            result.marker=FrozenModel.capture(geometry.marker(),state,index->safeTint(state,index));return result;});
     }
-    /** Flags every asset id the section uses. States are written before flags; a worker trusts only READY entries. */
-    private void prepare(SectionMesher.Palette palette,StateResolver1201 resolver,PackedSection section){
-        if(section==null)return;for(int i=0;i<section.paletteSize();i++){int id=section.paletteId(i);if((palette.flags[id]&SectionMesher.READY)==0)flag(palette,resolver,id);}
+    private int safeTint(BlockState state,int index){try{return geometry.tint(state,index);}catch(RuntimeException ignored){return 0xffffff;}}
+    /** Preparation is incremental and budgeted. No worker reads Minecraft's mutable model caches. */
+    private boolean prepare(SectionMesher.Palette palette,StateResolver1201 resolver,PackedSection section,long deadline){
+        if(section==null)return true;
+        for(int i=0;i<section.paletteSize();i++){int id=section.paletteId(i);if((palette.flags[id]&SectionMesher.READY)==0){if(System.nanoTime()>=deadline)return false;flag(palette,resolver,id);}}
+        return true;
     }
     private void flag(SectionMesher.Palette palette,StateResolver1201 resolver,int id){
         BlockState state=resolver.resolve(id);short flags=SectionMesher.flags(metadata().palette().get(id),state,displays(id),resolver.unresolvedState(id));
-        // Multipart models fill an unsynchronised per-state cache on first use. Fill it here, on the render thread,
-        // so builder threads only ever read it.
-        if((flags&SectionMesher.MODEL)!=0&&(flags&SectionMesher.SKIP)==0)try{random.setSeed(0);client.getBlockRenderManager().getModel(state).getQuads(state,null,random);}catch(RuntimeException ignored){/* The builder reports this model. */}
+        if((flags&SectionMesher.MODEL)!=0&&(flags&SectionMesher.SKIP)==0)try{palette.models[id]=FrozenModel.capture(geometry.model(state),state,index->safeTint(state,index));}
+        catch(RuntimeException ignored){/* Unknown/custom models use the render-thread builder. */}
         palette.states[id]=state;palette.flags[id]=flags;
     }
     private void lightSprites(){
@@ -540,84 +549,90 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
      * twenty-six around fluids, whose surfaces sample diagonal heights. Overlapping placements need the scene and
      * stay on the render-thread builder.
      */
-    private int startMeshing(SectionKey key,PackedSection center){
+    private int startMeshing(SectionKey key,PackedSection center,long deadline){
         if(client.world==null)return WAITING;
         var box=bounds(key);if(scene.overlapping(new PlacementBounds(new Vec3i((int)box.minX-1,(int)box.minY-1,(int)box.minZ-1),new Vec3i((int)box.maxX,(int)box.maxY,(int)box.maxZ))).size()>1)return RENDER_THREAD;
         var palette=palette(key.region());var resolver=resolver(key.region());
-        if((palette.flags[0]&SectionMesher.READY)==0)flag(palette,resolver,0);prepare(palette,resolver,center);
-        boolean fluid=false,light=false;for(int i=0;i<center.paletteSize();i++){short f=palette.flags[center.paletteId(i)];fluid|=(f&SectionMesher.FLUID)!=0;light|=(f&SectionMesher.LIGHT)!=0;}
+        if((palette.flags[0]&SectionMesher.READY)==0)flag(palette,resolver,0);if(!prepare(palette,resolver,center,deadline))return WAITING;
+        boolean fluid=false,light=false;for(int i=0;i<center.paletteSize();i++){int id=center.paletteId(i);short f=palette.flags[id];
+            if((f&SectionMesher.MODEL)!=0&&(f&SectionMesher.SKIP)==0&&(palette.models[id]==null||palette.marker==null))return RENDER_THREAD;
+            fluid|=(f&SectionMesher.FLUID)!=0;light|=(f&SectionMesher.LIGHT)!=0;}
         var sections=new PackedSection[27];boolean ready=true;
         for(int dy=-1;dy<=1;dy++)for(int dz=-1;dz<=1;dz++)for(int dx=-1;dx<=1;dx++){
             int at=(dx+1)+(dz+1)*3+(dy+1)*9;if(at==13){sections[at]=center;continue;}
             if(!fluid&&Math.abs(dx)+Math.abs(dy)+Math.abs(dz)!=1)continue;
             int x=key.x()+dx,y=key.y()+dy,z=key.z()+dz;if(x<0||y<0||z<0)continue;
-            var data=section(new SectionKey(key.region(),x,y,z));if(data==null)ready=false;else{sections[at]=data;prepare(palette,resolver,data);}
+            var data=section(new SectionKey(key.region(),x,y,z));if(data==null)ready=false;else{sections[at]=data;ready&=prepare(palette,resolver,data,deadline);}
         }
         if(!ready)return WAITING;
         if(light)lightSprites();
         var transform=layout.part(key.region()).transform();var localBase=localBase(key);var worldBase=transform.apply(localBase);var arena=ProjectionPages.origin(worldBase.x(),worldBase.y(),worldBase.z());
         var input=new SectionMesher.Input(key,meshGeneration,sections,palette,transform,localBase,worldBase,worldBase.x()-arena.x(),worldBase.y()-arena.y(),worldBase.z()-arena.z(),
             layer,capAxis,capLo,capHi,meshWorld(client.world),geometry,lightSprites);
-        var task=new MeshTask(input,worldRefresh.revision(key),layerRevision,arena);meshing.put(key,task);
-        try{SectionMesher.submit(()->{
-            var out=SectionMesher.build(input,generation->generation!=meshGeneration||closed);
-            meshed.add(out);if(closed)releaseMeshed();
-        });}catch(java.util.concurrent.RejectedExecutionException e){meshing.remove(key);return WAITING;}
-        return STARTED;
+        var task=new MeshTask(input,worldRefresh.revision(key),layerRevision,arena);
+        task.ticket=SectionMesher.submit(input,generation->generation!=meshGeneration||closed);
+        if(task.ticket==null)return WAITING;meshing.put(key,task);return STARTED;
     }
-    private void releaseMeshed(){SectionMesher.Output out;while((out=meshed.poll())!=null)out.free();}
     private void expireMeshing(){
-        if(meshing.size()<MAX_MESHING)return;long now=System.nanoTime();
-        meshing.entrySet().removeIf(entry->now-entry.getValue().started>10_000_000_000L&&(finishing==null||finishing.task!=entry.getValue()));
+        long now=System.nanoTime();
+        for(var task:meshing.values())if(!task.ticket.done()&&!task.ticket.cancelled()&&task.ticket.started()!=0&&now-task.ticket.started()>10_000_000_000L){
+            task.ticket.close();failed.add(task.input.key);failure="区段模型生成超时";
+        }
     }
-    /** Abandons in-flight builds; their outputs are freed on arrival. */
-    private void discardMeshing(){meshGeneration++;meshing.clear();abortFinishing();releaseMeshed();}
-    private void discardMeshing(SectionKey key){if(meshing.remove(key)!=null&&finishing!=null&&finishing.task.input.key.equals(key))abortFinishing();}
-    private void abortFinishing(){var current=finishing;finishing=null;if(current==null)return;current.out.free();if(current.group!=null)current.group.close();}
-    /** Finishes off-thread builds in arrival order within the frame's time and upload budget; the first always proceeds. */
+    private void discardMeshing(){meshGeneration++;abortFinishing();for(var task:meshing.values())task.ticket.close();meshing.clear();}
+    private void discardMeshing(SectionKey key){var task=meshing.remove(key);if(task==null)return;if(finishing!=null&&finishing.task==task)abortFinishing();task.ticket.close();}
+    private void abortFinishing(){var current=finishing;finishing=null;if(current==null)return;current.out.free();current.task.ticket.close();if(current.group!=null)current.group.close();}
+    /** Completed outputs retain a global slot until consumed, including while waiting for GPU space. */
+    private Finishing pollMeshed(){
+        var iterator=meshing.entrySet().iterator();
+        while(iterator.hasNext()){
+            var entry=iterator.next();var task=entry.getValue();var ticket=task.ticket;if(!ticket.done())continue;
+            var out=ticket.take();
+            if(out==null||out.cancelled||out.failed){
+                if(out!=null){if(out.failed){failed.add(entry.getKey());failure="区段模型生成失败";}out.free();}
+                if(ticket.failure()!=null){failed.add(entry.getKey());failure="区段模型生成失败";BetterLitematicaClient.LOGGER.warn("Projection mesh task failed",ticket.failure());}
+                ticket.close();iterator.remove();continue;
+            }
+            meshNanos+=out.nanos;meshedSections++;
+            var resolver=resolver(entry.getKey().region());for(int id=out.unsupported.nextSetBit(0);id>=0;id=out.unsupported.nextSetBit(id+1))resolver.markUnsupported(id);
+            if(!out.failure.isEmpty())failure=out.failure;return new Finishing(out,task);
+        }
+        return null;
+    }
+    /** Consume ready builds incrementally; every upload part must fit the remaining frame budget. */
     private boolean finishMeshes(long deadline){
         boolean progressed=false;int finished=0;
         while(System.nanoTime()<deadline&&(finished==0||frameUploadBytes<frameUploadLimit)){
-            if(finishing==null){
-                var out=meshed.poll();if(out==null)break;var key=out.input.key;var task=meshing.get(key);
-                if(task==null||task.input!=out.input||out.cancelled){out.free();continue;}
-                meshNanos+=out.nanos;meshedSections++;
-                if(out.failed){meshing.remove(key);out.free();failed.add(key);if(!out.failure.isEmpty())failure=out.failure;progressed=true;continue;}
-                var resolver=resolver(key.region());for(int id=out.unsupported.nextSetBit(0);id>=0;id=out.unsupported.nextSetBit(id+1))resolver.markUnsupported(id);if(!out.failure.isEmpty())failure=out.failure;
-                finishing=new Finishing(out,task);
-            }
-            int entityBefore=finishing.entity;boolean uploadedBefore=finishing.uploaded;
-            int result=finish(finishing,deadline,finished==0);
+            if(finishing==null){finishing=pollMeshed();if(finishing==null)break;}
+            int entityBefore=finishing.entity,partBefore=finishing.part;
+            int result=finish(finishing,deadline);
             if(result==WAIT){
                 // A section that cannot finish (no room on screen, a neighbour that never decodes) must not hold up the rest.
-                long now=System.nanoTime();if(finishing.entity!=entityBefore||finishing.uploaded!=uploadedBefore)finishing.waitingSince=0;
+                long now=System.nanoTime();if(finishing.entity!=entityBefore||finishing.part!=partBefore)finishing.waitingSince=0;
                 else if(finishing.waitingSince==0)finishing.waitingSince=now;
                 else if(now-finishing.waitingSince>500_000_000L){deferred.add(finishing.task.input.key);result=DROPPED;}
                 if(result==WAIT)break;
             }
-            var done=finishing;finishing=null;meshing.remove(done.task.input.key);progressed=true;finished++;nextWorkProbe=0;
+            var done=finishing;finishing=null;meshing.remove(done.task.input.key);done.task.ticket.close();progressed=true;finished++;nextWorkProbe=0;
             if(result==DROPPED){done.out.free();if(done.group!=null)done.group.close();}
         }
         return progressed;
     }
-    private int finish(Finishing f,long deadline,boolean first){
+    private int finish(Finishing f,long deadline){
         var key=f.task.input.key;boolean onscreen=visibleSet.contains(key);int demand=onscreen?RenderResources.VISIBLE:RenderResources.NEARBY;
         if(!f.uploaded){
-            long bytes=f.out.vertices*(long)SectionMesher.STRIDE;if(!first&&frameUploadBytes+bytes>frameUploadLimit)return WAIT;
             if(f.group==null){double distance=sectionDistance(key);f.group=meshes.contains(key)?resources.beginReplacement(demand,distance):resources.begin(demand,distance);if(f.group==null){waitingRevision=resources.revision();return WAIT;}}
-            if(!f.out.parts.isEmpty()){
-                int[] sizes=new int[f.out.parts.size()];for(int i=0;i<sizes.length;i++)sizes[i]=f.out.parts.get(i).vertices*SectionMesher.STRIDE;
-                List<RenderResources.Lease> leases;
-                try{leases=f.group.reserve(sizes,demand);}catch(IllegalArgumentException e){failed.add(key);failure="区段模型超过资源预算";return DROPPED;}
-                if(leases==null){if(!onscreen){deferred.add(key);return DROPPED;}waitingRevision=resources.revision();return WAIT;}
-                for(int i=0;i<sizes.length;i++){
-                    var part=f.out.parts.get(i);var slice=pages.allocate(f.task.arena,part.vertices);leases.get(i).attach(slice::free);
-                    pages.upload(slice,org.lwjgl.system.MemoryUtil.memByteBuffer(part.address(),sizes[i]));
-                    var visibility=new QuadVisibility.Part(part.owners);f.parts.add(new Part(null,slice,sizes[i],SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,false,visibility));
-                    f.visibilityBytes+=visibility.memoryEstimate();f.bytes+=sizes[i];frameUploadBytes+=sizes[i];
-                }
+            while(f.part<f.out.parts.size()){
+                var part=f.out.parts.get(f.part);int bytes=part.vertices*SectionMesher.STRIDE;
+                if(System.nanoTime()>=deadline||bytes>frameUploadLimit-frameUploadBytes)return WAIT;
+                ProjectionPages.Slice slice;
+                try{slice=pages.allocate(f.task.arena,part.vertices,f.group,demand);}catch(IllegalArgumentException e){failed.add(key);failure="区段模型超过资源预算";return DROPPED;}
+                if(slice==null){if(!onscreen){deferred.add(key);return DROPPED;}waitingRevision=resources.revision();return WAIT;}
+                pages.upload(slice,org.lwjgl.system.MemoryUtil.memByteBuffer(part.address(),bytes));
+                var visibility=new QuadVisibility.Part(part.owners);f.parts.add(new Part(null,slice,bytes,SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,false,visibility));
+                f.visibilityBytes+=visibility.memoryEstimate();f.bytes+=bytes;frameUploadBytes+=bytes;part.free();f.part++;
             }
-            f.out.free();f.uploaded=true;
+            f.uploaded=true;
         }
         // Block entity layers need the render thread, one cell at a time within the frame budget.
         while(f.entity<f.out.entities){
@@ -679,17 +694,20 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         for(int visited=0;visited<keys.size();visited++){
             int at=(start+visited)%keys.size();SectionKey key=keys.get(at);
             // Busy workers end the scan; the rare section that needs the render-thread builder waits for them too.
-            if(System.nanoTime()>=deadline||meshing.size()>=MAX_MESHING)return null;
+            if(System.nanoTime()>=deadline||meshing.size()>=MAX_MESHING||!SectionMesher.hasCapacity())return null;
             if(surrounding&&visibleSet.contains(key)||key.equals(coolingKey)&&System.nanoTime()<coolingUntil)continue;
             if(meshing.containsKey(key)||holesOnly&&meshes.contains(key)||!needsMesh(key)||failed.contains(key)||deferred.contains(key))continue;
             // Under a full budget a section farther than every resident mesh would only be rejected: skip it.
             if(!resources.admits(sectionDistance(key)))continue;
             var section=section(key);if(section==null)continue;
-            int started=startMeshing(key,section);
+            int started=startMeshing(key,section,deadline);
             if(started==STARTED){if(!holesOnly){if(surrounding)surroundingCursor=at+1;else buildCursor=at+1;}continue;}
             if(started==WAITING||job!=null)continue;
             Job next=prepare(key,section);if(next!=null){if(surrounding)surroundingCursor=at+1;else buildCursor=at+1;return next;}
         }
+        // A completed scan found every eligible key. Do not repeat it for each scheduler attempt in this frame.
+        // Early exits for a deadline or busy workers deliberately leave the scan retryable.
+        if(holesOnly)holesExhausted=true;else if(surrounding)surroundingExhausted=true;else visibleRefreshExhausted=true;
         return null;
     }
     private boolean prefetch(List<SectionKey> keys,int cursor,long deadline,boolean surrounding){
@@ -737,13 +755,13 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             if(state.isOf(Blocks.LIGHT)){
                 if(current.vertices+4>MAX_PART_VERTICES&&!flushPart())return;
                 if(!builder.isBuilding())builder.begin(VertexFormat.DrawMode.QUADS,VertexFormats.POSITION_TEXTURE_COLOR);
-                emitLight(state,world.x()-current.worldBase.x()+current.shiftX,world.y()-current.worldBase.y()+current.shiftY,world.z()-current.worldBase.z()+current.shiftZ);ownership.append(i,4);
+                emitLight(state,world.x()-current.worldBase.x(),world.y()-current.worldBase.y(),world.z()-current.worldBase.z());ownership.append(i,4);
                 current.vertices+=4;current.cursor++;processed++;continue;
             }
             try{
                 if(!state.getFluidState().isEmpty())client.getBlockRenderManager().renderFluid(new BlockPos(world.x(),world.y(),world.z()),current.view,fluidVertices,state,state.getFluidState());
                 if(state.getRenderType()==BlockRenderType.INVISIBLE){
-                    if(fluidVertices.size()>0){if(current.vertices+fluidVertices.size()>MAX_PART_VERTICES&&!flushPart())return;if(!builder.isBuilding())builder.begin(VertexFormat.DrawMode.QUADS,VertexFormats.POSITION_TEXTURE_COLOR);fluidVertices.emit(builder,world.x()-current.worldBase.x()+current.shiftX-(world.x()&15),world.y()-current.worldBase.y()+current.shiftY-(world.y()&15),world.z()-current.worldBase.z()+current.shiftZ-(world.z()&15));ownership.append(i,fluidVertices.size());current.vertices+=fluidVertices.size();}
+                    if(fluidVertices.size()>0){if(current.vertices+fluidVertices.size()>MAX_PART_VERTICES&&!flushPart())return;if(!builder.isBuilding())builder.begin(VertexFormat.DrawMode.QUADS,VertexFormats.POSITION_TEXTURE_COLOR);fluidVertices.emit(builder,world.x()-current.worldBase.x()-(world.x()&15),world.y()-current.worldBase.y()-(world.y()&15),world.z()-current.worldBase.z()-(world.z()&15));ownership.append(i,fluidVertices.size());current.vertices+=fluidVertices.size();}
                     current.cursor++;processed++;continue;
                 }
                 if(state.getRenderType()==BlockRenderType.MODEL){
@@ -769,7 +787,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             if(specialModels.vertices()>MAX_PART_VERTICES){states.markUnsupported(id);failure="特殊模型顶点超出预算";current.cursor++;processed++;continue;}
             if(specialModels.vertices()>0&&frameUploadBytes+(current.vertices+quads.size()*4+fluidVertices.size()+specialModels.vertices())*24>frameUploadLimit)return;
             if(quads.isEmpty()&&fluidVertices.size()==0&&specialModels.vertices()==0){current.cursor++;processed++;continue;}
-            Vec3i relative=world.subtract(current.worldBase);int ax=relative.x()+current.shiftX,ay=relative.y()+current.shiftY,az=relative.z()+current.shiftZ;
+            Vec3i relative=world.subtract(current.worldBase);int ax=relative.x(),ay=relative.y(),az=relative.z();
             if(specialModels.vertices()>0){
                 // Reserve the entire block before emitting it: a budget wait must never
                 // replay an already uploaded regular face or a subset of special layers.
@@ -779,8 +797,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                 int[] sizes=new int[layers.size()+offset];if(offset==1)sizes[0]=regular;
                 for(int partIndex=0;partIndex<layers.size();partIndex++)sizes[partIndex+offset]=layers.get(partIndex).getValue().size()*24;
                 var leases=reserve(sizes);if(leases==null)return;
-                if(regular>0){builder.begin(VertexFormat.DrawMode.QUADS,VertexFormats.POSITION_TEXTURE_COLOR);for(BakedQuad quad:quads)emit(quad,state,ax,ay,az);fluidVertices.emit(builder,ax-(world.x()&15),ay-(world.y()&15),az-(world.z()&15));ownership.append(i,regular/24);upload(leases.get(0),regular,SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,false,true);}
-                for(int partIndex=0;partIndex<layers.size();partIndex++){var special=layers.get(partIndex);builder.begin(VertexFormat.DrawMode.QUADS,VertexFormats.POSITION_TEXTURE_COLOR);special.getValue().emit(builder,relative.x(),relative.y(),relative.z());ownership.append(i,special.getValue().size());upload(leases.get(partIndex+offset),sizes[partIndex+offset],special.getKey().texture(),special.getKey().intensity(),false);}
+                if(regular>0){builder.begin(VertexFormat.DrawMode.QUADS,VertexFormats.POSITION_TEXTURE_COLOR);for(BakedQuad quad:quads)emit(quad,state,ax,ay,az);fluidVertices.emit(builder,ax-(world.x()&15),ay-(world.y()&15),az-(world.z()&15));ownership.append(i,regular/24);upload(leases.get(0),regular,SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,false);}
+                for(int partIndex=0;partIndex<layers.size();partIndex++){var special=layers.get(partIndex);builder.begin(VertexFormat.DrawMode.QUADS,VertexFormats.POSITION_TEXTURE_COLOR);special.getValue().emit(builder,relative.x(),relative.y(),relative.z());ownership.append(i,special.getValue().size());upload(leases.get(partIndex+offset),sizes[partIndex+offset],special.getKey().texture(),special.getKey().intensity());}
             }else{
                 if(current.vertices+quads.size()*4+fluidVertices.size()>MAX_PART_VERTICES&&!flushPart())return;
                 if(!builder.isBuilding())builder.begin(VertexFormat.DrawMode.QUADS,VertexFormats.POSITION_TEXTURE_COLOR);
@@ -803,7 +821,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         if(old!=null&&room)meshes.remove(key);
         boolean admitted=room&&(onscreen?meshes.tryPutProtecting(key,mesh,visibleSet):meshes.tryPutWithoutEviction(key,mesh));
         if(!admitted){mesh.close();deferred.add(key);if(onscreen)budgetSaturated=true;return false;}
-        worldRefresh.completed(key,mesh.worldRevision());mesh.resources().finish(onscreen?RenderResources.VISIBLE:RenderResources.NEARBY,()->{meshes.remove(key);deferred.clear();budgetSaturated=false;nextWorkProbe=0;});
+        if(onscreen)drawRevision++;
+        worldRefresh.completed(key,mesh.worldRevision());mesh.resources().finish(onscreen?RenderResources.VISIBLE:RenderResources.NEARBY,()->{if(visibleSet.contains(key))drawRevision++;meshes.remove(key);deferred.clear();budgetSaturated=false;nextWorkProbe=0;});
         return true;
     }
     private net.minecraft.block.entity.BlockEntity blockEntity(Job current,BlockPos pos){return blockEntity(current.overlaps,pos);}
@@ -817,7 +836,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private void append(List<BakedQuad> list){if(list.size()>MAX_BLOCK_QUADS-quads.size())throw new IllegalArgumentException("Model exceeds 512 quads per block");quads.addAll(list);}
     private Job prepare(SectionKey key,PackedSection section){
         Job next=new Job(key,section,localBase(key));var old=meshes.get(key);next.mask=old==null?new QuadVisibility.Mask():old.mask;next.wrong=old==null?new QuadVisibility.Mask():old.wrong;next.worldRevision=worldRefresh.revision(key);next.transform=layout.part(key.region()).transform();next.worldBase=next.transform.apply(next.localBase);
-        next.arena=ProjectionPages.origin(next.worldBase.x(),next.worldBase.y(),next.worldBase.z());next.shiftX=next.worldBase.x()-next.arena.x();next.shiftY=next.worldBase.y()-next.arena.y();next.shiftZ=next.worldBase.z()-next.arena.z();next.states=resolver(key.region());next.offsets=new Vec3i[6];
+        next.states=resolver(key.region());next.offsets=new Vec3i[6];
         for(var side:DIRECTIONS)next.offsets[side.ordinal()]=next.transform.inverse(next.transform.origin().add(new Vec3i(side.getOffsetX(),side.getOffsetY(),side.getOffsetZ())));
         var box=bounds(key);next.overlaps=scene.overlapping(new PlacementBounds(new Vec3i((int)box.minX-1,(int)box.minY-1,(int)box.minZ-1),new Vec3i((int)box.maxX,(int)box.maxY,(int)box.maxZ)));
         next.view=new ProjectionBlockView(client.world,scene,next.overlaps,layer);
@@ -876,23 +895,19 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         try{boolean onscreen=visibleSet.contains(job.key);var result=job.resources.reserve(sizes,onscreen?RenderResources.VISIBLE:RenderResources.NEARBY);if(result==null){if(!onscreen){discardJob();waitingRevision=-1;nextWorkProbe=0;}else waitingRevision=resources.revision();}return result;}
         catch(IllegalArgumentException e){failed.add(job.key);failure="区段模型超过资源预算";discardJob();return null;}
     }
-    /** Arena-relative block geometry goes into a shared page; section-relative special layers keep their own buffer. */
-    private void upload(RenderResources.Lease lease,int bytes,net.minecraft.util.Identifier texture,boolean intensity,boolean paged){
+    /** The rare overlapping/custom-model path keeps atomic, section-relative private buffers. */
+    private void upload(RenderResources.Lease lease,int bytes,net.minecraft.util.Identifier texture,boolean intensity){
         short[] owners=ownership.build(bytes/24);var visibility=new QuadVisibility.Part(owners);
         for(short cell:owners)if(cell>=0){int id=job.section.globalId(cell);var state=job.states.resolve(id);if(!job.states.unresolvedState(id))job.cells.record(cell,Block.getRawIdFromState(state));}
-        VertexBuffer buffer=null;ProjectionPages.Slice slice=null;var built=builder.end();
-        try{
-            if(paged){slice=pages.allocate(job.arena,bytes/24);lease.attach(slice::free);pages.upload(slice,built.getVertexBuffer());}
-            // VertexBuffer.upload releases the built buffer itself, also when it fails.
-            else{buffer=new VertexBuffer(VertexBuffer.Usage.STATIC);lease.attach(buffer::close);var owned=built;built=null;try{buffer.bind();buffer.upload(owned);}finally{VertexBuffer.unbind();}}
-        }finally{if(built!=null)built.release();}
-        job.parts.add(new Part(buffer,slice,bytes,texture,intensity,visibility));job.visibilityBytes+=visibility.memoryEstimate();ownership.clear();job.bytes+=bytes;frameUploadBytes+=bytes;
+        var buffer=new VertexBuffer(VertexBuffer.Usage.STATIC);lease.attach(buffer::close);var built=builder.end();
+        try{buffer.bind();buffer.upload(built);}finally{VertexBuffer.unbind();}
+        job.parts.add(new Part(buffer,null,bytes,texture,intensity,visibility));job.visibilityBytes+=visibility.memoryEstimate();ownership.clear();job.bytes+=bytes;frameUploadBytes+=bytes;
     }
     private boolean flushPart(){
         if(job.vertices==0)return true;int bytes=job.vertices*24;
         if(frameUploadBytes+bytes>frameUploadLimit)return false;
         var leases=reserve(new int[]{bytes});if(leases==null)return false;
-        upload(leases.get(0),bytes,SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,false,true);job.vertices=0;return true;
+        upload(leases.get(0),bytes,SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,false);job.vertices=0;return true;
     }
     /** Parts with their own texture (block entity layers) draw one by one after the paged geometry. */
     private record Special(Vec3i base,Part part,QuadVisibility.Mask mask,QuadVisibility.Mask wrong){}
@@ -906,7 +921,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         shader.getUniformOrDefault("LayerClip").set((float)clipAxis,(float)Math.max(-1e9,clipFrom),(float)Math.min(1e9,clipTo),(float)clipFade);
         shader.getUniformOrDefault("Fade").set(NEAR_CLEAR,NEAR_FULL);
         // Queue before binding anything: a frame without projection geometry leaves the composite target untouched.
-        pages.beginFrame();specials.clear();
+        if(job!=null||cachedDrawRevision!=drawRevision){
+        pages.beginFrame();specials.clear();commandRebuilds++;
         for(SectionKey key:visibleKeys){
             Mesh mesh=meshes.get(key);List<Part> parts=mesh!=null?mesh.parts:job!=null&&job.key.equals(key)?job.parts:List.of();if(parts.isEmpty())continue;
             var mask=mesh!=null?mesh.mask:job.mask;var wrong=mesh!=null?mesh.wrong:job.wrong;
@@ -922,6 +938,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                     for(int i=0,n=visibility.rangeCount(mask,wrong,true);i<n;i++)pages.add(slice,visibility.firstQuad(i),visibility.quadCount(i),true);
                 }
             }
+        }
+        cachedDrawRevision=drawRevision;
         }
         if(!pages.queued()&&specials.isEmpty())return;
         ProjectionComposite.activate();
@@ -962,12 +980,13 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                 if(mode!=null){mode.set(0);mode.upload();}
             }
         }finally{
-            specials.clear();if(bound)shader.unbind();
+            if(bound)shader.unbind();
             VertexBuffer.unbind();RenderSystem.setShaderTexture(0,previousTexture);RenderSystem.disablePolygonOffset();RenderSystem.polygonOffset(0f,0f);RenderSystem.depthMask(true);RenderSystem.enableCull();RenderSystem.disableBlend();
             RenderSystem.setShaderColor(previousColor[0],previousColor[1],previousColor[2],previousColor[3]);if(previous!=null)RenderSystem.setShader(()->previous);
         }
     }
     private void discardJob(){
+        if(job!=null)drawRevision++;
         if(builder.isBuilding())builder.end().release();builder.clear();ownership.clear();
         if(job!=null){job.resources.close();job=null;}
     }

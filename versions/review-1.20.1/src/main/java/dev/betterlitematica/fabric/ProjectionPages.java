@@ -3,14 +3,15 @@ package dev.betterlitematica.fabric;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.betterlitematica.core.RangeAllocator;
+import dev.betterlitematica.runtime.RenderResources;
 import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import org.joml.Matrix4f;
-import org.lwjgl.BufferUtils;
 import org.lwjgl.PointerBuffer;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL32;
@@ -35,21 +36,22 @@ final class ProjectionPages {
         Arena(Origin origin){this.origin=origin;}
     }
     private final class Page {
-        final Arena arena;final RangeAllocator ranges;final int vao,vbo;int slices;
+        final Arena arena;final RangeAllocator ranges;final RenderResources.SharedAllocation allocation;int vao,vbo,slices;
         final Commands normal=new Commands(),tinted=new Commands();
-        Page(Arena arena,int capacity){
-            this.arena=arena;ranges=new RangeAllocator(capacity);
-            vao=GlStateManager._glGenVertexArrays();vbo=GlStateManager._glGenBuffers();
-            BufferRenderer.resetCurrentVertexBuffer();GlStateManager._glBindVertexArray(vao);
+        Page(Arena arena,int capacity,RenderResources.SharedAllocation allocation){
+            this.arena=arena;this.allocation=allocation;ranges=new RangeAllocator(capacity);
             try{
+                vao=GlStateManager._glGenVertexArrays();vbo=GlStateManager._glGenBuffers();
+                BufferRenderer.resetCurrentVertexBuffer();GlStateManager._glBindVertexArray(vao);
                 GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER,vbo);GlStateManager._glBufferData(GL15.GL_ARRAY_BUFFER,(long)capacity*STRIDE,GL15.GL_STATIC_DRAW);
                 // The same attribute layout MC's own buffers use for this format; the element buffer binding is VAO state.
                 VertexFormats.POSITION_TEXTURE_COLOR.setupState();
                 RenderSystem.getSequentialBuffer(VertexFormat.DrawMode.QUADS).bindAndGrow(MAX_PART_INDICES);
-            }finally{GlStateManager._glBindVertexArray(0);GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER,0);}
+            }catch(RuntimeException|Error failure){if(vao!=0)GlStateManager._glDeleteVertexArrays(vao);if(vbo!=0)GlStateManager._glDeleteBuffers(vbo);allocation.close();throw failure;}
+            finally{GlStateManager._glBindVertexArray(0);GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER,0);}
             reservedBytes+=(long)capacity*STRIDE;pageCount++;
         }
-        void delete(){GlStateManager._glDeleteVertexArrays(vao);GlStateManager._glDeleteBuffers(vbo);reservedBytes-=(long)ranges.capacity()*STRIDE;pageCount--;}
+        void delete(){GlStateManager._glDeleteVertexArrays(vao);GlStateManager._glDeleteBuffers(vbo);normal.close();tinted.close();allocation.close();reservedBytes-=(long)ranges.capacity()*STRIDE;pageCount--;}
     }
     /** One section part inside a page; {@link #free()} returns its range, and an empty page deletes its buffers. */
     final class Slice {
@@ -63,33 +65,54 @@ final class ProjectionPages {
     /** Draws collected for one page in one pass; near sections are added first. */
     private static final class Commands {
         int size;int[] firstQuad=new int[16],quads=new int[16],base=new int[16];
+        private IntBuffer counts,bases;private PointerBuffer offsets;private int indexBytes;private boolean dirty=true;
         void add(int first,int count,int vertex){
             if(size==quads.length){firstQuad=Arrays.copyOf(firstQuad,size*2);quads=Arrays.copyOf(quads,size*2);base=Arrays.copyOf(base,size*2);}
-            firstQuad[size]=first;quads[size]=count;base[size]=vertex;size++;
+            firstQuad[size]=first;quads[size]=count;base[size]=vertex;size++;dirty=true;
         }
+        void clear(){size=0;dirty=true;}
+        void prepare(int bytes){
+            if(!dirty&&indexBytes==bytes)return;
+            if(counts==null||counts.capacity()<size){
+                close();int capacity=Math.max(16,Integer.highestOneBit(Math.max(1,size-1))<<1);
+                try{counts=MemoryUtil.memAllocInt(capacity);bases=MemoryUtil.memAllocInt(capacity);offsets=MemoryUtil.memAllocPointer(capacity);}
+                catch(RuntimeException|Error failure){close();throw failure;}
+            }
+            counts.clear();bases.clear();offsets.clear();
+            for(int i=0;i<size;i++){counts.put(quads[i]*6);offsets.put((long)firstQuad[i]*6*bytes);bases.put(base[i]);}
+            counts.flip();bases.flip();offsets.flip();indexBytes=bytes;dirty=false;
+        }
+        void close(){MemoryUtil.memFree(counts);MemoryUtil.memFree(bases);MemoryUtil.memFree(offsets);counts=null;bases=null;offsets=null;dirty=true;}
     }
     private final Map<Origin,Arena> arenas=new HashMap<>();
     private final ArrayList<Arena> order=new ArrayList<>();
-    private long frame,reservedBytes;private int pageCount;
-    private IntBuffer counts=BufferUtils.createIntBuffer(256),bases=BufferUtils.createIntBuffer(256);private PointerBuffer offsets=BufferUtils.createPointerBuffer(256);
+    private long frame,reservedBytes;private int pageCount;private final RenderResources resources;
+    ProjectionPages(RenderResources resources){this.resources=resources;}
 
-    Slice allocate(Origin origin,int vertices){
+    Slice allocate(Origin origin,int vertices,RenderResources.Group owner,int demand){
         if(vertices<1||vertices>16384)throw new IllegalArgumentException("Part outside page budget");
+        owner.checkReference(vertices*STRIDE);
         var arena=arenas.computeIfAbsent(origin,Arena::new);
-        for(var page:arena.pages){int at=page.ranges.allocate(vertices);if(at>=0)return slice(page,at,vertices);}
-        // Sparse arenas keep small pages; dense ones double towards the largest page.
-        long wanted=Math.max(vertices,Math.min(MAX_PAGE,Long.highestOneBit(Math.max(1,arena.live+vertices))*2));
-        var page=new Page(arena,(int)Math.max(MIN_PAGE,wanted));arena.pages.add(page);
-        return slice(page,page.ranges.allocate(vertices),vertices);
+        for(var page:arena.pages){int at=page.ranges.allocate(vertices);if(at>=0)return slice(page,at,vertices,owner);}
+        // Charge actual page capacity. Spare capacity shrinks before evicting meshes under budget pressure.
+        int wanted=(int)Math.max(MIN_PAGE,Math.max(vertices,Math.min(MAX_PAGE,
+            Long.highestOneBit(Math.max(1,arena.live+vertices))*2)));
+        long available=resources.availableBytes(owner.replacement())/STRIDE;
+        int capacity=(int)Math.max(vertices,Math.min(wanted,available&~3L));
+        var allocation=resources.reserveShared(capacity*STRIDE,2,owner,demand);
+        if(allocation==null){if(arena.pages.isEmpty())arenas.remove(origin);return null;}
+        var page=new Page(arena,capacity,allocation);arena.pages.add(page);
+        return slice(page,page.ranges.allocate(vertices),vertices,owner);
     }
-    private Slice slice(Page page,int first,int vertices){page.slices++;page.arena.live+=vertices;return new Slice(page,first,vertices);}
+    private Slice slice(Page page,int first,int vertices,RenderResources.Group owner){page.slices++;page.arena.live+=vertices;var slice=new Slice(page,first,vertices);owner.reference(vertices*STRIDE,slice::free);return slice;}
     void upload(Slice slice,ByteBuffer vertices){
         if(slice.freed||vertices.remaining()!=slice.vertices*STRIDE)throw new IllegalArgumentException("Vertex data does not match its slice");
         GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER,slice.page.vbo);
         try{GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER,(long)slice.first*STRIDE,vertices);}finally{GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER,0);}
     }
 
-    void beginFrame(){frame++;order.clear();}
+    /** Rebuild only after scene/visibility changes. Camera matrices and clipping uniforms remain per-frame. */
+    void beginFrame(){for(var arena:order)for(var page:arena.pages){page.normal.clear();page.tinted.clear();}frame++;order.clear();}
     boolean queued(){return !order.isEmpty();}
     /** Queue quads [firstQuad, firstQuad+quads) of a slice; tinted quads draw in a second pass. */
     void add(Slice slice,int firstQuad,int quads,boolean tinted){
@@ -109,8 +132,7 @@ final class ProjectionPages {
                 if(tint!=null){tint.set(0);tint.upload();}
             }
         }finally{
-            for(var arena:order)for(var page:arena.pages){page.normal.size=0;page.tinted.size=0;}
-            order.clear();GlStateManager._glBindVertexArray(0);BufferRenderer.resetCurrentVertexBuffer();
+            GlStateManager._glBindVertexArray(0);BufferRenderer.resetCurrentVertexBuffer();
         }
         return calls;
     }
@@ -124,16 +146,10 @@ final class ProjectionPages {
             }
             BufferRenderer.resetCurrentVertexBuffer();GlStateManager._glBindVertexArray(page.vao);
             indices.bindAndGrow(MAX_PART_INDICES);var type=indices.getIndexType();
-            ensure(commands.size);counts.clear();offsets.clear();bases.clear();
-            for(int i=0;i<commands.size;i++){counts.put(commands.quads[i]*6);offsets.put((long)commands.firstQuad[i]*6L*type.size);bases.put(commands.base[i]);}
-            counts.flip();offsets.flip();bases.flip();
-            GL32.glMultiDrawElementsBaseVertex(GL11.GL_TRIANGLES,counts,type.glType,offsets,bases);calls++;
+            commands.prepare(type.size);
+            GL32.glMultiDrawElementsBaseVertex(GL11.GL_TRIANGLES,commands.counts,type.glType,commands.offsets,commands.bases);calls++;
         }
         return calls;
-    }
-    private void ensure(int size){
-        if(counts.capacity()>=size)return;int next=Integer.highestOneBit(size-1)<<1;
-        counts=BufferUtils.createIntBuffer(next);bases=BufferUtils.createIntBuffer(next);offsets=BufferUtils.createPointerBuffer(next);
     }
     int pages(){return pageCount;}
     long reservedBytes(){return reservedBytes;}

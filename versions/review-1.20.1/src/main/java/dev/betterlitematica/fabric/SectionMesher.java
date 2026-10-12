@@ -33,11 +33,12 @@ final class SectionMesher {
     /** Palette flags by asset id, written on the render thread before any snapshot that uses the id is published. */
     static final short READY=1,SKIP=2,OPAQUE=4,FLUID=8,ENTITY=16,LIGHT=32,MODEL=64,INVISIBLE=128,INVALID=256;
     static final int THREADS=Math.max(1,Math.min(4,Runtime.getRuntime().availableProcessors()/2));
-    private static final ThreadPoolExecutor POOL=new ThreadPoolExecutor(THREADS,THREADS,30,TimeUnit.SECONDS,new LinkedBlockingQueue<>(),new ThreadFactory(){
-        private int count;
-        @Override public synchronized Thread newThread(Runnable task){var thread=new Thread(task,"betterlitematica-mesh-"+(++count));thread.setDaemon(true);thread.setPriority(Thread.MIN_PRIORITY);return thread;}
-    });
-    static void submit(Runnable task){POOL.execute(task);}
+    static final int MAX_IN_FLIGHT=THREADS*3;
+    private static final dev.betterlitematica.runtime.BoundedTaskPool POOL=new dev.betterlitematica.runtime.BoundedTaskPool(THREADS,MAX_IN_FLIGHT,"betterlitematica-mesh-");
+    static dev.betterlitematica.runtime.BoundedTaskPool.Ticket<Output> submit(Input input,java.util.function.LongPredicate obsolete){
+        return POOL.submit(cancelled->build(input,generation->cancelled.getAsBoolean()||obsolete.test(generation)),Output::free);
+    }
+    static boolean hasCapacity(){return POOL.outstanding()<MAX_IN_FLIGHT;}
     private static final Direction[] DIRECTIONS=Direction.values();
     static final class Cancelled extends RuntimeException {private static final long serialVersionUID=1L;Cancelled(){super(null,null,false,false);}}
 
@@ -55,8 +56,8 @@ final class SectionMesher {
     }
     /** Resolved states and flags for one placement transform; entries are immutable once flagged READY. */
     static final class Palette {
-        final BlockState[] states;final short[] flags;
-        Palette(int size){states=new BlockState[size];flags=new short[size];}
+        final BlockState[] states;final short[] flags;final FrozenModel[] models;FrozenModel marker;
+        Palette(int size){states=new BlockState[size];flags=new short[size];models=new FrozenModel[size];}
     }
     /** Where models, fluids and tints come from; the game supplies vanilla's, tests their own. */
     interface Geometry {
@@ -114,7 +115,7 @@ final class SectionMesher {
     }
     /** Per-thread scratch: one part of vertices, quad ownership, model and fluid capture. */
     private static final class Workspace {
-        final Random random=Random.create(0);final ArrayList<BakedQuad> quads=new ArrayList<>(48);final FluidCapture fluid=new FluidCapture();
+        final Random random=Random.create(0);final ArrayList<FrozenModel.Quad> quads=new ArrayList<>(48);final FluidCapture fluid=new FluidCapture();
         final QuadVisibility.Builder ownership=new QuadVisibility.Builder();final BlockPos.Mutable pos=new BlockPos.Mutable();
         // Lives as long as its pool thread; the pool's threads never time out, so this is allocated at most THREADS times.
         final long address=MemoryUtil.nmemAllocChecked((long)MAX_PART_VERTICES*STRIDE);int vertices;
@@ -137,9 +138,9 @@ final class SectionMesher {
     }
     private static void mesh(Input in,Output out,Workspace ws,java.util.function.LongPredicate cancelled){
         var center=in.sections[13];var flags=in.palette.flags;var states=in.palette.states;var view=new View(in);
-        int lastChunkX=Integer.MIN_VALUE,lastChunkZ=Integer.MIN_VALUE;boolean chunkLoaded=false;
+        int lastChunkX=Integer.MIN_VALUE,lastChunkZ=Integer.MIN_VALUE,scanned=0;boolean chunkLoaded=false;
         for(int i=center.nextNonZero(0);i<PackedSection.VOLUME;i=center.nextNonZero(i+1)){
-            if((i&255)==0&&cancelled.test(in.generation))throw new Cancelled();
+            if((scanned++&63)==0&&cancelled.test(in.generation))throw new Cancelled();
             int x=i&15,z=(i>>>4)&15,y=i>>>8,id=center.globalId(i);short flag=flags[id];
             if((flag&READY)==0)throw new IllegalStateException("Palette entry not prepared: "+id);
             if((flag&SKIP)!=0)continue;
@@ -160,24 +161,24 @@ final class SectionMesher {
             try{
                 if((flag&FLUID)!=0)in.geometry.fluid(ws.pos.set(wx,wy,wz),view,ws.fluid,state);
                 if((flag&INVISIBLE)==0&&model){
-                    BakedModel blockModel=in.geometry.model(state);long seed=state.getRenderingSeed(ws.pos.set(wx,wy,wz));
-                    for(var side:DIRECTIONS){if((culled&(1<<side.ordinal()))!=0)continue;ws.random.setSeed(seed);append(ws,blockModel.getQuads(state,side,ws.random));}
-                    ws.random.setSeed(seed);append(ws,blockModel.getQuads(state,null,ws.random));
-                    // A model without any quad would be invisible; show the unsupported marker instead.
-                    if(ws.quads.isEmpty()){out.unsupported.set(id);state=StateResolver1201.marker();var marker=in.geometry.marker();
-                        for(var side:DIRECTIONS){ws.random.setSeed(0);append(ws,marker.getQuads(state,side,ws.random));}ws.random.setSeed(0);append(ws,marker.getQuads(state,null,ws.random));}
+                    FrozenModel blockModel=in.palette.models[id];boolean randomized=blockModel.randomized();
+                    long seed=randomized?state.getRenderingSeed(ws.pos.set(wx,wy,wz)):0;
+                    for(var side:DIRECTIONS){if((culled&(1<<side.ordinal()))!=0)continue;if(randomized)ws.random.setSeed(seed);blockModel.append(side.ordinal(),ws.random,ws.quads);}
+                    if(randomized)ws.random.setSeed(seed);blockModel.append(6,ws.random,ws.quads);
+                    if(ws.quads.isEmpty()){out.unsupported.set(id);var marker=in.palette.marker;
+                        for(var side:DIRECTIONS){ws.random.setSeed(0);marker.append(side.ordinal(),ws.random,ws.quads);}ws.random.setSeed(0);marker.append(6,ws.random,ws.quads);}
+
                 }
                 if((flag&ENTITY)!=0)out.entity(i);
             }catch(Cancelled stop){throw stop;}
             catch(RuntimeException e){out.unsupported.set(id);out.failure="Unsupported model: "+state+" (block omitted)";continue;}
             int vertices=ws.quads.size()*4+ws.fluid.size();if(vertices==0)continue;
             room(in,out,ws,vertices);
-            for(var quad:ws.quads)quad(in,ws,quad,state,ax,ay,az);
+            for(var quad:ws.quads)quad(ws,quad,ax,ay,az);
             ws.fluid.emit(ws,ax-(wx&15),ay-(wy&15),az-(wz&15));
             ws.ownership.append(i,vertices);
         }
     }
-    private static void append(Workspace ws,List<BakedQuad> list){if(list.size()>MAX_BLOCK_QUADS-ws.quads.size())throw new IllegalArgumentException("Model exceeds 512 quads per block");ws.quads.addAll(list);}
     private static boolean contains(LayerRange layer,int x,int y,int z){int v=switch(layer.axis()){case X->x;case Y->y;case Z->z;};return v>=layer.min()&&v<=layer.max();}
     /** Same rule as the render-thread builder: only displayed, opaque or self-hiding neighbours inside the layer cull. */
     private static boolean culled(Input in,int x,int y,int z,int wx,int wy,int wz,BlockState state,Direction side){
@@ -202,15 +203,12 @@ final class SectionMesher {
         for(short cell:owners)if(cell>=0){int id=in.sections[13].globalId(cell);if((in.palette.flags[id]&INVALID)==0)out.cells.record(cell,Block.getRawIdFromState(in.palette.states[id]));}
         ws.vertices=0;ws.ownership.clear();
     }
-    private static void quad(Input in,Workspace ws,BakedQuad quad,BlockState state,float x,float y,float z){
-        int[] data=quad.getVertexData();int stride=data.length/4;if(stride<6||data.length%4!=0)throw new IllegalArgumentException("Unknown baked vertex format");
-        int tint=0xffffff;
-        if(quad.hasColor())try{tint=in.geometry.tint(state,quad.getColorIndex());}catch(RuntimeException ignored){/* Context-sensitive tint: neutral fallback in preview. */}
-        float shade=quad.getFace()==Direction.UP?1f:quad.getFace()==Direction.DOWN?0.6f:quad.getFace().getAxis()==Direction.Axis.X?0.8f:0.9f;
-        for(int vertex=0;vertex<4;vertex++){
-            int at=vertex*stride,color=data[at+3];
-            float red=(color&255)/255f*((tint>>>16)&255)/255f*shade,green=((color>>>8)&255)/255f*((tint>>>8)&255)/255f*shade,blue=((color>>>16)&255)/255f*(tint&255)/255f*shade;
-            ws.vertex(x+Float.intBitsToFloat(data[at]),y+Float.intBitsToFloat(data[at+1]),z+Float.intBitsToFloat(data[at+2]),Float.intBitsToFloat(data[at+4]),Float.intBitsToFloat(data[at+5]),(int)(red*255f),(int)(green*255f),(int)(blue*255f),255);
+    private static void quad(Workspace ws,FrozenModel.Quad quad,float x,float y,float z){
+        int[] data=quad.data;
+        for(int v=0;v<4;v++){
+            int at=v*6;long p=ws.address+(long)ws.vertices++*STRIDE;
+            MemoryUtil.memPutFloat(p,x+Float.intBitsToFloat(data[at]));MemoryUtil.memPutFloat(p+4,y+Float.intBitsToFloat(data[at+1]));MemoryUtil.memPutFloat(p+8,z+Float.intBitsToFloat(data[at+2]));
+            MemoryUtil.memPutInt(p+12,data[at+3]);MemoryUtil.memPutInt(p+16,data[at+4]);MemoryUtil.memPutInt(p+20,data[at+5]);
         }
     }
     /** Four coincident centers; alpha=0 tags a marker and RG encodes view-space corners for the vertex shader. */

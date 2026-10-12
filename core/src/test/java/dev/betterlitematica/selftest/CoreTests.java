@@ -68,6 +68,8 @@ public final class CoreTests {
             test("distance-ordered residency keeps the nearest meshes",()->{checks+=DistanceResidencyChecks.run();});
             test("highlight outlines draw only silhouette edges",()->{checks+=HighlightOutlineChecks.run();});
             test("vertex page ranges are first-fit and coalesce",()->{checks+=RangeAllocatorChecks.run();});
+            test("shared GPU pages retain their entire physical charge",()->{checks+=SharedRenderChecks.run();});
+            test("mesh task bounds include cancelled work and ready results",()->{checks+=BoundedTaskChecks.run();});
             test("complete bounded directory search and cancellation",()->{checks+=DirectorySearchChecks.run(temp);});
             test("draft persistence ordering and failure recovery",()->{checks+=DraftRecoveryChecks.run(temp.resolve("recovery"));});
             test("finite material batches avoid needless switches without starvation",()->{checks+=PrinterBatchChecks.run();});
@@ -244,6 +246,7 @@ public final class CoreTests {
                 check(!cache.canReplaceProtecting("visible",51,Set.of("visible","other"))&&cache.canReplaceProtecting("visible",80,Set.of("visible")),"Growing replacement can reclaim only unprotected neighbors");
                 check(cache.size()==2&&released.isEmpty(),"Admission check never deletes the old mesh");cache.remove("visible");check(cache.tryPutProtecting("visible",50,Set.of("other"))&&cache.get("other")==50,"Admitted replacement publishes without evicting another visible mesh");cache.close();
             });
+            test("tall-world chunk frontier remains local",()->checks+=WorldColumnChecks.run());
             test("world render changes coalesce and survive bounded overflow",()->{
                 var changes=new WorldSectionChanges(4);changes.block(new Vec3i(-1,-64,15));changes.block(new Vec3i(-16,-63,0));check(changes.pending()==1,"Same negative world section is coalesced");
                 var box=changes.drain(1).get(0);check(box.min().equals(new Vec3i(-16,-64,0))&&box.max().equals(new Vec3i(-1,-49,15)),"Dirty section keeps exact inclusive bounds");
