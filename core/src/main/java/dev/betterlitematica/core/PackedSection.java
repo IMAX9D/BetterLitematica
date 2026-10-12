@@ -35,6 +35,9 @@ public final class PackedSection {
         return (word<<6)+Long.numberOfTrailingZeros(bits);
     }
     public boolean isCanonicalAir(){return palette.length==1&&palette[0]==0;}
+    /** Distinct asset ids used by this section, in local palette order. */
+    public int paletteSize(){return palette.length;}
+    public int paletteId(int index){return palette[index];}
     public long estimatedBytes(){return 104L+4L*palette.length+indices.estimatedBytes()+16L+8L*occupied.length;}
     public void write(DataOutput out)throws IOException{
         out.writeInt(palette.length);for(int v:palette)out.writeInt(v);out.writeByte(indices.bits());

@@ -67,6 +67,7 @@ public final class CoreTests {
             test("layer moves rebuild only sections whose membership changed",()->{checks+=LayerRefreshChecks.run();});
             test("distance-ordered residency keeps the nearest meshes",()->{checks+=DistanceResidencyChecks.run();});
             test("highlight outlines draw only silhouette edges",()->{checks+=HighlightOutlineChecks.run();});
+            test("vertex page ranges are first-fit and coalesce",()->{checks+=RangeAllocatorChecks.run();});
             test("complete bounded directory search and cancellation",()->{checks+=DirectorySearchChecks.run(temp);});
             test("draft persistence ordering and failure recovery",()->{checks+=DraftRecoveryChecks.run(temp.resolve("recovery"));});
             test("finite material batches avoid needless switches without starvation",()->{checks+=PrinterBatchChecks.run();});

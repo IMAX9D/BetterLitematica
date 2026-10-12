@@ -15,7 +15,7 @@ public final class RenderResources {
      * nearer than it. The resident set becomes a stable shell around the viewer, so turning the camera never
      * trades the meshes behind it for farther ones in front.
      */
-    private boolean distanceOrdered;private long sequence;
+    private boolean distanceOrdered,concurrentBuilds;private long sequence;
     private final TreeSet<Group> byDistance=new TreeSet<>((a,b)->a.distance!=b.distance?Double.compare(b.distance,a.distance):Long.compare(a.order,b.order));
     private long used,pendingBytes,revision,frame,wakeFrame=Long.MAX_VALUE;
     private int objects,pendingObjects,groups,pendingGroups;
@@ -64,7 +64,7 @@ public final class RenderResources {
             for(int size:sizes){var lease=new Lease(size);allocations.add(lease);result.add(lease);}
             bytes+=total;used+=total;objects+=sizes.length;return result;
         }
-        public void finish(int priority,Runnable evicted){if(closed||!building)throw new IllegalStateException();this.evicted=Objects.requireNonNull(evicted);building=false;builder=null;revision++;this.priority=priority;lanes.get(priority).add(this);byDistance.add(this);if(priority==VISIBLE)lastVisible=frame;}
+        public void finish(int priority,Runnable evicted){if(closed||!building)throw new IllegalStateException();this.evicted=Objects.requireNonNull(evicted);building=false;if(builder==this)builder=null;revision++;this.priority=priority;lanes.get(priority).add(this);byDistance.add(this);if(priority==VISIBLE)lastVisible=frame;}
         public void priority(int value){
             if(value<COLD||value>VISIBLE)throw new IllegalArgumentException();if(closed||building)return;
             if(value==VISIBLE||priority==VISIBLE)lastVisible=frame;
@@ -73,7 +73,7 @@ public final class RenderResources {
         public boolean closed(){return closed;}
         @Override public void close(){
             if(closed)return;if(!building)byDistance.remove(this);closed=true;if(!building)lanes.get(priority).remove(this);
-            if(building){builder=null;revision++;}
+            if(building){if(builder==this)builder=null;revision++;}
             if(allocations.isEmpty()){groups--;revision++;}
             else {pendingBytes+=bytes;pendingObjects+=allocations.size();pendingGroups++;retired.add(this);}
             // Detach the cache entry now; native deletion remains incremental and charged.
@@ -91,10 +91,12 @@ public final class RenderResources {
     public Group beginReplacement(int demand,double distance){return begin(demand,true,distance);}
     private Group begin(int demand,boolean replacement,double distance){
         if(demand<COLD||demand>VISIBLE)throw new IllegalArgumentException();
-        if(builder!=null)return null;
+        if(builder!=null&&!concurrentBuilds)return null;
         int groupLimit=replacement?maxGroups:normalGroups;
         if(groups>=groupLimit){request(0,0,1,demand,replacement,distance);if(groups>=groupLimit)return null;}groups++;builder=new Group(replacement,distance);return builder;
     }
+    /** Opt-in: several groups may build at once, e.g. a background mesh finishing beside a foreground build. */
+    public void concurrentBuilds(boolean value){concurrentBuilds=value;}
     /** Switch to distance-ordered residency; call before any mesh is resident. */
     public void distanceOrdered(boolean value){distanceOrdered=value;}
     public boolean distanceOrdered(){return distanceOrdered;}

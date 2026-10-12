@@ -31,6 +31,14 @@ public final class DistanceResidencyChecks {
         budget.drain(16,Long.MAX_VALUE);budget.resize(1000,1000);check(budget.capacity()==1000&&budget.admits(1e9),"Larger budget admits everything again");
         // Legacy budgets keep their lane policy.
         var legacy=new RenderResources(100,100,100,10,2,1);check(!legacy.distanceOrdered()&&legacy.admits(1e9),"Distance order is opt-in");
+        // One builder at a time unless a renderer opts in; finishing either never clears the other's slot.
+        var single=new RenderResources(1000,100,100);var first=single.begin(RenderResources.VISIBLE);check(first!=null&&single.begin(RenderResources.VISIBLE)==null,"A second concurrent build waits by default");
+        first.close();check(single.begin(RenderResources.VISIBLE)!=null,"Closing the build frees the slot");
+        var concurrent=new RenderResources(1000,100,100);concurrent.concurrentBuilds(true);
+        var a=concurrent.begin(RenderResources.VISIBLE);var b=concurrent.begin(RenderResources.VISIBLE);check(a!=null&&b!=null,"Opted-in budgets build several meshes at once");
+        check(a.reserve(new int[]{400},RenderResources.VISIBLE)!=null&&b.reserve(new int[]{400},RenderResources.VISIBLE)!=null&&concurrent.usedBytes()==800,"Concurrent builds share one byte budget");
+        var c=concurrent.begin(RenderResources.VISIBLE);check(c.reserve(new int[]{400},RenderResources.VISIBLE)==null,"The shared budget still bounds concurrent builds");
+        a.finish(RenderResources.NEARBY,()->{});c.close();b.finish(RenderResources.NEARBY,()->{});check(concurrent.groups()==2,"Finished concurrent builds stay resident");
         return checks;
     }
 }
