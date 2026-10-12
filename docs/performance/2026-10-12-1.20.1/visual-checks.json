@@ -1,0 +1,14 @@
+[
+  {
+    "height": 65,
+    "equal_pixel_fraction": 1.0,
+    "mean_channel_difference": 0.0,
+    "max_channel_difference": 0
+  },
+  {
+    "height": 40,
+    "equal_pixel_fraction": 0.9999924045138889,
+    "mean_channel_difference": 9.765625e-06,
+    "max_channel_difference": 6
+  }
+]
