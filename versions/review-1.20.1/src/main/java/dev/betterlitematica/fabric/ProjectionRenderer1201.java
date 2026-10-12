@@ -353,10 +353,30 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     void invalidate(){
         discardJob();discardMeshing();palettes.clear();layerRevision++;meshes.close();worldRefresh.clear();editedSections.close();candidates=List.of();candidateSet=Set.of();candidateIndex=Map.of();candidateBoxes=new double[0];candidateArena=new int[0];arenaBoxes=new double[0];candidateVisible=new boolean[0];arenaCull=new byte[0];entityCandidates=List.of();entities.invalidate();visibleKeys.clear();Arrays.fill(lightSprites,null);opaqueStates.clear();failed.clear();deferred.clear();budgetSaturated=false;visibilityDirty=true;nextWorkProbe=0;waitingRevision=-1;visibleSet.clear();queryGeneration++;resolvers.clear();blockEntities.clear();projectionWorld=null;lastCamera=null;failure="";
     }
-    String status(){return "Partial preview (nearby only, max "+MAX_CANDIDATES+" sections) | "+String.format(Locale.ROOT,"mesh=%d, drawn=%d, commands-rebuilt=%d, world-full=%d, world-local=%d, built=%d, off-thread=%d (%d in flight, %.2f ms avg), pages=%d (%.1f MiB), CPU=%.1f MiB, GPU-total=%.1f MiB, queue=%d, build=%.2f ms, unsupported=%d",
+    String status(){return "Partial preview (nearby only, max "+MAX_CANDIDATES+" sections) | "+phaseTimes.text()+" | "+String.format(Locale.ROOT,"mesh=%d, drawn=%d, commands-rebuilt=%d, world-full=%d, world-local=%d, built=%d, off-thread=%d (%d in flight, %.2f ms avg), pages=%d (%.1f MiB), CPU=%.1f MiB, GPU-total=%.1f MiB, queue=%d, build=%.2f ms, unsupported=%d",
         meshes.size(),drawCalls,commandRebuilds,fullWorldRefreshes,localWorldRefreshes,builtSections,meshedSections,meshing.size(),meshedSections==0?0:meshNanos/1e6/meshedSections,pages.pages(),pages.reservedBytes()/1048576.0,stream.cachedBytes()/1048576.0,resources.usedBytes()/1048576.0,stream.queuedJobs(),lastBuildNanos/1e6,resolvers.values().stream().mapToInt(StateResolver1201::unsupportedCount).sum());}
     String error(){return !failure.isEmpty()?failure:!detailsError.isEmpty()?detailsError:!entities.error().isEmpty()?entities.error():stream.error();}
+    /**
+     * Render-thread time of this renderer, per phase, over the last complete second: average and worst frame in
+     * milliseconds. Frame-time spikes can then be split into projection work and everything else.
+     */
+    private static final class PhaseTimes {
+        private final long[] total=new long[3],worst=new long[3],current=new long[3],reported=new long[6];private long second=-1;private int frames,reportedFrames;
+        void add(int phase,long nanos){current[phase]+=nanos;}
+        void frame(){
+            long now=System.nanoTime()/1_000_000_000L;
+            for(int i=0;i<3;i++){total[i]+=current[i];worst[i]=Math.max(worst[i],current[i]);current[i]=0;}frames++;
+            if(now!=second){if(second>=0){for(int i=0;i<3;i++){reported[i]=frames==0?0:total[i]/frames;reported[3+i]=worst[i];}reportedFrames=frames;}second=now;Arrays.fill(total,0);Arrays.fill(worst,0);frames=0;}
+        }
+        String text(){return String.format(Locale.ROOT,"render-thread ms avg/max: prepare=%.2f/%.2f, build=%.2f/%.2f, draw=%.2f/%.2f over %d frames",
+            reported[0]/1e6,reported[3]/1e6,reported[1]/1e6,reported[4]/1e6,reported[2]/1e6,reported[5]/1e6,reportedFrames);}
+    }
+    private final PhaseTimes phaseTimes=new PhaseTimes();
     void prepareFrame(WorldRenderContext context,boolean active){
+        phaseTimes.frame();long started=System.nanoTime();
+        try{prepareFrameTimed(context,active);}finally{phaseTimes.add(0,System.nanoTime()-started);}
+    }
+    private void prepareFrameTimed(WorldRenderContext context,boolean active){
         settleLayer();
         stream.drain();drawCalls=0;lastBuildNanos=0;frameReady=active&&visible&&client.world!=null;prefetchedThisFrame=false;frameMissingWork=false;holesExhausted=visibleRefreshExhausted=surroundingExhausted=false;
         // Disk workers can finish between frames. Wake builds on admitted data instead of
@@ -430,6 +450,10 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         }catch(RuntimeException e){frameReady=false;failure="Renderer paused: "+e;visible=false;discardJob();discardMeshing();BetterLitematicaClient.LOGGER.error("Projection visibility failed",e);}
     }
     @Override public RenderScheduler.Work buildFrame(long deadline,int uploadLimit){
+        long started=System.nanoTime();
+        try{return buildFrameTimed(deadline,uploadLimit);}finally{phaseTimes.add(1,System.nanoTime()-started);}
+    }
+    private RenderScheduler.Work buildFrameTimed(long deadline,int uploadLimit){
         if(!frameReady||System.nanoTime()>=deadline||uploadLimit<=0)return RenderScheduler.Work.NONE;
         long started=System.nanoTime();frameUploadBytes=0;frameUploadLimit=uploadLimit;boolean progressed=false;
         try{
@@ -481,7 +505,10 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         finally{lastBuildNanos+=System.nanoTime()-started;}
     }
     void drawFrame(WorldRenderContext context){
-        if(!frameReady)return;
+        if(!frameReady)return;long started=System.nanoTime();
+        try{drawFrameTimed(context);}finally{phaseTimes.add(2,System.nanoTime()-started);}
+    }
+    private void drawFrameTimed(WorldRenderContext context){
         try{renderMeshes(context,context.camera().getPos(),visibleKeys);entities.render(context,entityCandidates,opacity);}
         catch(RuntimeException e){failure="Renderer paused: "+e;visible=false;frameReady=false;discardJob();discardMeshing();BetterLitematicaClient.LOGGER.error("Projection draw failed",e);}
     }
