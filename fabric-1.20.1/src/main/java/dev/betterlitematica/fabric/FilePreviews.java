@@ -61,7 +61,7 @@ final class FilePreviews implements AutoCloseable {
     private Preview load(TemporarySources.Reference reference,boolean interactive,Map<String,RegionPlacement> regions,Cancellation cancel)throws IOException{
             Path source=reference.read();var stamp=Files.readAttributes(source,BasicFileAttributes.class);
             if(stamp.size()>SchematicImporter.MAX_SOURCE_BYTES)throw new IOException("投影超过预览读取上限");
-            String sha=SchematicImporter.sha256(source,cancel),key=SchematicPreview.configuredKey(sha,regions);
+            String sha=SchematicImporter.sha256(source,cancel),key=SourceVersions.previewKey(SchematicPreview.configuredKey(sha,regions));
             var detailSource=new DetailSource(reference,regions,sha,key,stamp);
             SchematicPreview.Images images=null;
             try{images=cache.read(key,cancel);}catch(InterruptedIOException e){throw e;}catch(IOException e){BetterLitematicaClient.LOGGER.debug("Preview cache unavailable",e);}
@@ -71,7 +71,7 @@ final class FilePreviews implements AutoCloseable {
             if(images!=null&&(!interactive||model!=null)){unchanged(source,stamp);return new Preview(images,model,detailSource);}
             Map<String,Object> root=NbtReader.readPartial(source,SchematicImporter.SOURCE_LIMITS,cancel,FilePreviews::omitAuxiliary);
             sourceReads.incrementAndGet();
-            if(regions.isEmpty()&&(images==null||interactive&&model==null)){
+            if(regions.isEmpty()&&(images==null||interactive&&model==null)&&!SourceVersions.requiresFiltering(root,cancel)){
                 var saved=EmbeddedPreviewCache.read(root,cancel);
                 if(saved!=null){if(images==null){images=saved.images();embedded.incrementAndGet();}if(interactive&&model==null&&saved.model()!=null){model=saved.model();modelHits.incrementAndGet();}}
             }
@@ -104,11 +104,11 @@ final class FilePreviews implements AutoCloseable {
         return submit(cancel->{
             Cancellation together=()->cancel.cancelled()||owner.cancelled();together.check();
             PreviewSourceArrays.materialize(root,together);
-            var saved=EmbeddedPreviewCache.read(root,together);
+            var saved=SourceVersions.requiresFiltering(root,together)?null:EmbeddedPreviewCache.read(root,together);
             SchematicPreview.Images images=saved==null?null:saved.images();
             SchematicPreview.OrbitModel model=saved==null?null:saved.model();
             if(source!=null&&(images==null||model==null)){
-                String key=SchematicImporter.sha256(source,together),digest=SchematicPreview.geometryDigest(root,together);
+                String key=SourceVersions.previewKey(SchematicImporter.sha256(source,together)),digest=SchematicPreview.geometryDigest(root,together);
                 try{
                     var local=orbitCache.read(key,together);
                     if(EmbeddedPreviewCache.matches(local,digest,images)){
@@ -124,7 +124,7 @@ final class FilePreviews implements AutoCloseable {
             EmbeddedPreviewCache.write(root,new EmbeddedPreviewCache.Cached(images,model),preserveEmptyThumbnail,together);return images;
         });
     }
-    void remember(Path source,SchematicPreview.Images images,Cancellation cancel)throws IOException{store(SchematicImporter.sha256(source,cancel),images,cancel);}
+    void remember(Path source,SchematicPreview.Images images,Cancellation cancel)throws IOException{store(SourceVersions.previewKey(SchematicImporter.sha256(source,cancel)),images,cancel);}
     private SchematicPreview.Images generate(SchematicPreview.Geometry geometry,Cancellation cancel)throws IOException{
         var images=SchematicPreview.render(geometry,colors(geometry,cancel),cancel);generated.incrementAndGet();return images;
     }

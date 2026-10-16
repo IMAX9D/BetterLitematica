@@ -1,0 +1,242 @@
+[
+  {
+    "camera": [
+      0.0,
+      139.0,
+      54.0,
+      180.0,
+      0.0
+    ],
+    "occlusion": true,
+    "scene": 0,
+    "image": "scene-00-culled.png"
+  },
+  {
+    "camera": [
+      0.0,
+      139.0,
+      54.0,
+      180.0,
+      0.0
+    ],
+    "occlusion": false,
+    "scene": 0,
+    "image": "scene-00-unculled.png"
+  },
+  {
+    "camera": [
+      54.0,
+      139.0,
+      0.0,
+      90.0,
+      0.0
+    ],
+    "occlusion": true,
+    "scene": 1,
+    "image": "scene-01-culled.png"
+  },
+  {
+    "camera": [
+      54.0,
+      139.0,
+      0.0,
+      90.0,
+      0.0
+    ],
+    "occlusion": false,
+    "scene": 1,
+    "image": "scene-01-unculled.png"
+  },
+  {
+    "camera": [
+      0.0,
+      139.0,
+      -54.0,
+      0.0,
+      0.0
+    ],
+    "occlusion": true,
+    "scene": 2,
+    "image": "scene-02-culled.png"
+  },
+  {
+    "camera": [
+      0.0,
+      139.0,
+      -54.0,
+      0.0,
+      0.0
+    ],
+    "occlusion": false,
+    "scene": 2,
+    "image": "scene-02-unculled.png"
+  },
+  {
+    "camera": [
+      -54.0,
+      139.0,
+      0.0,
+      -90.0,
+      0.0
+    ],
+    "occlusion": true,
+    "scene": 3,
+    "image": "scene-03-culled.png"
+  },
+  {
+    "camera": [
+      -54.0,
+      139.0,
+      0.0,
+      -90.0,
+      0.0
+    ],
+    "occlusion": false,
+    "scene": 3,
+    "image": "scene-03-unculled.png"
+  },
+  {
+    "camera": [
+      0.0,
+      138.0,
+      5.0,
+      180.0,
+      0.0
+    ],
+    "occlusion": true,
+    "scene": 4,
+    "image": "scene-04-culled.png"
+  },
+  {
+    "camera": [
+      0.0,
+      138.0,
+      5.0,
+      180.0,
+      0.0
+    ],
+    "occlusion": false,
+    "scene": 4,
+    "image": "scene-04-unculled.png"
+  },
+  {
+    "camera": [
+      -16.01,
+      138.0,
+      -16.01,
+      135.0,
+      0.0
+    ],
+    "occlusion": true,
+    "scene": 5,
+    "image": "scene-05-culled.png"
+  },
+  {
+    "camera": [
+      -16.01,
+      138.0,
+      -16.01,
+      135.0,
+      0.0
+    ],
+    "occlusion": false,
+    "scene": 5,
+    "image": "scene-05-unculled.png"
+  },
+  {
+    "camera": [
+      16.01,
+      138.0,
+      16.01,
+      -45.0,
+      0.0
+    ],
+    "occlusion": true,
+    "scene": 6,
+    "image": "scene-06-culled.png"
+  },
+  {
+    "camera": [
+      16.01,
+      138.0,
+      16.01,
+      -45.0,
+      0.0
+    ],
+    "occlusion": false,
+    "scene": 6,
+    "image": "scene-06-unculled.png"
+  },
+  {
+    "camera": [
+      0.0,
+      168.0,
+      0.0,
+      0.0,
+      90.0
+    ],
+    "occlusion": true,
+    "scene": 7,
+    "image": "scene-07-culled.png"
+  },
+  {
+    "camera": [
+      0.0,
+      168.0,
+      0.0,
+      0.0,
+      90.0
+    ],
+    "occlusion": false,
+    "scene": 7,
+    "image": "scene-07-unculled.png"
+  },
+  {
+    "camera": [
+      0.0,
+      969.0,
+      0.0,
+      0.0,
+      90.0
+    ],
+    "occlusion": true,
+    "scene": 8,
+    "image": "scene-08-culled.png"
+  },
+  {
+    "camera": [
+      0.0,
+      969.0,
+      0.0,
+      0.0,
+      90.0
+    ],
+    "occlusion": false,
+    "scene": 8,
+    "image": "scene-08-unculled.png"
+  },
+  {
+    "camera": [
+      0.0,
+      -70.0,
+      0.0,
+      0.0,
+      -90.0
+    ],
+    "occlusion": true,
+    "scene": 9,
+    "image": "scene-09-culled.png"
+  },
+  {
+    "camera": [
+      0.0,
+      -70.0,
+      0.0,
+      0.0,
+      -90.0
+    ],
+    "occlusion": false,
+    "scene": 9,
+    "image": "scene-09-unculled.png"
+  }
+]

@@ -640,8 +640,10 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                 else if(now-finishing.waitingSince>500_000_000L){deferred.add(finishing.task.input.key);result=DROPPED;}
                 if(result==WAIT)break;
             }
-            var done=finishing;finishing=null;meshing.remove(done.task.input.key);done.task.ticket.close();progressed=true;finished++;nextWorkProbe=0;
-            if(result==DROPPED){done.out.free();if(done.group!=null)done.group.close();}
+            var done=finishing;finishing=null;meshing.remove(done.task.input.key);
+            // Meshes own immutable cell snapshots; return staging buffers on success as well as cancellation.
+            done.out.free();done.task.ticket.close();progressed=true;finished++;nextWorkProbe=0;
+            if(result==DROPPED&&done.group!=null)done.group.close();
         }
         return progressed;
     }

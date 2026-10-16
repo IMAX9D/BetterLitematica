@@ -16,6 +16,7 @@ final class FileMaterials {
         long end=System.nanoTime()+2_000_000L;int budget=256;
         while(cursor<counts.length&&budget-->0&&System.nanoTime()<end){
             int id=cursor++;if(counts[id]==0)continue;var state=resolver.resolve(id);
+            if(state.is(net.minecraft.world.level.block.Blocks.STRUCTURE_VOID))continue;
             if(resolver.unresolved(id)){unsupported+=counts[id];continue;}
             for(var need:BuildMaterials.forState(state))totals.merge(need.item(),Math.multiplyExact(counts[id],need.count()),Math::addExact);
         }

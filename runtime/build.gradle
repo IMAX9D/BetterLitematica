@@ -1,1 +1,5 @@
-dependencies { api project(':core'); api project(':blueprint-io') }
+dependencies {
+    api project(':core'); api project(':blueprint-io')
+    // Minecraft supplies JNA on every supported target; compile against the oldest bundled API.
+    compileOnly 'net.java.dev.jna:jna-platform:5.9.0'
+}

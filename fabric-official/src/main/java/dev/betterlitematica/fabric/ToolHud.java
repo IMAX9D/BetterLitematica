@@ -15,8 +15,9 @@ final class ToolHud {
     private long epoch=Long.MIN_VALUE;
 
     boolean visible(Minecraft client,ProjectionController controller) {
+        var mode=controller.editor().active()?ToolMode.REBUILD:controller.tool().mode();
         return ToolHudData.visible(client.player!=null,HudLayout.menuHidesHud(ClientUi.screen(client)),ClientUi.hidden(client),
-            controller.toolRenderingEnabled(),controller.tool().held(),controller.tool().mode());
+            controller.toolRenderingEnabled(),controller.tool().held(),mode);
     }
     private void snapshot(ProjectionController controller) {
         var next=controller.tool().hudData();

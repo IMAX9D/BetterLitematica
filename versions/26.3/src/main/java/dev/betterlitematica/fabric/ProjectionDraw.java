@@ -17,11 +17,12 @@ final class ProjectionDraw {
  private record Draw(ProjectionGpuMesh mesh,RenderPipeline pipeline,Matrix4f view,Matrix4f projection,Identifier texture,GpuTextureView direct,float opacity,int intensity,int red,boolean mask,boolean near,ProjectionClip clip,ProjectionComposite target,int[] ranges){}
  static void beginFrame(){clear();composite=null;EntityOverlayMask.prepare();}
  static void target(ProjectionComposite value){composite=value;}
+ static void page(ProjectionGpuMesh mesh,Matrix4f view,Matrix4f projection,float opacity,boolean red,int[] ranges){add(mesh,ProjectionShaders.SURFACE,view,projection,net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS,null,opacity,0,red?1:0,false,false,ranges);}
  static void command(Runnable action){if(commands.size()>=MAX_COMMANDS)throw new IllegalStateException("投影绘制指令超过预算");commands.add(action);}
  static boolean surface(ProjectionGpuMesh mesh,Matrix4f view,Matrix4f projection,Identifier texture,boolean intensity,float opacity,QuadVisibility.Part geometry,QuadVisibility.Mask hidden,QuadVisibility.Mask wrong,boolean red){int[] selected=null;if(geometry!=null){int count=geometry.rangeCount(hidden,wrong,red);if(count==0)return false;selected=new int[count*2];for(int i=0;i<count;i++){selected[i*2]=geometry.firstQuad(i)*6;selected[i*2+1]=geometry.quadCount(i)*6;}}add(mesh,ProjectionShaders.SURFACE,view,projection,texture,null,opacity,intensity?1:0,red?1:0,false,false,selected);return true;}
  static void overlay(ProjectionGpuMesh mesh,Matrix4f projection,boolean face,boolean through,boolean near){add(mesh,ProjectionShaders.overlay(face,through?1:0),new Matrix4f(),projection,null,null,1,0,0,through,near,null);}
  static void blit(ProjectionGpuMesh mesh,GpuTextureView texture,float opacity){add(mesh,ProjectionShaders.COMPOSITE,new Matrix4f(),new Matrix4f(),null,texture,opacity,0,0,false,false,null);}
- private static void add(ProjectionGpuMesh mesh,RenderPipeline pipeline,Matrix4f view,Matrix4f projection,Identifier texture,GpuTextureView direct,float opacity,int intensity,int red,boolean mask,boolean near,int[] selected){int size=selected==null?0:selected.length;if(commands.size()>=MAX_COMMANDS||ranges+size>MAX_RANGE_INTS)throw new IllegalStateException("投影绘制指令超过预算");mesh.retain();commands.add(new Draw(mesh,pipeline,new Matrix4f(view),new Matrix4f(projection),texture,direct,opacity,intensity,red,mask,near,ProjectionClip.current,composite,selected));ranges+=size;}
+ private static void add(ProjectionGpuMesh mesh,RenderPipeline pipeline,Matrix4f view,Matrix4f projection,Identifier texture,GpuTextureView direct,float opacity,int intensity,int red,boolean mask,boolean near,int[] selected){if(pipeline==ProjectionShaders.SURFACE)ProjectionComposite.activate();int size=selected==null?0:selected.length;if(commands.size()>=MAX_COMMANDS||ranges+size>MAX_RANGE_INTS)throw new IllegalStateException("投影绘制指令超过预算");mesh.retain();commands.add(new Draw(mesh,pipeline,new Matrix4f(view),new Matrix4f(projection),texture,direct,opacity,intensity,red,mask,near,ProjectionClip.current,composite,selected));ranges+=size;}
 
  private static final class Batch implements AutoCloseable {
   final com.mojang.blaze3d.pipeline.RenderTarget target;
@@ -35,6 +36,9 @@ final class ProjectionDraw {
   int stride=(UNIFORM_BYTES+alignment-1)/alignment*alignment;
   int draws=(int)commands.stream().filter(Draw.class::isInstance).count();
   if(draws==0){try{for(var value:commands)if(value instanceof Runnable action)action.run();}finally{clear();}return;}
+  // Extraction's base projection excludes walking/hurt/nausea transforms. At this world-pass
+  // boundary the vanilla buffer contains the final matrix used by terrain, on both backends.
+  var worldProjection=RenderSystem.getProjectionMatrixBuffer();
   var data=MemoryUtil.memCalloc(Math.multiplyExact(draws,stride));GpuBuffer uniforms=null;Batch batch=null;
   try{
    int index=0;
@@ -53,7 +57,8 @@ final class ProjectionDraw {
     var draw=(Draw)value;var target=draw.target==null?ClientUi.target(client):draw.target.target();
     if(batch==null||batch.target!=target){if(batch!=null)batch.close();batch=new Batch(target);}
     var pass=batch.pass;pass.setPipeline(RenderSystem.getCompiledPipeline(draw.pipeline));
-    pass.setUniform("Projection",uniforms.slice((long)index++*stride,UNIFORM_BYTES));pass.setVertexBuffer(0,draw.mesh.vertices.slice());
+    pass.setUniform("Projection",uniforms.slice((long)index++*stride,UNIFORM_BYTES));
+    if(draw.pipeline!=ProjectionShaders.COMPOSITE)pass.setUniform("WorldProjection",worldProjection);pass.setVertexBuffer(0,draw.mesh.vertices.slice());
     var indices=RenderSystem.getSequentialBuffer(draw.mesh.mode);var indexBuffer=indices.getBuffer(draw.mesh.indexCount);pass.setIndexBuffer(indexBuffer,indices.type());
     if(draw.texture!=null){var texture=client.getTextureManager().getTexture(draw.texture);pass.setUniform("Sampler0",texture.getTextureView(),texture.getSampler());}
     else if(draw.direct!=null)pass.setUniform("Sampler0",draw.direct,RenderSystem.getSamplerCache().getClampToEdge(com.mojang.renderpearl.api.textures.FilterMode.NEAREST));

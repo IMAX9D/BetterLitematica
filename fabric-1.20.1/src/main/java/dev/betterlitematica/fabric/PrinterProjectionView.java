@@ -31,7 +31,16 @@ final class PrinterProjectionView implements Function<Vec3i,ProjectionController
         if(section.overflow())return UNKNOWN;
         for(var part:section.pending())if(part.contains(world))return UNKNOWN;
         var cell=scene.sample(section.ready(),world);
-        if(cell==null)return OUTSIDE;
+        if(cell==null){
+            // A discarded source cell is excluded even from ALL/SELECTION fill and fluid modes.
+            // Returning ordinary OUTSIDE here would allow those modes to act on it.
+            for(var part:section.ready()){
+                var r=part.renderer();if(r.metadata().compatibility().skippedBlockTypes()==0||!part.region().contains(world))continue;
+                var local=part.region().local(world);int id=r.sampleRaw(part.region().section(local),part.region().cell(local));
+                if(id>=0&&r.metadata().palette().get(id).equals(dev.betterlitematica.io.SourceVersions.SKIPPED))return null;
+            }
+            return OUTSIDE;
+        }
         var renderer=cell.renderer();return cell.unknown()||renderer.resolver(cell.region().index()).unresolved(cell.id())?UNKNOWN:new ProjectionController.PrinterSample(true,renderer.resolve(cell.region().index(),cell.id()));
     }
     private Section section(Vec3i key){

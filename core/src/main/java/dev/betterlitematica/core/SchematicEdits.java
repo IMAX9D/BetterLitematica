@@ -106,7 +106,7 @@ public final class SchematicEdits {
         var sections=updated(snapshot.sections(),deltas,false);
         if(sections.size()>MAX_SECTIONS)throw new IllegalArgumentException("编辑范围过大，请先另存投影");
         var palette=new ArrayList<>(snapshot.metadata().palette());palette.addAll(added.keySet());
-        var metadata=added.isEmpty()?snapshot.metadata():new BlueprintMetadata(original.name(),original.dataVersion(),original.sourceSha256(),palette,original.regions(),original.warnings());
+        var metadata=added.isEmpty()?snapshot.metadata():new BlueprintMetadata(original.name(),original.dataVersion(),original.sourceSha256(),palette,original.regions(),original.warnings(),original.compatibility());
         if(counts.length<palette.size())counts=Arrays.copyOf(counts,palette.size());
         applyCounts(deltas,false);ids.putAll(added);for(var state:added.keySet())metadataBytes+=stateBytes(state);cells=nextCount;snapshot=new Snapshot(metadata,sections,snapshot.revision()+1);cachedCheckpoint=null;
         for(var action:redo)historyCells-=action.values().size();redo.clear();

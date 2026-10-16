@@ -1,6 +1,8 @@
 #version 330
 #extension GL_ARB_separate_shader_objects : require
 #include <betterlitematica:projection.glsl>
+// Same final camera transform as the terrain pass, including view bobbing.
+layout(std140) uniform WorldProjection { mat4 WorldProjMat; };
 layout(location=0) in vec3 Position;
 layout(location=1) in vec2 UV0;
 layout(location=2) in vec4 Color;
@@ -24,6 +26,6 @@ void main() {
     } else {
         vertexColor = Color;
     }
-    gl_Position = ProjMat * viewPosition;
+    gl_Position = WorldProjMat * viewPosition;
     texCoord = UV0;
 }

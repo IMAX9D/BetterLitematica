@@ -831,6 +831,7 @@ public final class CoreTests {
                 check(UiViewport.fit(1920,1008,480,252,4).scale()*9>=20,"1080-class window text nominal height at least 20 physical pixels");
                 expect(IllegalArgumentException.class,()->UiViewport.fit(1920,1080,640,360,Double.NaN));
             });
+            test("cross-version loading discards unsupported cells safely",()->{checks+=CompatibilityChecks.run(temp.resolve("compatibility"));});
             test("source bytes were never overwritten",()->{check(SchematicImporter.sha256(source,Cancellation.NEVER).equals(expectedHash),"Original checksum unchanged");});
             System.out.printf(Locale.ROOT,"RESULT: %d tests passed; %,d assertions; %.3f seconds%n",tests,checks,(System.nanoTime()-started)/1e9);
         }finally{try(var walk=Files.walk(temp)){for(Path p:walk.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(p);}}

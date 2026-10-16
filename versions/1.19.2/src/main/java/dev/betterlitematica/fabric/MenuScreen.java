@@ -28,7 +28,7 @@ abstract class MenuScreen extends Screen {
     private BlueprintPreviewPanel previewCapture;
     private ClickableWidget pendingFocus;
     private ButtonWidget back;
-    private ClickableWidget hintTarget;private long hintSince;
+    private ClickableWidget hintTarget;private long hintSince;private String lastDynamicHint="";
     private static final long HINT_DELAY=350_000_000L;
     MenuScreen(String title,String description,Screen parent,ProjectionController controller,boolean wide){super(Text.literal(title));this.description=description;this.parent=parent;this.controller=controller;this.wide=wide;sessionEpoch=controller.sessionEpoch();}
     @Override protected final void init(){
@@ -265,11 +265,17 @@ abstract class MenuScreen extends Screen {
         String status=displayedStatus();
         if(!status.isEmpty()){int color=statusColor();boolean compact=footerHeight()<49;double sx=left+(compact?88:0),sy=compact?footerTop+(footerHeight()-ui.lineHeight())/2-.5:panelBottom-15;ui.roundRect(sx,sy+ui.lineHeight()/2-1.5,sx+3,sy+ui.lineHeight()/2+1.5,1.5,color==UiTheme.MUTED?UiTheme.ACCENT:color);ui.text(status,sx+8,sy,innerWidth-(compact?184:8),color);}
         // Tooltips wait for a short rest on one control so sweeping the pointer across icons stays quiet.
-        ClickableWidget resting=null;
+        ClickableWidget resting=null;String dynamicHint="";
         for(var entry:hints.entrySet())if(entry.getKey().visible&&entry.getKey().isMouseOver(mouseX,mouseY)){resting=entry.getKey();break;}
         if(resting==null)for(var item:body)if(item.widget.visible&&item.widget instanceof MenuButton&&item.widget.isMouseOver(mouseX,mouseY)){resting=item.widget;break;}
-        long now=System.nanoTime();if(resting!=hintTarget){hintTarget=resting;hintSince=now;}
+        if(resting==null)for(var item:body)if(item.widget.visible&&item.widget instanceof OverlayList list){var text=list.warningAt(mouseX,mouseY);if(!text.isEmpty()){resting=list;dynamicHint=text;break;}}
+        long now=System.nanoTime();if(resting!=hintTarget||!dynamicHint.equals(lastDynamicHint)){hintTarget=resting;hintSince=now;lastDynamicHint=dynamicHint;}
         if(resting==null||now-hintSince<HINT_DELAY)return;
+        if(!dynamicHint.isEmpty()){
+            String[] lines=dynamicHint.split("\n");double w=Math.min(width-16,Arrays.stream(lines).mapToDouble(ui::measure).max().orElse(0)+20),h=lines.length*(ui.lineHeight()+2)+10;
+            double x=Math.max(8,Math.min(width-w-8,mouseX+12)),y=Math.max(8,Math.min(height-h-8,mouseY+16));
+            tooltip(ui,x,y,w,h);for(int i=0;i<lines.length;i++)ui.text(lines[i],x+9,y+5+i*(ui.lineHeight()+2),w-18,UiTheme.TEXT);return;
+        }
         for(var entry:hints.entrySet())if(entry.getKey()==resting&&(!(entry.getKey() instanceof BlueprintPreviewPanel panel)||!panel.capturing()&&!panel.recentlyUsed())){
             String[] lines=entry.getValue().split("\n");double w=Arrays.stream(lines).mapToDouble(ui::measure).max().orElse(0)+20,h=lines.length*(ui.lineHeight()+2)+10;
             double x=Math.max(8,Math.min(width-w-8,entry.getKey().x+entry.getKey().getWidth()/2d-w/2)),y=entry.getKey().y-h-6;if(y<8)y=entry.getKey().y+entry.getKey().getHeight()+6;

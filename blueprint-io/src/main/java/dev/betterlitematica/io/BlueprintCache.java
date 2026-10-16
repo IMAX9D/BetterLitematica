@@ -22,8 +22,9 @@ public final class BlueprintCache implements AutoCloseable {
     public static BlueprintCache open(Path path)throws IOException {
         RandomAccessFile in=new RandomAccessFile(path.toFile(),"r");
         try{
-            if(in.readInt()!=MAGIC||in.readInt()!=VERSION)throw new IOException("Unsupported BPC cache format");
-            long directory=in.readLong();BlueprintMetadata meta=readMetadata(in);long payloadStart=in.getFilePointer();
+            if(in.readInt()!=MAGIC)throw new IOException("Unsupported BPC cache format");int version=in.readInt();
+            if(version!=VERSION&&version!=3)throw new IOException("Unsupported BPC cache format");
+            long directory=in.readLong();BlueprintMetadata meta=readMetadata(in,version);long payloadStart=in.getFilePointer();
             if(directory<payloadStart||directory>in.length()-4)throw new IOException("Invalid BPC directory offset");
             in.seek(directory);int n=bounded(in.readInt(),0,MAX_SECTIONS,"section count");
             long expectedEnd=directory+4L+36L*n+8L*meta.palette().size();
@@ -96,8 +97,9 @@ public final class BlueprintCache implements AutoCloseable {
             out.writeInt(r.anchor().x());out.writeInt(r.anchor().y());out.writeInt(r.anchor().z());
         }
         out.writeInt(m.warnings().size());for(String w:m.warnings())strings.write(out,w);
+        if(!m.compatibility().equals(ProjectionCompatibility.NONE)){var c=m.compatibility();out.writeInt(c.formatVersion());out.writeInt(c.sourceDataVersion());out.writeInt(c.gameDataVersion());out.writeInt(c.skippedBlockTypes());}
     }
-    private static BlueprintMetadata readMetadata(DataInput in)throws IOException {
+    private static BlueprintMetadata readMetadata(DataInput in,int cacheVersion)throws IOException {
         MetadataStrings strings=new MetadataStrings();
         String name=strings.read(in);int version=in.readInt();String hash=strings.read(in);
         int n=bounded(in.readInt(),1,65536,"palette size");List<BlockStateSpec> palette=new ArrayList<>(n);
@@ -105,7 +107,8 @@ public final class BlueprintCache implements AutoCloseable {
         n=bounded(in.readInt(),1,1024,"region count");List<Region> regions=new ArrayList<>(n);
         for(int i=0;i<n;i++)regions.add(new Region(strings.read(in),new Vec3i(in.readInt(),in.readInt(),in.readInt()),new Vec3i(in.readInt(),in.readInt(),in.readInt()),new Vec3i(in.readInt(),in.readInt(),in.readInt())));
         n=bounded(in.readInt(),0,1024,"warning count");List<String>warnings=new ArrayList<>(n);for(int i=0;i<n;i++)warnings.add(strings.read(in));
-        return new BlueprintMetadata(name,version,hash,palette,regions,warnings);
+        var compatibility=cacheVersion>=3?new ProjectionCompatibility(in.readInt(),in.readInt(),in.readInt(),in.readInt()):ProjectionCompatibility.NONE;
+        return new BlueprintMetadata(name,version,hash,palette,regions,warnings,compatibility);
     }
     public static final class Writer implements AutoCloseable {
         private final Path temporary,target;private final RandomAccessFile out;private final BlueprintMetadata metadata;
@@ -116,7 +119,7 @@ public final class BlueprintCache implements AutoCloseable {
             this.target=target.toAbsolutePath();this.metadata=metadata;counts=new long[metadata.palette().size()];activeCounts=new long[counts.length];
             Files.createDirectories(this.target.getParent());temporary=Files.createTempFile(this.target.getParent(),"bpc-",".part");
             RandomAccessFile handle=null;
-            try{handle=new RandomAccessFile(temporary.toFile(),"rw");handle.writeInt(MAGIC);handle.writeInt(VERSION);handle.writeLong(0);writeMetadata(handle,metadata);out=handle;}
+            try{handle=new RandomAccessFile(temporary.toFile(),"rw");handle.writeInt(MAGIC);handle.writeInt(metadata.compatibility().equals(ProjectionCompatibility.NONE)?VERSION:3);handle.writeLong(0);writeMetadata(handle,metadata);out=handle;}
             catch(IOException|RuntimeException e){if(handle!=null)handle.close();Files.deleteIfExists(temporary);throw e;}
         }
         public void count(int globalId){count(0,globalId);}

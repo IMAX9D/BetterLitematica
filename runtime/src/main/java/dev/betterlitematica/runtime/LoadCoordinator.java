@@ -64,7 +64,7 @@ public final class LoadCoordinator implements AutoCloseable {
             Cancellation cancel=()->Thread.currentThread().isInterrupted()||outdated(epoch);
             var result=SchematicImporter.importFile(source,directory,cancel,p->publishStatus(epoch,new Status(p.phase(),p.completed(),p.total(),"")));
             cancel.check();cache=BlueprintCache.open(result.path());SpatialIndex index=new SpatialIndex(cache,cancel);cancel.check();AuxiliaryData details=null;String detailsError="";
-            try{details=AuxiliaryData.read(source,cache.metadata(),cancel);}catch(java.io.InterruptedIOException e){throw e;}catch(IOException|RuntimeException e){detailsError=e.toString();}cancel.check();
+            try{details=AuxiliaryData.read(source,cache,cancel);}catch(java.io.InterruptedIOException e){throw e;}catch(IOException|RuntimeException e){detailsError=e.toString();}cancel.check();
             Loaded prepared=new Loaded(cache,index,details,detailsError,result.cacheHit(),result.elapsedNanos());cache=null;
             synchronized(this){if(!closed&&epoch==generation){completed=prepared;status=new Status("ready",1,1,"");}else closeQuietly(prepared);}
         }catch(IOException|RuntimeException e){publishStatus(epoch,new Status(e instanceof InterruptedIOException?"cancelled":"failed",0,0,e.toString()));}

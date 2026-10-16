@@ -138,7 +138,7 @@ public final class SchematicPreview {
     }
     private static Parsed parse(Map<String,Object> input,Cancellation cancel,boolean paletteNeeded)throws IOException{
         cancel.check();Map<String,Object> root=SchematicFormats.canonical(input,cancel);
-        int version=NbtReader.integer(root,"Version");if(version!=5&&version!=6)throw new IOException("Unsupported preview source version");
+        int version=NbtReader.integer(root,"Version");SourceVersions.requireLitematicVersion(version);
         int dataVersion=NbtReader.integer(root,"MinecraftDataVersion");var regions=NbtReader.compound(root.get("Regions"),"Regions");if(regions.isEmpty()||regions.size()>1024)throw new IOException("Invalid preview regions");
         MessageDigest digest=sha();var hash=new DigestOutputStream(OutputStream.nullOutputStream(),digest);var out=new DataOutputStream(hash);
         out.writeInt(VERSION);out.writeInt(version);out.writeInt(dataVersion);out.writeInt(regions.size());
@@ -155,9 +155,10 @@ public final class SchematicPreview {
                 int[] mapping=new int[palette.size()];Arrays.fill(mapping,-1);out.writeInt(palette.size());
                 for(int i=0;i<palette.size();i++){
                     if((i&255)==0)cancel.check();var state=NbtReader.compound(palette.get(i),"State");String name=NbtReader.string(state,"Name","");var props=new TreeMap<String,String>();
+                    if(SourceVersions.skipUnknown(SourceVersions.Kind.STATE,name,dataVersion)){string(out,name);out.writeInt(0);continue;}
                     if(state.containsKey("Properties"))for(var prop:NbtReader.compound(state.get("Properties"),"Properties").entrySet()){if(!(prop.getValue() instanceof String text))throw new IOException("Invalid preview state property");props.put(prop.getKey(),text);}
                     string(out,name);out.writeInt(props.size());for(var prop:props.entrySet()){string(out,prop.getKey());string(out,prop.getValue());}
-                    if(paletteNeeded){var spec=SourceVersions.state(new BlockStateSpec(name,props),dataVersion);if(visible(spec)){Integer id=global.get(spec);if(id==null){if(global.size()==MAX_PALETTE)throw new IOException("Preview combined palette exceeds limit");id=global.size();global.put(spec,id);}mapping[i]=id;}}
+                    if(paletteNeeded){var spec=SourceVersions.readState(state,dataVersion).state();if(visible(spec)){Integer id=global.get(spec);if(id==null){if(global.size()==MAX_PALETTE)throw new IOException("Preview combined palette exceeds limit");id=global.size();global.put(spec,id);}mapping[i]=id;}}
                 }
                 if(!(tag.get("BlockStates") instanceof long[] words))throw new IOException("Missing preview packed states");int bits=Math.max(2,32-Integer.numberOfLeadingZeros(palette.size()-1));var packed=PackedBits.takeOwnership(bits,Math.toIntExact(r.volume()),words);out.writeInt(words.length);
                 for(int i=0;i<words.length;){cancel.check();int count=Math.min(wordsBuffer.length/8,words.length-i);for(int k=0;k<count;k++){long word=words[i++];for(int byteIndex=0;byteIndex<8;byteIndex++)wordsBuffer[k*8+byteIndex]=(byte)(word>>>(56-byteIndex*8));}out.write(wordsBuffer,0,count*8);}

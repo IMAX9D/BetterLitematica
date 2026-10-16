@@ -8,7 +8,10 @@ import java.util.function.Consumer;
 
 /** Virtual scrolling list with one identity per row and keyboard selection. */
 final class OverlayList extends ButtonWidget {
-    record Row(String id,String name,boolean enabled){}
+    record Row(String id,String name,boolean enabled,dev.betterlitematica.core.ProjectionCompatibility compatibility){
+        Row(String id,String name,boolean enabled){this(id,name,enabled,dev.betterlitematica.core.ProjectionCompatibility.NONE);}
+    }
+    String warningAt(double x,double y){int index=hit(x,y);return index<0?"":rows.get(index).compatibility().description();}
     private List<Row> rows=List.of();private String selected;private final Consumer<String> choose;private double scroll;private boolean dragging;private int hovered=-1;private long since;
     private static final int ROW=26;
     private final Map<String,UiMotion> motion=new LinkedHashMap<>();
@@ -31,7 +34,8 @@ final class OverlayList extends ButtonWidget {
         ui.clip(getX(),getY(),getX()+width,getY()+height);try{int start=(int)(scroll/ROW),end=Math.min(rows.size(),(int)Math.ceil((scroll+height)/ROW));for(int i=start;i<end;i++){var row=rows.get(i);double y=getY()+i*ROW-scroll;boolean chosen=Objects.equals(row.id(),selected);var animation=motion(row.id());double over=animation.hover(i==h&&active);int fill=chosen?UiMotion.mix(UiTheme.SELECTED,UiTheme.PRESSED,over*.6):UiMotion.alpha(UiTheme.HOVER,over);fill=UiMotion.mix(fill,UiTheme.PRESSED,animation.pressed()*.6);if((fill>>>24)!=0)ui.roundRect(getX(),y,getX()+width-9,y+ROW-4,UiTheme.BUTTON_RADIUS,fill);
                 if(chosen)ui.roundRect(getX()+1,y+5,getX()+3,y+ROW-9,1,UiTheme.ACCENT);
                 if(chosen&&isFocused())ui.roundFrame(getX(),y,getX()+width-9,y+ROW-4,UiTheme.BUTTON_RADIUS,UiTheme.ACCENT);
-                if(row.enabled())ui.roundRect(getX()+7,y+9.5,getX()+11,y+13.5,2,chosen?UiTheme.ACCENT:UiTheme.MUTED);else ui.roundFrame(getX()+7,y+9.5,getX()+11,y+13.5,2,UiTheme.DISABLED_TEXT);double x=getX()+18,space=width-33;ui.clip(x,y+1,getX()+width-12,y+ROW-5);try{if(i==h&&ui.measure(row.name())>space)ui.rawText(row.name(),x-BrowserGrid.marqueeOffset(ui.measure(row.name())-space,(System.nanoTime()-since)/1e9),y+(ROW-4-ui.lineHeight())/2-.5,UiTheme.TEXT);else ui.text(row.name(),x,y+(ROW-4-ui.lineHeight())/2-.5,space,chosen?UiTheme.TEXT:UiTheme.SECONDARY);}finally{ui.unclip();}}
+                if(row.compatibility().incompatible()){ui.roundRect(getX()+8,y+5,getX()+10,y+13,1,UiTheme.WARNING);ui.roundRect(getX()+8,y+15,getX()+10,y+17,1,UiTheme.WARNING);}
+                else if(row.enabled())ui.roundRect(getX()+7,y+9.5,getX()+11,y+13.5,2,chosen?UiTheme.ACCENT:UiTheme.MUTED);else ui.roundFrame(getX()+7,y+9.5,getX()+11,y+13.5,2,UiTheme.DISABLED_TEXT);double x=getX()+18,space=width-33;ui.clip(x,y+1,getX()+width-12,y+ROW-5);try{if(i==h&&ui.measure(row.name())>space)ui.rawText(row.name(),x-BrowserGrid.marqueeOffset(ui.measure(row.name())-space,(System.nanoTime()-since)/1e9),y+(ROW-4-ui.lineHeight())/2-.5,UiTheme.TEXT);else ui.text(row.name(),x,y+(ROW-4-ui.lineHeight())/2-.5,space,chosen?UiTheme.TEXT:UiTheme.SECONDARY);}finally{ui.unclip();}}
         }finally{ui.unclip();}if(maxScroll()>0){double thumb=Math.max(18,height*(double)height/(rows.size()*ROW)),y=getY()+(height-thumb)*scroll/maxScroll();ui.roundRect(getX()+width-4,getY(),getX()+width-2,getY()+height,1,UiMotion.alpha(UiTheme.TRACK,.8));ui.roundRect(getX()+width-4,y,getX()+width-2,y+thumb,1,UiTheme.THUMB);}
     }
 }

@@ -193,7 +193,7 @@ final class PrinterEngine implements AutoCloseable {
         int fillId=Block.getId(fillState);
         while(scan.hasNext()&&n<512&&visited++<2048&&budget.hasTime(System.nanoTime())&&System.nanoTime()-started<1_000_000L){
             var at=scan.next();if(at==null)continue;var pos=new BlockPos(at.x(),at.y(),at.z());if(s.shape==PrinterRange.Shape.SPHERE&&PrinterReach.distanceSquared(eye,pos)>rangeSquared||client.level.isOutsideBuildHeight(pos)||!client.level.getWorldBorder().isWithinBounds(pos))continue;
-            var sample=sampler.apply(at);boolean in=sample!=null&&sample.inside();int scope=0;
+            var sample=sampler.apply(at);if(sample==null)continue;boolean in=sample.inside();int scope=0;
             if((s.print||mining(s))&&scope(at,s.printScope,in)&&in)scope|=1;if(s.fill&&scope(at,s.fillScope,in))scope|=2;if(s.fluid&&scope(at,s.fluidScope,in))scope|=4;if(s.bedrock&&scope(at,s.bedrockScope,in))scope|=8;
             if(scope==0)continue;int i=n++;positions[i]=pos.asLong();scopes[i]=scope;fill[i]=fillId;
             boolean needsProjection=(scope&1)!=0||((scope&8)!=0&&s.bedrockScope==PrinterSettings.Scope.PROJECTION);
@@ -227,7 +227,7 @@ final class PrinterEngine implements AutoCloseable {
         var s=settings();if(!withinRange(pos,s))return false;
         if(!WorldChunks.loaded(client.level,pos)||client.level.isOutsideBuildHeight(pos)||!client.level.getWorldBorder().isWithinBounds(pos))return false;
         if(Block.getId(client.level.getBlockState(pos))!=job.observed()&&!actions.owns(job))return false;
-        var sample=sampler.apply(at);boolean in=sample!=null&&sample.inside();
+        var sample=sampler.apply(at);if(sample==null)return false;boolean in=sample.inside();
         return switch(job.kind()){
             case BREAK->mining(s)&&scope(at,s.printScope,in)&&sample!=null&&sample.state()!=null&&Block.getId(sample.state())==job.expected();
             case PLACE,ADJUST->s.print&&scope(at,s.printScope,in)&&sample!=null&&sample.state()!=null&&Block.getId(sample.state())==job.expected();

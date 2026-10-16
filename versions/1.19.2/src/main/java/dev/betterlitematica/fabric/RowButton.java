@@ -8,7 +8,8 @@ import net.minecraft.text.Text;
 final class RowButton extends ButtonWidget {
     public int getX(){return x;} public int getY(){return y;} public void setX(int value){x=value;} public void setY(int value){y=value;}
 
-    private final boolean selected,live;private final UiMotion motion;private long hoverStart;
+    private final boolean selected,live;private final UiMotion motion;private long hoverStart;private boolean incompatible;
+    void incompatible(boolean value){incompatible=value;}
     RowButton(int x,int width,String name,boolean selected,boolean live,UiMotion motion,Runnable action){
         super(x,0,width,20,Text.literal(name),b->action.run(),EMPTY);this.selected=selected;this.live=live;this.motion=motion;
     }
@@ -21,7 +22,8 @@ final class RowButton extends ButtonWidget {
         if((fill>>>24)!=0)ui.roundRect(x,y,r,b,radius,fill);
         if(selected)ui.roundRect(x+1,y+5,x+3,b-5,1,UiTheme.ACCENT);
         double dot=5,dy=y+(height-dot)/2;
-        if(live)ui.roundRect(x+10,dy,x+10+dot,dy+dot,dot/2,selected?UiTheme.ACCENT:UiTheme.SUCCESS);
+        if(incompatible){ui.roundRect(x+11,y+4,x+13,y+12,1,UiTheme.WARNING);ui.roundRect(x+11,y+14,x+13,y+16,1,UiTheme.WARNING);}
+        else if(live)ui.roundRect(x+10,dy,x+10+dot,dy+dot,dot/2,selected?UiTheme.ACCENT:UiTheme.SUCCESS);
         else ui.roundFrame(x+10,dy,x+10+dot,dy+dot,dot/2,UiTheme.MUTED);
         String name=getMessage().getString();double tx=x+22,space=r-tx-8,ty=y+(height-ui.lineHeight())/2-.5;
         int color=selected?UiTheme.TEXT:UiMotion.mix(UiTheme.SECONDARY,UiTheme.TEXT,hover);

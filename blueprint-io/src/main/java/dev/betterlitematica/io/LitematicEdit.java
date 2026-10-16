@@ -17,7 +17,7 @@ public final class LitematicEdit {
     /** Prepare a private replacement tree so callers can attach render metadata before publication. */
     public static Prepared prepare(Path source,BlockStateSpec from,BlockStateSpec to,boolean matchBlockType,Vec3i onlyPosition,Cancellation cancel)throws IOException{
         Map<String,Object> root=SourceVersions.litematic(SchematicFormats.canonical(NbtReader.read(source,SchematicImporter.SOURCE_LIMITS,cancel),cancel),cancel);
-        int version=NbtReader.integer(root,"Version");if(version!=5&&version!=6)throw new IOException("不支持的 litematic 版本");
+        int version=NbtReader.integer(root,"Version");SourceVersions.requireLitematicVersion(version);int dataVersion=NbtReader.integer(root,"MinecraftDataVersion");
         var regions=NbtReader.compound(root.get("Regions"),"Regions");
         if(regions.size()>1024)throw new IOException("区域数量超限");
         long changed=0,removedEntities=0,removedTicks=0,totalBlocks=0,totalVolume=0;
@@ -29,11 +29,11 @@ public final class LitematicEdit {
             totalVolume+=volume;if(totalVolume>SchematicImporter.MAX_CELLS)throw new IOException("编辑体积超过预算");
             if(!(tag.get("BlockStatePalette") instanceof List<?> original)||original.isEmpty()||original.size()>65536)throw new IOException("Invalid palette");
             List<Object> paletteTags=new ArrayList<>(original);List<BlockStateSpec> palette=new ArrayList<>();
-            for(Object value:original){var state=NbtReader.compound(value,"State");Map<String,String> props=new TreeMap<>();if(state.containsKey("Properties"))for(var prop:NbtReader.compound(state.get("Properties"),"Properties").entrySet()){if(!(prop.getValue() instanceof String text))throw new IOException("Invalid property");props.put(prop.getKey(),text);}palette.add(new BlockStateSpec(NbtReader.string(state,"Name",""),props));}
+            for(Object value:original)palette.add(SourceVersions.readState(NbtReader.compound(value,"State"),dataVersion).state());
             int oldBits=Math.max(2,32-Integer.numberOfLeadingZeros(palette.size()-1));
             if(!(tag.get("BlockStates") instanceof long[] words)||words.length!=PackedBits.wordCount(oldBits,volume))throw new IOException("Invalid block states");
             boolean[] changedPalette=new boolean[palette.size()];
-            for(int id=0;id<palette.size();id++){var state=palette.get(id);changedPalette[id]=!state.equals(to)&&(from==null||(matchBlockType?state.name().equals(from.name()):state.equals(from)));}
+            for(int id=0;id<palette.size();id++){var state=palette.get(id);changedPalette[id]=!(SourceVersions.compatibleLoading()&&state.equals(SourceVersions.SKIPPED))&&!state.equals(to)&&(from==null||(matchBlockType?state.name().equals(from.name()):state.equals(from)));}
             int cell=-1;
             if(onlyPosition!=null){long x=(long)onlyPosition.x()-min.x(),y=(long)onlyPosition.y()-min.y(),z=(long)onlyPosition.z()-min.z();if(x>=0&&y>=0&&z>=0&&x<sx&&y<sy&&z<sz)cell=(int)(x+z*sx+y*sx*sz);}
             long changedHere=0;
@@ -46,7 +46,7 @@ public final class LitematicEdit {
             changed+=changedHere;
             for(String key:List.of("TileEntities","PendingBlockTicks","PendingFluidTicks")){
                 if(!(tag.get(key) instanceof List<?> list))continue;List<Object> retained=new ArrayList<>();
-                for(Object value:list){cancel.check();var data=NbtReader.compound(value,key);int x=NbtReader.integer(data,"x"),y=NbtReader.integer(data,"y"),z=NbtReader.integer(data,"z");
+                for(Object value:list){cancel.check();var data=NbtReader.compound(value,key);if(key.equals("TileEntities")&&!SourceVersions.acceptsAuxiliary(SourceVersions.Kind.BLOCK_ENTITY,data,dataVersion)){retained.add(value);continue;}int x=NbtReader.integer(data,"x"),y=NbtReader.integer(data,"y"),z=NbtReader.integer(data,"z");
                     int at=x>=0&&y>=0&&z>=0&&x<sx&&y<sy&&z<sz?x+z*sx+y*sx*sz:-1;
                     boolean remove=false;
                     if(at>=0&&changedPalette[get(words,oldBits,at)]&&(onlyPosition==null||at==cell)){

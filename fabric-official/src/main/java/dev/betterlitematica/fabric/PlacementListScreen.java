@@ -8,6 +8,7 @@ final class PlacementListScreen extends MenuScreen {
         boolean selected=controller.selectedPlacement()!=null;button("配置",0,4,0,()->ClientUi.setScreen(minecraft,new PlacementConfigScreen(this,controller)),selected,true);button("复制",1,4,0,()->{controller.duplicate();refresh();},selected,false);button("重载",2,4,0,controller::reload,selected,false);button("移除",3,4,0,()->{controller.unload();refresh();},selected,false);
         if(list==null)list=new OverlayList(left,innerWidth,Math.max(30,bodyBottom-bodyTop-38),id->{controller.select(UUID.fromString(id).equals(controller.selectedId())?null:UUID.fromString(id));refresh();});addBody(list,38);rows();
     }
-    private void rows(){list.rows(controller.placements().stream().map(p->new OverlayList.Row(p.id().toString(),p.name(),p.enabled()&&p.renderBlocks())).toList(),controller.selectedId()==null?null:controller.selectedId().toString());snapshot=controller.placements().toString()+controller.selectedId();}
-    @Override protected void updateMenu(){if(!snapshot.equals(controller.placements().toString()+controller.selectedId()))refresh();}
+    private String snapshot(){return controller.placements().toString()+controller.selectedId()+controller.placements().stream().map(p->controller.compatibility(p.id())).toList();}
+    private void rows(){list.rows(controller.placements().stream().map(p->new OverlayList.Row(p.id().toString(),p.name(),p.enabled()&&p.renderBlocks(),controller.compatibility(p.id()))).toList(),controller.selectedId()==null?null:controller.selectedId().toString());snapshot=snapshot();}
+    @Override protected void updateMenu(){if(!snapshot.equals(snapshot()))refresh();}
 }

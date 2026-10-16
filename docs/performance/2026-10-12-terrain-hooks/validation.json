@@ -1,0 +1,84 @@
+{
+  "candidate": "betterlitematica-fabric-1.20.1-0.4.4-review.22.jar",
+  "sha256": "2f09cd6521aa36b3595c8c3d8277801614a493d5bf60e9636fe9b6bc7b7427d0",
+  "hooks": [
+    "TerrainChunkInfoAccessor",
+    "TerrainLayerIndexMixin",
+    "TerrainFrustumAccessor",
+    "TerrainVisibilitySetAccessor",
+    "TerrainFrustumCacheMixin",
+    "TerrainDataClearMixin",
+    "TerrainDataPublishMixin"
+  ],
+  "headlessChecks": 971211,
+  "geometricComparisons": 480000,
+  "mutationRounds": 900,
+  "vanillaTraversalInstructionsUnchanged": 388,
+  "game": {
+    "finished": true,
+    "passed": true,
+    "calls": 4111,
+    "naturalCacheHits": 921,
+    "controlledReplayHits": 406,
+    "concurrentGraphPublications": 4,
+    "vanillaVisibleSectionsChecked": 17408979,
+    "actualSections": 18323112,
+    "missingOrReorderedLists": 0,
+    "stages": [
+      "world-0-fixture-ready",
+      "straight-translation-and-section-boundaries",
+      "rapid-turns-up-down-and-wall-corners",
+      "glass-water-leaves-and-chest-only-section",
+      "fov-110-view-distance-12",
+      "teleport-unload-view-distance-32",
+      "renderer-reload-fov-30",
+      "disconnect-rejoin-another-world",
+      "world-1-fixture-ready"
+    ],
+    "runtimeSeconds": 95.3772373
+  },
+  "probes": {
+    "native": {
+      "terrainHooks": true,
+      "checks": 12,
+      "kind": "real production class transformation"
+    },
+    "disabled": {
+      "terrainHooks": false,
+      "checks": 12,
+      "kind": "real production class transformation"
+    },
+    "sodium": {
+      "terrainHooks": false,
+      "checks": 12,
+      "kind": "real production class transformation"
+    },
+    "iris-gate": {
+      "terrainHooks": false,
+      "checks": 12,
+      "kind": "metadata-only gate test"
+    },
+    "canvas-gate": {
+      "terrainHooks": false,
+      "checks": 12,
+      "kind": "metadata-only gate test"
+    },
+    "vulkanmod-gate": {
+      "terrainHooks": false,
+      "checks": 12,
+      "kind": "metadata-only gate test"
+    },
+    "optifabric-gate": {
+      "terrainHooks": false,
+      "checks": 12,
+      "kind": "metadata-only gate test"
+    }
+  },
+  "notValidated": [
+    "Iris/Canvas/VulkanMod/OptiFabric gameplay",
+    "Performance and frame-time spikes",
+    "Other Minecraft versions"
+  ],
+  "testInstanceReplaced": false,
+  "pushed": false
+}

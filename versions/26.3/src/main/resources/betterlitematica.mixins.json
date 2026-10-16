@@ -28,7 +28,8 @@
     "SupplyInteractionMixin",
     "ExternalMinerMixin",
     "ProjectionFeatureCaptureMixin",
-    "CarpetPayloadMixin"
+    "CarpetPayloadMixin",
+    "TerrainVisibilityGraphMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -1,0 +1,112 @@
+{
+  "version": "0.4.4-review.23",
+  "minecraft": "1.20.1",
+  "jarSha256": "8a1425a66b75306c2f04f68d7022a41bf8b2668bda6065fa603293cdf18a5375",
+  "terrainHookCount": 8,
+  "hooks": [
+    "TerrainChunkInfoAccessor",
+    "TerrainLayerIndexMixin",
+    "TerrainVisibilityGraphMixin",
+    "TerrainFrustumAccessor",
+    "TerrainVisibilitySetAccessor",
+    "TerrainFrustumCacheMixin",
+    "TerrainDataClearMixin",
+    "TerrainDataPublishMixin"
+  ],
+  "graphChecks": 2284252,
+  "randomRayPairs": 120000,
+  "boundaryRayPairs": 600,
+  "memoizedRayPairs": 90000,
+  "otherTerrainChecks": 971219,
+  "microbenchmark": [
+    {
+      "variant": 0,
+      "rays": 98304,
+      "medianNs": 4953300,
+      "medianAllocatedBytes": 58519488,
+      "lookupCalls": 1462968
+    },
+    {
+      "variant": 1,
+      "rays": 98304,
+      "medianNs": 2849300,
+      "medianAllocatedBytes": 768,
+      "lookupCalls": 1462968
+    },
+    {
+      "variant": 2,
+      "rays": 98304,
+      "medianNs": 4088800,
+      "medianAllocatedBytes": 768,
+      "lookupCalls": 483544
+    }
+  ],
+  "game": {
+    "finished": true,
+    "passed": true,
+    "calls": 4077,
+    "naturalCacheHits": 936,
+    "controlledReplayHits": 406,
+    "concurrentGraphPublications": 4,
+    "vanillaVisibleSectionsChecked": 17270809,
+    "actualSections": 18180483,
+    "missingOrReorderedLists": 0,
+    "stages": [
+      "world-0-fixture-ready",
+      "straight-translation-and-section-boundaries",
+      "rapid-turns-up-down-and-wall-corners",
+      "glass-water-leaves-and-chest-only-section",
+      "fov-110-view-distance-12",
+      "teleport-unload-view-distance-32",
+      "renderer-reload-fov-30",
+      "disconnect-rejoin-another-world",
+      "world-1-fixture-ready"
+    ],
+    "graphRayOracle": {
+      "invalidatedDuringSample": 0,
+      "seen": 3382975,
+      "paired": 52871,
+      "mismatches": 0
+    },
+    "runtimeSeconds": 95.5270686
+  },
+  "gates": {
+    "native": {
+      "hooksEnabled": true,
+      "checks": 13,
+      "scope": "real production class transformation"
+    },
+    "disabled": {
+      "hooksEnabled": false,
+      "checks": 13,
+      "scope": "real production class transformation"
+    },
+    "sodium": {
+      "hooksEnabled": false,
+      "checks": 13,
+      "scope": "real production class transformation"
+    },
+    "iris-gate": {
+      "hooksEnabled": false,
+      "checks": 13,
+      "scope": "metadata-only gate"
+    },
+    "canvas-gate": {
+      "hooksEnabled": false,
+      "checks": 13,
+      "scope": "metadata-only gate"
+    },
+    "vulkanmod-gate": {
+      "hooksEnabled": false,
+      "checks": 13,
+      "scope": "metadata-only gate"
+    },
+    "optifabric-gate": {
+      "hooksEnabled": false,
+      "checks": 13,
+      "scope": "metadata-only gate"
+    }
+  },
+  "pushed": false,
+  "userInstanceReplaced": false
+}

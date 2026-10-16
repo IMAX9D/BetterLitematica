@@ -5,6 +5,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 @Mixin(Frustum.class)
 public interface TerrainFrustumAccessor {
+    @Accessor("frustumIntersection") org.joml.FrustumIntersection betterlitematica$intersection();
     @Accessor("positionProjectionMatrix") Matrix4f betterlitematica$matrix();
     @Accessor("x") double betterlitematica$x();
     @Accessor("y") double betterlitematica$y();

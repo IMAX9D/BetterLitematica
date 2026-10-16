@@ -1,0 +1,68 @@
+{
+  "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.21.jar",
+  "sha256": "8ae063c611dff3b166c95bfca916e15a741d7ba00deb23444d8a746487328a14",
+  "build": "passed",
+  "placementChecks": 1014,
+  "settingDescriptions": 97,
+  "settingControls": 35,
+  "reasonIds": 37,
+  "terrainMixinsPerProbe": 8,
+  "loader": "0.18.4",
+  "java": "17.0.20.1+1",
+  "sodium": "0.5.13+mc1.20.1",
+  "allocationWarmup": 2000,
+  "allocationIterations": 20000,
+  "probes": [
+    {
+      "case": "baseline",
+      "terrainHooksPresent": true,
+      "assertions": 11,
+      "pooled": false,
+      "allocationBytesPerOutput": 18354.7748,
+      "lifecycleNanosecondsPerOutput": 1532.26
+    },
+    {
+      "case": "default",
+      "terrainHooksPresent": false,
+      "assertions": 12,
+      "pooled": true,
+      "allocationBytesPerOutput": 1936.042,
+      "lifecycleNanosecondsPerOutput": 427.22
+    },
+    {
+      "case": "experimental",
+      "terrainHooksPresent": true,
+      "assertions": 12,
+      "pooled": true,
+      "allocationBytesPerOutput": 1936.042,
+      "lifecycleNanosecondsPerOutput": 532.255
+    },
+    {
+      "case": "disabled",
+      "terrainHooksPresent": false,
+      "assertions": 12,
+      "pooled": true,
+      "allocationBytesPerOutput": 1936.042,
+      "lifecycleNanosecondsPerOutput": 406.49
+    },
+    {
+      "case": "sodium-default",
+      "terrainHooksPresent": false,
+      "assertions": 12,
+      "pooled": true,
+      "allocationBytesPerOutput": 1936.042,
+      "lifecycleNanosecondsPerOutput": 444.96
+    },
+    {
+      "case": "sodium-experimental",
+      "terrainHooksPresent": false,
+      "assertions": 12,
+      "pooled": true,
+      "allocationBytesPerOutput": 1936.042,
+      "lifecycleNanosecondsPerOutput": 447.045
+    }
+  ],
+  "newGameBenchmarks": "not run",
+  "irisCanvasVisualCompatibility": "not tested",
+  "note": "Class-loading and allocation probes only. Old frame data is not a new performance result."
+}

@@ -140,8 +140,7 @@
       "overlays": [
         "review-1.20.1"
       ],
-      "fabricApiId": "fabric-api",
-      "artifactVersion": "0.4.4-review.16"
+      "fabricApiId": "fabric-api"
     },
     {
       "minecraft": "1.20.2",

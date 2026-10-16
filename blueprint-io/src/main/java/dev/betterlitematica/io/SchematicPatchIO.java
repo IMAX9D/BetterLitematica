@@ -36,7 +36,7 @@ public final class SchematicPatchIO {
             if(!expected.equals(new Region(expected.name(),min,size,anchor)))throw new IOException("子区域范围已改变");
             if(!(tag.get("BlockStatePalette") instanceof List<?> original)||original.isEmpty()||original.size()>65536)throw new IOException("无效方块调色板");
             var palette=new ArrayList<BlockStateSpec>();var paletteTags=new ArrayList<Object>(original);var ids=new HashMap<BlockStateSpec,Integer>();
-            for(var item:original){var state=state(item);ids.putIfAbsent(state,palette.size());palette.add(state);}
+            for(var item:original){var state=SourceVersions.readState(NbtReader.compound(item,"BlockState"),NbtReader.integer(root,"MinecraftDataVersion")).state();ids.putIfAbsent(state,palette.size());palette.add(state);}
             int oldBits=Math.max(2,32-Integer.numberOfLeadingZeros(palette.size()-1)),volume=Math.toIntExact(expected.volume());
             if(!(tag.get("BlockStates") instanceof long[] words)||words.length!=PackedBits.wordCount(oldBits,volume))throw new IOException("无效方块数组");
             var values=PackedBits.takeOwnership(oldBits,volume,words);var changes=new TreeMap<Integer,Integer>();
@@ -54,12 +54,9 @@ public final class SchematicPatchIO {
         if(metadata.get("TotalBlocks") instanceof Number value)metadata.put("TotalBlocks",Math.toIntExact(value.longValue()+blockDelta));metadata.put("TimeModified",System.currentTimeMillis());root.put("Metadata",metadata);
         cancel.check();return root;
     }
-    private static BlockStateSpec state(Object value)throws IOException{
-        var tag=NbtReader.compound(value,"BlockState");var properties=new TreeMap<String,String>();if(tag.containsKey("Properties"))for(var entry:NbtReader.compound(tag.get("Properties"),"Properties").entrySet()){if(!(entry.getValue() instanceof String text))throw new IOException("无效方块属性");properties.put(entry.getKey(),text);}return new BlockStateSpec(NbtReader.string(tag,"Name",""),properties);
-    }
     private static void filter(Map<String,Object> tag,String name,Vec3i size,Map<Integer,SchematicEdits.Patch> changes,int type)throws IOException{
         if(!(tag.get(name) instanceof List<?> list))return;var retained=new ArrayList<Object>();
-        for(var item:list){var pos=SchematicDocument.vector(item);SchematicEdits.Patch change=null;if(pos.x()>=0&&pos.y()>=0&&pos.z()>=0&&pos.x()<size.x()&&pos.y()<size.y()&&pos.z()<size.z())change=changes.get(pos.x()+pos.z()*size.x()+pos.y()*size.x()*size.z());
+        for(var item:list){if(type==0&&!SourceVersions.acceptsAuxiliary(SourceVersions.Kind.BLOCK_ENTITY,NbtReader.compound(item,name),SourceVersions.gameVersion())){retained.add(item);continue;}var pos=SchematicDocument.vector(item);SchematicEdits.Patch change=null;if(pos.x()>=0&&pos.y()>=0&&pos.z()>=0&&pos.x()<size.x()&&pos.y()<size.y()&&pos.z()<size.z())change=changes.get(pos.x()+pos.z()*size.x()+pos.y()*size.x()*size.z());
             if(change==null||switch(type){case 0->change.blockData();case 1->change.blockTicks();default->change.fluidTicks();})retained.add(item);
         }tag.put(name,retained);
     }

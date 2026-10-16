@@ -1,0 +1,30 @@
+[
+  {
+    "frame": "49026",
+    "elapsed_ns": "3452000",
+    "phase": "diagonal_outbound",
+    "interval_ns": "121492500",
+    "work_ns": "4642500",
+    "uptime_ns": "106542182700",
+    "player_x": "-499.8765135703074",
+    "player_y": "232.0",
+    "player_z": "-449.88886221327664",
+    "camera_x": "-499.89154149149374",
+    "camera_y": "233.61999988555908",
+    "camera_z": "-449.90238734234435",
+    "yaw": "-48.012787",
+    "pitch": "0.0",
+    "focused": "1",
+    "prepare_ns": "180100",
+    "build_ns": "700",
+    "draw_ns": "149900",
+    "finish_ns": "-1",
+    "dispatch_ns": "-1",
+    "snapshot_ns": "-1",
+    "legacy_ns": "-1",
+    "entities_ns": "-1",
+    "other_ns": "-1",
+    "budget_ns": "8000000",
+    "holes": "-1"
+  }
+]

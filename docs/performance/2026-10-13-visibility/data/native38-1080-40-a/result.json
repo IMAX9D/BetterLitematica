@@ -1,0 +1,46 @@
+{
+  "side": "native38-1080-40-a",
+  "durationSeconds": 90,
+  "warmupSeconds": 90,
+  "viewDistanceChunks": 32,
+  "movementSpeedMps": 30,
+  "routeStart": [
+    -500,
+    232.0,
+    -450
+  ],
+  "routeEnd": [
+    -500,
+    232.0,
+    -450
+  ],
+  "camera": "aligned with diagonal travel direction; pitch 0",
+  "printerParameters": [
+    0,
+    0,
+    0
+  ],
+  "worldHeight": 1024,
+  "projectionHeight": 580,
+  "heightFraction": 0.4,
+  "playerY": 232.0,
+  "roundTripSeconds": 89.69082698049141,
+  "printingEnabled": false,
+  "loadSeconds": 8.5324394,
+  "framebuffer": [
+    1920,
+    1080
+  ],
+  "startedUtc": "2026-10-13T17:52:28.860665100Z",
+  "elapsedSeconds": 89.7321914,
+  "frames": 39837,
+  "matched": 0,
+  "phase": "diagonal_return",
+  "measurementFinishedUtc": "2026-10-13T17:53:58.593668800Z",
+  "passed": true,
+  "routeTurn": [
+    500,
+    232.0,
+    450
+  ]
+}

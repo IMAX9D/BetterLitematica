@@ -13,5 +13,11 @@ record UiMeshState(float[] coordinates,int color,Matrix3x2f pose,ScreenRectangle
     UiMeshState {coordinates=coordinates.clone();pose=new Matrix3x2f(pose);}
     @Override public RenderPipeline pipeline(){return RenderPipelines.GUI;}
     @Override public TextureSetup textureSetup(){return TextureSetup.noTexture();}
-    @Override public void buildVertices(VertexConsumer consumer){for(int i=0;i<coordinates.length;i+=2)consumer.addVertexWith2DPose(pose,coordinates[i],coordinates[i+1]).setColor(color);}
+    @Override public void buildVertices(VertexConsumer consumer){
+        // RenderPearl's GUI pipeline culls the opposite winding to our polar-coordinate order.
+        for(int i=0;i<coordinates.length;i+=8)for(int vertex=0;vertex<4;vertex++){
+            int offset=i+(vertex==0?0:4-vertex)*2;
+            consumer.addVertexWith2DPose(pose,coordinates[offset],coordinates[offset+1]).setColor(color);
+        }
+    }
 }

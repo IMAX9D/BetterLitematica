@@ -1,0 +1,21 @@
+{
+  "run": "visual28-vanilla",
+  "height": 65,
+  "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.28.jar",
+  "sha256": "56237f9c09eb588893f83a2cbdb8ea0b0bced1e3b2053dd27c2efe584defa72f",
+  "sodium": false,
+  "diagnostic": false,
+  "optionsSha256": "1e73b11f34843842927b709f65a41897ff107d2f1e26932d01ffd2201de7001d",
+  "projectionSha256": "b67e199f858f9f183460ca3d919bc8afaee357824827702729c3d000a1eb2295",
+  "mods": {
+    "betterlitematica-fabric-1.20.1-0.4.4-review.28.jar": "56237f9c09eb588893f83a2cbdb8ea0b0bced1e3b2053dd27c2efe584defa72f",
+    "controlled-benchmark.jar": "b1b18c0f3de630fd87ac5006ce1cf9caad3e45320eadc32328c7cf1372798edb",
+    "fabric-api-0.92.2+1.20.1.jar": "4500f844c45573d039d68d3963c9885aa9de7712670216e0ad3e5df16c6770fc"
+  },
+  "purpose": "visual acceptance, not performance",
+  "requestedFramebuffer": [
+    1280,
+    720
+  ],
+  "terrainDisabled": true
+}

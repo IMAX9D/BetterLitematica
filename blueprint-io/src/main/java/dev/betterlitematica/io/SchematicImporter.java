@@ -74,10 +74,10 @@ public final class SchematicImporter {
         List<RegionData> regions=new ArrayList<>();List<String> warnings=new ArrayList<>();
         warnings.add("Block previews and full source details are loaded separately; exports always read the source file.");
         if(SourceVersions.cacheKey().equals("raw"))warnings.add("This standalone importer has no game data fixer installed.");
-        String name;int dataVersion;
+        String name;int dataVersion,formatVersion;var skipped=new HashSet<String>();
         if(root.containsKey("Regions")){
             int format=NbtReader.integer(root,"Version");
-            if(format!=5&&format!=6)throw new IOException("Only litematic format versions 5 and 6 are supported in this milestone; found "+format);
+            SourceVersions.requireLitematicVersion(format);formatVersion=format;
             dataVersion=NbtReader.integer(root,"MinecraftDataVersion");
             Map<String,Object> meta=optionalCompound(root,"Metadata");name=NbtReader.string(meta,"Name",filename);
             Map<String,Object> regionTags=NbtReader.compound(root.get("Regions"),"Regions");
@@ -94,10 +94,9 @@ public final class SchematicImporter {
                 int[] remap=new int[palette.size()];
                 for(int i=0;i<remap.length;i++){
                     Map<String,Object> state=NbtReader.compound(palette.get(i),"BlockStatePalette");
-                    Map<String,String> props=new TreeMap<>();for(var e:optionalCompound(state,"Properties").entrySet()){
-                        if(!(e.getValue() instanceof String s))throw new IOException("Non-string block property");props.put(e.getKey(),s);
-                    }
-                    remap[i]=register(global,SourceVersions.state(new BlockStateSpec(NbtReader.string(state,"Name",""),props),dataVersion));
+                    if((i&255)==0)cancel.check();var read=SourceVersions.readState(state,dataVersion);
+                    if(read.skipped())skipped.add(NbtReader.string(state,"Name",""));
+                    remap[i]=register(global,read.state());
                 }
                 int bits=Math.max(2,32-Integer.numberOfLeadingZeros(remap.length-1));
                 if(!(tag.get("BlockStates") instanceof long[] words))throw new IOException("Missing litematic BlockStates");
@@ -107,6 +106,7 @@ public final class SchematicImporter {
         }else{
             Map<String,Object> schematic=root.containsKey("Schematic")?NbtReader.compound(root.get("Schematic"),"Schematic"):root;
             int format=NbtReader.integer(schematic,"Version");if(format!=2&&format!=3)throw new IOException("Only Sponge .schem v2/v3 and .litematic v5/v6 are supported");
+            formatVersion=0;
             dataVersion=NbtReader.integer(schematic,"DataVersion");
             name=NbtReader.string(optionalCompound(schematic,"Metadata"),"Name",filename);
             Vec3i size=new Vec3i(unsignedShort(schematic,"Width"),unsignedShort(schematic,"Height"),unsignedShort(schematic,"Length"));
@@ -120,7 +120,8 @@ public final class SchematicImporter {
             Map<Integer,Integer> remap=new HashMap<>();
             for(String state:new TreeSet<>(palette.keySet())){
                 int external=NbtReader.integer(palette,state);if(external<0)throw new IOException("Negative Sponge palette id");
-                if(remap.put(external,register(global,SourceVersions.state(BlockStateSpec.parse(state),dataVersion)))!=null)throw new IOException("Duplicate Sponge palette id");
+                var spec=BlockStateSpec.parse(state);var read=SourceVersions.readState(spec,dataVersion);if(read.skipped())skipped.add(spec.name());
+                if(remap.put(external,register(global,read.state()))!=null)throw new IOException("Duplicate Sponge palette id");
             }
             Object raw=blocks.get(format==3?"Data":"BlockData");if(!(raw instanceof byte[] bytes))throw new IOException("Missing Sponge block data");
             VarInts decoder=new VarInts(bytes);int bits=Math.max(1,32-Integer.numberOfLeadingZeros(global.size()-1));PackedBits packed;
@@ -136,7 +137,8 @@ public final class SchematicImporter {
             totalVolume=Math.addExact(totalVolume,regions.get(i).region.volume());
             if(totalVolume>MAX_CELLS)throw new IOException("Import exceeds 512 Mi cells");
         }
-        BlueprintMetadata metadata=new BlueprintMetadata(name,SourceVersions.version(dataVersion),digest,new ArrayList<>(global.keySet()),regions.stream().map(RegionData::region).toList(),warnings);
+        var compatibility=SourceVersions.compatibleLoading()?new ProjectionCompatibility(formatVersion,dataVersion,SourceVersions.gameVersion(),skipped.size()):ProjectionCompatibility.NONE;
+        BlueprintMetadata metadata=new BlueprintMetadata(name,SourceVersions.version(dataVersion),digest,new ArrayList<>(global.keySet()),regions.stream().map(RegionData::region).toList(),warnings,compatibility);
         return new Parsed(metadata,List.copyOf(regions));
     }
     private static int register(LinkedHashMap<BlockStateSpec,Integer> global,BlockStateSpec spec)throws IOException{

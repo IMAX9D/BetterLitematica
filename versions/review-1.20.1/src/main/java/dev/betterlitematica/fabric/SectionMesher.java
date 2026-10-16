@@ -34,6 +34,13 @@ final class SectionMesher {
     static final short READY=1,SKIP=2,OPAQUE=4,FLUID=8,ENTITY=16,LIGHT=32,MODEL=64,INVISIBLE=128,INVALID=256;
     static final int THREADS=Math.max(1,Math.min(4,Runtime.getRuntime().availableProcessors()/2));
     static final int MAX_IN_FLIGHT=THREADS*3;
+    // A result may wait across frames and receive block-entity cells on the render thread.
+    // Keep exclusive ownership until consumption/cancellation, then reuse its 16 KiB staging array.
+    private static final ArrayBlockingQueue<RenderedCells.Builder> CELL_BUFFERS=new ArrayBlockingQueue<>(MAX_IN_FLIGHT);
+    private static RenderedCells.Builder acquireCells(){
+        var cells=CELL_BUFFERS.poll();if(cells==null)return new RenderedCells.Builder();
+        cells.clear();return cells;
+    }
     private static final dev.betterlitematica.runtime.BoundedTaskPool POOL=new dev.betterlitematica.runtime.BoundedTaskPool(THREADS,MAX_IN_FLIGHT,"betterlitematica-mesh-");
     static dev.betterlitematica.runtime.BoundedTaskPool.Ticket<Output> submit(Input input,java.util.function.LongPredicate obsolete){
         return POOL.submit(cancelled->build(input,generation->cancelled.getAsBoolean()||obsolete.test(generation)),Output::free);
@@ -107,11 +114,14 @@ final class SectionMesher {
     static final class Output {
         final Input input;final ArrayList<Part> parts=new ArrayList<>();
         final QuadVisibility.Mask mask=new QuadVisibility.Mask(),wrong=new QuadVisibility.Mask();
-        final RenderedCells.Builder cells=new RenderedCells.Builder();final BitSet omitted=new BitSet(4096),unsupported=new BitSet();
+        RenderedCells.Builder cells=acquireCells();final BitSet omitted=new BitSet(4096),unsupported=new BitSet();
         int[] entityCells=new int[8];int entities;String failure="";boolean failed,cancelled;long vertices,nanos;
         Output(Input input){this.input=input;}
         void entity(int cell){if(entities==entityCells.length)entityCells=Arrays.copyOf(entityCells,entities*2);entityCells[entities++]=cell;}
-        void free(){for(var part:parts)part.free();}
+        void free(){
+            for(var part:parts)part.free();
+            var staging=cells;cells=null;if(staging!=null)CELL_BUFFERS.offer(staging);
+        }
     }
     /** Per-thread scratch: one part of vertices, quad ownership, model and fluid capture. */
     private static final class Workspace {

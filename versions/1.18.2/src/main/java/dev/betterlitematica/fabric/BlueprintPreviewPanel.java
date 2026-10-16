@@ -29,6 +29,9 @@ final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseab
     private record Request(PreviewCamera camera,int side,boolean coarse,PlacementTransform transform){}
     private Request requested;
     private String status="";
+    private Vec3i dimensions;
+    private long blockCount;
+    private String volumeText="",blocksText="";
     private boolean moved,appliedDetailed;private int dragButton=-1,orbitSide;
     private long lastInput,lastClick,requestedFrame,appliedFrame;
     private double clickX,clickY,pointerX=-1,pointerY=-1;
@@ -44,12 +47,18 @@ final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseab
         int combinedSide=side*2;int[] pixels=new int[combinedSide*combinedSide];
         for(int i=0;i<4;i++)for(int y=0;y<side;y++)System.arraycopy(views.get(i),y*side,pixels,((i/2)*side+y)*combinedSide+(i%2)*side,side);
         close();
+        dimensions=value.size();blockCount=value.blocks();updateInfo();
         try{image=new OverlayPreview(getX(),imageSize());image.pixels(pixels);orbitImage=new OverlayPreview(getX(),imageSize());orbit=controller.previewOrbit(preview);active=true;status="";request(false);}
         catch(RuntimeException e){close();throw e;}
     }
     void orientation(PlacementTransform value){
         var next=new PlacementTransform(Vec3i.ZERO,value.quarterTurns(),value.mirrorX(),value.mirrorZ());
-        if(transform.equals(next))return;transform=next;request(interacting(System.nanoTime()));
+        if(transform.equals(next))return;transform=next;updateInfo();request(interacting(System.nanoTime()));
+    }
+    private void updateInfo(){
+        if(dimensions==null){volumeText=blocksText="";return;}
+        var summary=dev.betterlitematica.runtime.PreviewSummary.of(dimensions,blockCount,transform.quarterTurns());
+        volumeText=summary.volume();blocksText=summary.blocks();
     }
     private int physicalSide(){
         var window=MinecraftClient.getInstance().getWindow();
@@ -122,6 +131,12 @@ final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseab
             }
         }
         int size=imageSize(),x=imageLeft(),y=imageTop();drawOrbit(x,y,size);
+        if(dimensions!=null){
+            double infoWidth=size-16-(resetShown()?RESET+6:0),line=ui.smallLineHeight();
+            ui.roundRect(x+5,y+5,x+8+infoWidth,y+10+line*2,4,UiMotion.alpha(UiTheme.SUNKEN,.90));
+            ui.smallText(volumeText,x+8,y+7,infoWidth,UiTheme.SECONDARY);
+            ui.smallText(blocksText,x+8,y+7+line,infoWidth,UiTheme.SECONDARY);
+        }
         if(gallery){int thumb=thumbnailSize();for(int i=0;i<3;i++)drawView(i,x+size+GAP,y+i*(thumb+GAP),thumb);}
         if(!status.isEmpty())ui.centered(status,x,y+(size-19)/2.0,size,19,status.equals("预览失败")?UiTheme.ERROR:UiTheme.MUTED);
     }
@@ -155,5 +170,5 @@ final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseab
         ui.roundFrame(x,y,x+size,y+size,UiTheme.CARD_RADIUS,UiTheme.BORDER);
     }
     @Override public void appendNarrations(NarrationMessageBuilder builder){}
-    @Override public void close(){cancelCapture();active=false;requested=null;displayedCamera=null;requestedFrame=appliedFrame=0;appliedDetailed=false;orbitSide=0;if(orbit!=null){orbit.close();orbit=null;}if(image!=null){image.close();image=null;}if(orbitImage!=null){orbitImage.close();orbitImage=null;}}
+    @Override public void close(){cancelCapture();active=false;dimensions=null;volumeText=blocksText="";requested=null;displayedCamera=null;requestedFrame=appliedFrame=0;appliedDetailed=false;orbitSide=0;if(orbit!=null){orbit.close();orbit=null;}if(image!=null){image.close();image=null;}if(orbitImage!=null){orbitImage.close();orbitImage=null;}}
 }

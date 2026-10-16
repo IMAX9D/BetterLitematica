@@ -1,0 +1,19 @@
+{
+  "run": "native38-1080-40-a",
+  "height": 40,
+  "requestedFramebuffer": [
+    1920,
+    1080
+  ],
+  "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.38.jar",
+  "sha256": "200994995facf81dc3ba538415aa8a57da8ae546dc02a1d8f4b5c0fcee1178f2",
+  "sodium": false,
+  "diagnostic": false,
+  "optionsSha256": "0297bda1c80cf60005875f1c9ff9760cdb4d02a9b7ad7ba375b9c15be874e5da",
+  "projectionSha256": "b67e199f858f9f183460ca3d919bc8afaee357824827702729c3d000a1eb2295",
+  "mods": {
+    "betterlitematica-fabric-1.20.1-0.4.4-review.38.jar": "200994995facf81dc3ba538415aa8a57da8ae546dc02a1d8f4b5c0fcee1178f2",
+    "controlled-benchmark.jar": "bef3cc457acc266fa880e909ca6847a5e6939eaaf9c2c4eb44743e1bd6a446b5",
+    "fabric-api-0.92.2+1.20.1.jar": "4500f844c45573d039d68d3963c9885aa9de7712670216e0ad3e5df16c6770fc"
+  }
+}

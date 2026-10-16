@@ -35,10 +35,13 @@
     "TerrainLayerIndexMixin",
     "TerrainVisibilityGraphMixin",
     "TerrainFrustumAccessor",
-    "TerrainVisibilitySetAccessor",
-    "TerrainFrustumCacheMixin",
     "TerrainDataClearMixin",
-    "TerrainDataPublishMixin"
+    "TerrainDataPublishMixin",
+    "TerrainBufferAllocationMixin",
+    "TerrainSectionBufferMixin",
+    "TerrainSortUploadMixin",
+    "TerrainUploadQueueMixin",
+    "TerrainRegionDrawMixin"
   ],
   "injectors": {
     "defaultRequire": 1

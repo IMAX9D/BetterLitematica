@@ -48,6 +48,8 @@ final class ProjectionController implements AutoCloseable {
     private final SessionIo io = new SessionIo();
     private final Path schematicDirectory, cacheDirectory, settingsDirectory;
     private final TemporarySources temporarySources;
+    private final SchematicFolders folders;
+    private final CompletableFuture<Void> foldersLoading;
     private final FilePreviews filePreviews;
     private final java.util.concurrent.atomic.AtomicBoolean cleanupWarning=new java.util.concurrent.atomic.AtomicBoolean();
     private final LinkedHashMap<UUID, Entry> entries = new LinkedHashMap<>();
@@ -132,6 +134,8 @@ final class ProjectionController implements AutoCloseable {
         Path game = FabricLoader.getInstance().getGameDir().toAbsolutePath();
         schematicDirectory = game.resolve("schematics"); cacheDirectory = game.resolve(".betterlitematica-cache");
         temporarySources=new TemporarySources(cacheDirectory);
+        folders=new SchematicFolders(schematicDirectory,game.resolve("config/betterlitematica/folders.properties"));
+        foldersLoading=io.submit(()->{folders.load();return null;});
         filePreviews=new FilePreviews(cacheDirectory);
         settingsDirectory = game.resolve("config/betterlitematica/placements");
         optionsFile=game.resolve("config/betterlitematica/options.json");optionsLoading=io.submit(()->InteractionOptions.read(optionsFile));
@@ -203,7 +207,7 @@ final class ProjectionController implements AutoCloseable {
             boolean project=projectActivation!=null&&projectActivation.id().equals(importing);
             String resourceFile=resourceRequests.get(importing);
             if(entry==null&&!project&&resourceFile==null)importing=null;
-            else{if(entry!=null&&entry.renderer==null)entry.state="Loading";String source=resourceFile!=null?resourceFile:project?projectActivation.placement().source():entry.placement.source();var shared=resources.get(sourceKey(source));if(shared!=null&&!project)activate(shared.retain());else try{var reference=temporarySources.reference(schematicDirectory,source);loader.request(reference.path(),cacheDirectory,reference.root());}catch(RuntimeException e){if(entry!=null){draftLoadFailed(entry.placement.id());entry.state="加载失败："+e.getMessage();}if(resourceFile!=null){resourceRequests.remove(importing);resourceFailures.put(resourceFile,e.getMessage());}if(project)projectActivation=null;importing=null;fail(e.getMessage());}}
+            else{if(entry!=null&&entry.renderer==null)entry.state="Loading";String source=resourceFile!=null?resourceFile:project?projectActivation.placement().source():entry.placement.source();var shared=resources.get(sourceKey(source));if(shared!=null&&!project)activate(shared.retain());else try{var reference=sourceReference(source);loader.request(reference.path(),cacheDirectory,reference.root());}catch(RuntimeException e){if(entry!=null){draftLoadFailed(entry.placement.id());entry.state="加载失败："+e.getMessage();}if(resourceFile!=null){resourceRequests.remove(importing);resourceFailures.put(resourceFile,e.getMessage());}if(project)projectActivation=null;importing=null;fail(e.getMessage());}}
         }
         tickDraftAssociation();tickDraftRecovery();editor.tick();
         if(draftFile!=null){var status=draftWriter.status(draftFile);if(!status.error().isEmpty()&&!status.error().equals(checkpointFailure)){checkpointFailure=status.error();fail("草稿保存失败，正在重试："+status.error());}else if(status.error().isEmpty())checkpointFailure="";}
@@ -250,7 +254,10 @@ final class ProjectionController implements AutoCloseable {
             }else if(previous!=null)previous.close();
             report("已加载：" + entry.placement.name());if(!loaded.detailsError().isEmpty())report("附加数据读取失败："+loaded.detailsError());
             int current = SharedConstants.getGameVersion().getSaveVersion().getId();
-            if (entry.metadata.dataVersion() > current) report("投影来自更新版本，无法识别的方块已标记");
+            if(entry.metadata.compatibility().incompatible()){
+                int skipped=entry.metadata.compatibility().skippedBlockTypes();
+                report(skipped>0?"投影已兼容加载，跳过 "+skipped+" 种不支持的方块或状态":"投影来自更新版本，已按当前游戏加载");
+            }else if (entry.metadata.dataVersion() > current) report("投影来自更新版本，无法识别的方块已标记");
         } catch (RuntimeException e) { if(entry.renderer!=previous&&entry.renderer!=null)entry.renderer.close();closeLoaded(loaded);entry.renderer=previous;entry.metadata=previousMetadata;entry.counts=previousCounts;draftLoadFailed(entry.placement.id());rebuildScene();entry.state = "Activation failed: " + e; report(entry.state); }
     }
     private void activateProject(LoadCoordinator.Loaded loaded){
@@ -387,7 +394,7 @@ final class ProjectionController implements AutoCloseable {
     record BlockFilterSource(BlueprintMetadata metadata,long[] counts){
         List<String> blockIds(){
             var ids=new TreeSet<String>();
-            for(int i=0;i<counts.length;i++)if(counts[i]>0&&!metadata.palette().get(i).isAir())ids.add(metadata.palette().get(i).name());
+            for(int i=0;i<counts.length;i++)if(counts[i]>0&&!metadata.palette().get(i).isAir()&&!metadata.palette().get(i).equals(SourceVersions.SKIPPED))ids.add(metadata.palette().get(i).name());
             return List.copyOf(ids);
         }
     }
@@ -395,6 +402,8 @@ final class ProjectionController implements AutoCloseable {
         var entry=entries.get(id);
         return entry==null||entry.metadata==null||entry.counts==null?null:new BlockFilterSource(entry.metadata,entry.counts);
     }
+    ProjectionCompatibility compatibility(UUID id){var entry=entries.get(id);return entry==null||entry.metadata==null?ProjectionCompatibility.NONE:entry.metadata.compatibility();}
+    ProjectionCompatibility resourceCompatibility(String source){var resource=resources.get(sourceKey(source));return resource==null?ProjectionCompatibility.NONE:resource.cache().metadata().compatibility();}
     FileMaterials materialTotals(UUID id){
         Entry entry=entries.get(id);if(entry==null||entry.metadata==null||entry.counts==null)return null;
         if(entry.materials==null)entry.materials=new FileMaterials(entry.metadata,entry.counts,entry.placement.transform());
@@ -449,7 +458,7 @@ final class ProjectionController implements AutoCloseable {
         SchematicPatchIO.Source open(Cancellation cancel)throws IOException{return SchematicPatchIO.open(reference.read(),snapshot,directory,cancel);}
         SchematicDocument document(Cancellation cancel)throws IOException{try(var source=open(cancel)){return SchematicDocument.read(source.path(),cancel);}}
     }
-    private SourceInput sourceInput(Entry entry){if(draftAdoptions.containsKey(entry.placement.id()))throw new IllegalStateException("投影正在关联新文件");return new SourceInput(temporarySources.reference(schematicDirectory,entry.placement.source()),editor.snapshot(entry.placement.id()),cacheDirectory.resolve("edit-operations"));}
+    private SourceInput sourceInput(Entry entry){if(draftAdoptions.containsKey(entry.placement.id()))throw new IllegalStateException("投影正在关联新文件");return new SourceInput(sourceReference(entry.placement.source()),editor.snapshot(entry.placement.id()),cacheDirectory.resolve("edit-operations"));}
     void editorChanged(UUID id,Set<SectionKey> changed,SchematicEdits draft){
         nearbyHighlights.clear();
         var entry=require(id);var renderer=entry.renderer;if(renderer==null)throw new IllegalStateException("投影已卸载");
@@ -510,7 +519,7 @@ final class ProjectionController implements AutoCloseable {
         }
     }
     CompletableFuture<String> saveDraft(UUID id,SchematicEdits.Snapshot patch,String name,NewFileCommit commit){
-        var entry=require(id);var reference=temporarySources.reference(schematicDirectory,entry.placement.source());Path target=exportPath(name,".litematic"),directory=cacheDirectory.resolve("edit-operations");
+        var entry=require(id);var reference=sourceReference(entry.placement.source());Path target=exportPath(name,".litematic"),directory=cacheDirectory.resolve("edit-operations");
         return io.submit(()->{
             Files.createDirectories(directory);Path temporary=directory.resolve(UUID.randomUUID()+".litematic");
             try{Cancellation cancel=()->Thread.currentThread().isInterrupted()||commit.cancelled();Path source=reference.read();var root=SchematicPatchIO.prepare(source,patch,cancel);
@@ -580,21 +589,36 @@ final class ProjectionController implements AutoCloseable {
     private CompletableFuture<String> submit(String label, Callable<String> task) { if (background.size() >= 16) throw new IllegalStateException("后台任务已满");var job=io.submit(task);background.put(label + "-" + UUID.randomUUID(),job);return job; }
     Placement selectedPlacement() { Entry entry = entries.get(selected); return entry == null ? null : entry.placement; }
     String entryStatus(UUID id) { Entry entry = entries.get(id); return entry == null ? "已移除" : switch(entry.state){case "Queued"->"排队中";case "Loading"->"加载中";case "Ready"->"已加载";default->entry.state;}; }
-    CompletableFuture<SessionIo.Listing> files(String relative) { return io.list(schematicDirectory, relative); }
-    CompletableFuture<SessionIo.Listing> files(String relative,String query) { return io.list(schematicDirectory,relative,query); }
-    private Path sourcePath(String relative)throws IOException{return temporarySources.reference(schematicDirectory,relative).read();}
+    CompletableFuture<SessionIo.Listing> files(String relative) { return files(relative, ""); }
+    CompletableFuture<SessionIo.Listing> files(String relative,String query) { return foldersLoading.thenCompose(v->folders.list(io,relative,query)); }
+    private TemporarySources.Reference sourceReference(String source){
+        return TemporarySources.temporary(source)?temporarySources.reference(schematicDirectory,source):folders.reference(source);
+    }
+    List<SchematicFolders.Folder> schematicFolders(){return folders.folders();}
+    String folderLabel(String source){return folders.label(source);}
+    String parentFolder(String source){return folders.parent(source);}
+    String schematicFolderPath(String source){var directory=folders.directory(source);return directory.root().resolve(directory.relative()).toString();}
+    CompletableFuture<String> importSchematicFile(String path){return io.submit(()->SchematicFileImport.copy(Path.of(path),schematicDirectory));}
+    CompletableFuture<SchematicFolders.Folder> mountFolder(String path){return io.submit(()->{foldersLoading.join();return folders.mount(Path.of(path));});}
+    CompletableFuture<Void> removeFolder(String id){
+        String prefix="@folder/"+id+"/";
+        if(placements().stream().anyMatch(p->p.source().startsWith(prefix))||resources().stream().anyMatch(r->r.source().startsWith(prefix)))
+            return CompletableFuture.failedFuture(new IllegalStateException("请先卸载该文件夹中的投影"));
+        return io.submit(()->{foldersLoading.join();folders.remove(id);return null;});
+    }
+    private Path sourcePath(String relative)throws IOException{return sourceReference(relative).read();}
     CompletableFuture<SchematicFileInfo> fileInfo(String relative){return io.submit(()->SchematicFileInfo.read(sourcePath(relative),Cancellation.THREAD));}
-    CompletableFuture<SchematicPreview.Images> previewFile(String relative){return filePreviews.request(temporarySources.reference(schematicDirectory,relative));}
-    CompletableFuture<FilePreviews.Preview> interactivePreview(String relative){return filePreviews.interactive(temporarySources.reference(schematicDirectory,relative));}
-    CompletableFuture<FilePreviews.Preview> interactivePreview(String relative,Map<String,RegionPlacement> regions){return filePreviews.interactive(temporarySources.reference(schematicDirectory,relative),regions);}
+    CompletableFuture<SchematicPreview.Images> previewFile(String relative){return filePreviews.request(sourceReference(relative));}
+    CompletableFuture<FilePreviews.Preview> interactivePreview(String relative){return filePreviews.interactive(sourceReference(relative));}
+    CompletableFuture<FilePreviews.Preview> interactivePreview(String relative,Map<String,RegionPlacement> regions){return filePreviews.interactive(sourceReference(relative),regions);}
     FilePreviews.Orbit previewOrbit(SchematicPreview.OrbitModel model){return filePreviews.orbit(model);}
     FilePreviews.Orbit previewOrbit(FilePreviews.Preview preview){return filePreviews.orbit(preview);}
     FilePreviews.Stats previewStats(){return filePreviews.stats();}
     CompletableFuture<String> exportFile(String relative,String output,String format,String name,String author,String description,int[] preview){return exportFile(relative,output,format,name,author,description,preview,true);}
     CompletableFuture<String> exportFile(String relative,String output,String format,String name,String author,String description,int[] preview,boolean attachPreview){
-        Path filename=exportPath(output,"."+format).getFileName();var reference=temporarySources.reference(schematicDirectory,relative);int[] pixels=preview==null?null:preview.clone();
+        Path filename=exportPath(output,"."+format).getFileName();var reference=sourceReference(relative);int[] pixels=preview==null?null:preview.clone();
         return io.submit(()->{
-            Path source=reference.read(),target=(reference.temporary()?schematicDirectory.toRealPath():source.getParent()).resolve(filename);
+            Path source=reference.read(),target=(reference.temporary()||SchematicFolders.external(relative)?schematicDirectory.toRealPath():source.getParent()).resolve(filename);
             var root=SchematicFileInfo.prepareExport(source,format,name,author,description,pixels,Cancellation.THREAD);
             if(format.equals("litematic")&&attachPreview)FilePreviews.await(filePreviews.attach(root,source,pixels!=null&&pixels.length==0,Cancellation.THREAD),Cancellation.THREAD);
             else EmbeddedPreviewCache.remove(root);
@@ -602,7 +626,7 @@ final class ProjectionController implements AutoCloseable {
             return schematicDirectory.toRealPath().relativize(target).toString().replace((char)92,(char)47);
         });
     }
-    CompletableFuture<String> createDirectory(String relative,String name){return io.submit(()->{if(!name.matches("[\\p{L}\\p{N}_ -]{1,80}"))throw new IOException("无效目录名称");Path root=schematicDirectory.toRealPath(),parent=root.resolve(relative).normalize().toRealPath();if(!parent.startsWith(root))throw new IOException("目录越界");Files.createDirectory(parent.resolve(name));return name;});}
+    CompletableFuture<String> createDirectory(String relative,String name){return io.submit(()->{if(!name.matches("[\\p{L}\\p{N}_ -]{1,80}"))throw new IOException("无效目录名称");Path parent=folders.directory(relative).read();Files.createDirectory(parent.resolve(name));return name;});}
     CompletableFuture<int[]> preview(){requireWorld();if(previewCapture!=null&&!previewCapture.isDone())throw new IllegalStateException("预览图正在获取");previewCapture=new CompletableFuture<>();return previewCapture;}
     void capturePreview(){
         var request=previewCapture;if(request==null)return;previewCapture=null;if(request.isCancelled())return;

@@ -1,0 +1,13 @@
+{
+  "artifact": "betterlitematica-fabric-1.20.1-0.4.4-review.38.jar",
+  "sha256": "200994995facf81dc3ba538415aa8a57da8ae546dc02a1d8f4b5c0fcee1178f2",
+  "minecraft": "1.20.1",
+  "traversalAssertions": 157991,
+  "openglAssertions": 3036,
+  "renderer": "NVIDIA GeForce RTX 3080/PCIe/SSE2",
+  "namedCheckLoader": "0.15.0",
+  "actualGameLoader": "0.18.4",
+  "visualViews": 10,
+  "comparedAgainst": "vanilla renderer with native terrain hooks disabled; recorded earlier with identical fixture",
+  "noSodiumCodeOrNestedJar": true
+}

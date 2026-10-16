@@ -23,26 +23,28 @@ public final class DraftStore {
         if(bytes.length<16||bytes.length>MAX_BYTES)throw new IOException("Invalid draft size");var crc=new CRC32();crc.update(bytes,0,bytes.length-8);
         try(var tail=new DataInputStream(new ByteArrayInputStream(bytes,bytes.length-8,8))){if(tail.readLong()!=crc.getValue())throw new IOException("Draft checksum mismatch");}
         try(var in=new DataInputStream(new ByteArrayInputStream(bytes,0,bytes.length-8))){
-            if(in.readInt()!=MAGIC||in.readInt()!=VERSION)throw new IOException("Unsupported draft format");var strings=new Strings();String world=strings.read(in);
+            if(in.readInt()!=MAGIC)throw new IOException("Unsupported draft format");int version=in.readInt();if(version!=VERSION&&version!=2)throw new IOException("Unsupported draft format");var strings=new Strings();String world=strings.read(in);
             int length=bounded(in.readInt(),1,8*1024*1024,"placement size");byte[] placement=in.readNBytes(length);if(placement.length!=length)throw new EOFException();var session=PlacementStore.decode(placement);if(session.placements().size()!=1)throw new IOException("Draft must identify one placement");
             String name=strings.read(in);int dataVersion=in.readInt();String hash=strings.read(in);int originalSize=in.readInt();long revision=in.readLong();
             int count=bounded(in.readInt(),1,65536,"palette");var palette=new ArrayList<BlockStateSpec>(count);for(int i=0;i<count;i++)palette.add(BlockStateSpec.parse(strings.read(in)));
             count=bounded(in.readInt(),1,1024,"regions");var regions=new ArrayList<Region>(count);for(int i=0;i<count;i++)regions.add(new Region(strings.read(in),vector(in),vector(in),vector(in)));
             count=bounded(in.readInt(),0,1024,"warnings");var warnings=new ArrayList<String>(count);for(int i=0;i<count;i++)warnings.add(strings.read(in));
+            var compatibility=version>=2?new ProjectionCompatibility(in.readInt(),in.readInt(),in.readInt(),in.readInt()):ProjectionCompatibility.NONE;
             count=bounded(in.readInt(),0,SchematicEdits.MAX_SECTIONS,"sections");var sections=new HashMap<SectionKey,Map<Integer,SchematicEdits.Patch>>();int cells=0;
             for(int i=0;i<count;i++){var key=section(in);int n=bounded(in.readInt(),1,4096,"section cells");cells+=n;if(cells>SchematicEdits.MAX_CELLS)throw new IOException("Draft cell budget");var values=new HashMap<Integer,SchematicEdits.Patch>();for(int j=0;j<n;j++){int cell=in.readUnsignedShort();var value=patch(in);if(value==null||values.put(cell,value)!=null)throw new IOException("Invalid duplicate draft cell");}if(sections.put(key,values)!=null)throw new IOException("Duplicate draft section");}
             int[] history={0,0};var undo=actions(in,history);var redo=actions(in,history);if(in.read()!=-1)throw new IOException("Trailing draft bytes");
-            var metadata=new BlueprintMetadata(name,dataVersion,hash,palette,regions,warnings);var image=new SchematicEdits.Checkpoint(metadata,originalSize,sections,revision,undo,redo);SchematicEdits.validateCheckpoint(image);return new Draft(world,session.placements().get(0),image);
+            var metadata=new BlueprintMetadata(name,dataVersion,hash,palette,regions,warnings,compatibility);var image=new SchematicEdits.Checkpoint(metadata,originalSize,sections,revision,undo,redo);SchematicEdits.validateCheckpoint(image);return new Draft(world,session.placements().get(0),image);
         }catch(IllegalArgumentException|ArithmeticException e){throw new IOException("Invalid draft checkpoint",e);}
     }
     public static byte[] encode(Draft draft)throws IOException{
         try{SchematicEdits.validateCheckpoint(draft.checkpoint());}catch(IllegalArgumentException|ArithmeticException e){throw new IOException("Invalid draft checkpoint",e);}
         var bytes=new ByteArrayOutputStream();var crc=new CRC32();
         try(var out=new DataOutputStream(new OutputStream(){int size;@Override public void write(int value)throws IOException{if(++size>MAX_BYTES)throw new IOException("Draft output budget");bytes.write(value);crc.update(value);}@Override public void write(byte[] b,int offset,int length)throws IOException{if(length>MAX_BYTES-size)throw new IOException("Draft output budget");size+=length;bytes.write(b,offset,length);crc.update(b,offset,length);}})){
-            var strings=new Strings();out.writeInt(MAGIC);out.writeInt(VERSION);strings.write(out,draft.worldKey());var p=draft.placement();byte[] placement=PlacementStore.encode(new PlacementSession(List.of(p),p.id(),LayerRange.ALL,p.opacity(),true));out.writeInt(placement.length);out.write(placement);
+            var strings=new Strings();out.writeInt(MAGIC);out.writeInt(draft.checkpoint().metadata().compatibility().equals(ProjectionCompatibility.NONE)?VERSION:2);strings.write(out,draft.worldKey());var p=draft.placement();byte[] placement=PlacementStore.encode(new PlacementSession(List.of(p),p.id(),LayerRange.ALL,p.opacity(),true));out.writeInt(placement.length);out.write(placement);
             var image=draft.checkpoint();var meta=image.metadata();strings.write(out,meta.name());out.writeInt(meta.dataVersion());strings.write(out,meta.sourceSha256());out.writeInt(image.originalPaletteSize());out.writeLong(image.revision());
             out.writeInt(meta.palette().size());for(var state:meta.palette())strings.write(out,state.toString());out.writeInt(meta.regions().size());for(var r:meta.regions()){strings.write(out,r.name());vector(out,r.min());vector(out,r.size());vector(out,r.anchor());}
             out.writeInt(meta.warnings().size());for(var w:meta.warnings())strings.write(out,w);
+            if(!meta.compatibility().equals(ProjectionCompatibility.NONE)){var c=meta.compatibility();out.writeInt(c.formatVersion());out.writeInt(c.sourceDataVersion());out.writeInt(c.gameDataVersion());out.writeInt(c.skippedBlockTypes());}
             out.writeInt(image.sections().size());for(var e:image.sections().entrySet()){section(out,e.getKey());out.writeInt(e.getValue().size());for(var cell:e.getValue().entrySet()){out.writeShort(cell.getKey());patch(out,cell.getValue());}}
             actions(out,image.undo());actions(out,image.redo());long checksum=crc.getValue();out.writeLong(checksum);
         }return bytes.toByteArray();

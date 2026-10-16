@@ -9,12 +9,28 @@ import java.util.*;
 public record AuxiliaryData(List<Part> parts) {
     public record Part(Map<Vec3i,Map<String,Object>> blocks,List<Map<String,Object>> entities){}
     public AuxiliaryData {parts=List.copyOf(parts);}
+    public static AuxiliaryData read(Path path,BlueprintCache cache,Cancellation cancel)throws IOException{
+        var data=read(path,cache.metadata(),cancel);
+        if(cache.metadata().compatibility().skippedBlockTypes()==0)return data;
+        // Only sparse block-entity positions are queried; no full-volume second scan.
+        var sections=new LinkedHashMap<SectionKey,PackedSection>(32,.75f,true){protected boolean removeEldestEntry(Map.Entry<SectionKey,PackedSection> e){return size()>32;}};
+        var retained=new ArrayList<Part>();
+        for(int i=0;i<data.parts().size();i++){
+            var region=cache.metadata().regions().get(i);var part=data.parts().get(i);var blocks=new LinkedHashMap<Vec3i,Map<String,Object>>();
+            for(var entry:part.blocks().entrySet()){
+                cancel.check();var p=entry.getKey().subtract(region.min());var key=new SectionKey(i,p.x()>>4,p.y()>>4,p.z()>>4);
+                if(!sections.containsKey(key))sections.put(key,cache.read(key));var section=sections.get(key);int id=section==null?0:section.globalId(p.x()&15,p.y()&15,p.z()&15);
+                if(!cache.metadata().palette().get(id).equals(SourceVersions.SKIPPED))blocks.put(entry.getKey(),entry.getValue());
+            }
+            retained.add(new Part(Collections.unmodifiableMap(blocks),part.entities()));
+        }return new AuxiliaryData(retained);
+    }
     public static AuxiliaryData read(Path path,BlueprintMetadata metadata,Cancellation cancel)throws IOException{
         var root=NbtReader.readPartial(path,new NbtReader.Limits(512L<<20,64L<<20,64,4_000_000),cancel,(branch,type)->omit(branch)||branch.size()==1&&branch.get(0).equals("Blocks")&&type==7);
         var result=new ArrayList<Part>();int sourceVersion=root.containsKey("MinecraftDataVersion")?NbtReader.integer(root,"MinecraftDataVersion"):root.containsKey("Schematic")?NbtReader.integer(NbtReader.compound(root.get("Schematic"),"Schematic"),"DataVersion"):root.containsKey("DataVersion")?NbtReader.integer(root,"DataVersion"):1343;
         if(root.containsKey("Regions")){
             var regions=NbtReader.compound(root.get("Regions"),"Regions");
-            for(var region:metadata.regions()){var tag=NbtReader.compound(regions.get(region.name()),"Region");var blocks=new LinkedHashMap<Vec3i,Map<String,Object>>();for(var block:tags(tag,"TileEntities")){var p=SchematicDocument.vector(block);blocks.put(region.min().add(p),block);}result.add(new Part(Collections.unmodifiableMap(blocks),tags(tag,"Entities")));}
+            for(var region:metadata.regions()){var tag=NbtReader.compound(regions.get(region.name()),"Region");var blocks=new LinkedHashMap<Vec3i,Map<String,Object>>();for(var block:tags(tag,"TileEntities")){if(!SourceVersions.acceptsAuxiliary(SourceVersions.Kind.BLOCK_ENTITY,block,sourceVersion))continue;var p=SchematicDocument.vector(block);blocks.put(region.min().add(p),block);}result.add(new Part(Collections.unmodifiableMap(blocks),tags(tag,"Entities")));}
         }else if(root.containsKey("Materials")||!root.containsKey("Version")&&!root.containsKey("size")&&!root.containsKey("Schematic")){
             var region=metadata.regions().get(0);var blocks=new LinkedHashMap<Vec3i,Map<String,Object>>();for(var tag:tags(root,"TileEntities"))blocks.put(region.min().add(SchematicDocument.vector(tag)),tag);result.add(new Part(Collections.unmodifiableMap(blocks),tags(root,"Entities")));
         }else if(root.containsKey("size")){
@@ -26,6 +42,7 @@ public record AuxiliaryData(List<Part> parts) {
             var entities=new ArrayList<Map<String,Object>>();for(var raw:tags(tag,"Entities")){var data=version==3?NbtReader.compound(raw.get("Data"),"Data"):new LinkedHashMap<>(raw);data.remove("Id");if(raw.containsKey("Id"))data.put("id",raw.get("Id"));data.put("Pos",raw.get("Pos"));entities.add(data);}result.add(new Part(Collections.unmodifiableMap(blocks),List.copyOf(entities)));
         }
         if(SourceVersions.version(sourceVersion)!=sourceVersion){var upgraded=new ArrayList<Part>();for(var part:result){var blocks=new LinkedHashMap<Vec3i,Map<String,Object>>();for(var e:part.blocks().entrySet()){cancel.check();blocks.put(e.getKey(),SourceVersions.fix(SourceVersions.Kind.BLOCK_ENTITY,e.getValue(),sourceVersion));}var entities=new ArrayList<Map<String,Object>>();for(var entity:part.entities()){cancel.check();entities.add(SourceVersions.fix(SourceVersions.Kind.ENTITY,entity,sourceVersion));}upgraded.add(new Part(Collections.unmodifiableMap(blocks),List.copyOf(entities)));}result=upgraded;}
+        if(SourceVersions.compatibleLoading()){var filtered=new ArrayList<Part>();for(var part:result){var blocks=new LinkedHashMap<Vec3i,Map<String,Object>>();for(var e:part.blocks().entrySet())if(SourceVersions.acceptsAuxiliary(SourceVersions.Kind.BLOCK_ENTITY,e.getValue(),metadata.dataVersion()))blocks.put(e.getKey(),e.getValue());filtered.add(new Part(Collections.unmodifiableMap(blocks),part.entities().stream().filter(e->SourceVersions.acceptsAuxiliary(SourceVersions.Kind.ENTITY,e,metadata.dataVersion())).toList()));}result=filtered;}
         if(!SchematicImporter.sha256(path,cancel).equals(metadata.sourceSha256()))throw new IOException("Source changed while reading auxiliary data");
         return new AuxiliaryData(result);
     }

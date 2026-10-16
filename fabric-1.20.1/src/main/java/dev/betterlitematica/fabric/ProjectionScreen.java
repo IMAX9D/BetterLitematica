@@ -29,7 +29,9 @@ final class ProjectionScreen extends MenuScreen {
             var entry=entries.get(i);
             boolean selected=entry.id().equals(controller.selectedId()),live=entry.enabled()&&entry.renderBlocks();
             int y=ROW+i*ROW,ax=left+nameWidth+6;
-            rowAt(entry.name(),left,y,nameWidth,selected,live,()->{controller.select(selected?null:entry.id());refresh();});
+            var row=rowAt(entry.name(),left,y,nameWidth,selected,live,()->{controller.select(selected?null:entry.id());refresh();});
+            var compatibility=controller.compatibility(entry.id());row.incompatible(compatibility.incompatible());
+            if(compatibility.incompatible())hint(row,compatibility.description()+"\n点击选中投影");
             iconAt(Kind.TUNE,"配置",ax,y,icon,()->{controller.select(entry.id());client.setScreen(new PlacementConfigScreen(this,controller));},true,Look.GHOST,0);
             iconAt(live?Kind.EYE:Kind.EYE_OFF,!entry.enabled()?"启用并显示":live?"隐藏方块":"显示方块",ax+icon+2,y,icon,()->{controller.toggleDisplay(entry.id());refresh();},true,Look.GHOST,live?0:UiTheme.MUTED);
             // Removing loses position, rotation and filters, so it takes a second click on the same, now red, control.
@@ -59,7 +61,7 @@ final class ProjectionScreen extends MenuScreen {
 
     private String snapshot(){
         var state=new StringBuilder().append(controller.selectedId()).append(controller.hasDraftRecovery());
-        for(var entry:controller.placements())state.append(entry).append(controller.entryStatus(entry.id()));
+        for(var entry:controller.placements())state.append(entry).append(controller.entryStatus(entry.id())).append(controller.compatibility(entry.id()));
         return state.toString();
     }
 
