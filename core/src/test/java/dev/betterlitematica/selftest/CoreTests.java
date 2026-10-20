@@ -71,6 +71,7 @@ public final class CoreTests {
             test("shared GPU pages retain their entire physical charge",()->{checks+=SharedRenderChecks.run();});
             test("mesh task bounds include cancelled work and ready results",()->{checks+=BoundedTaskChecks.run();});
             test("complete bounded directory search and cancellation",()->{checks+=DirectorySearchChecks.run(temp);});
+            test("settings cancellation, broken mounts and shortage recovery",()->{checks+=UserFlowRecoveryChecks.run(temp.resolve("user-flow"));});
             test("draft persistence ordering and failure recovery",()->{checks+=DraftRecoveryChecks.run(temp.resolve("recovery"));});
             test("finite material batches avoid needless switches without starvation",()->{checks+=PrinterBatchChecks.run();});
             test("movement retains printer work and scans the advancing frontier",()->{checks+=PrinterMovementChecks.run();});

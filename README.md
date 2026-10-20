@@ -1,6 +1,6 @@
 # BetterLitematica
 
-面向 Minecraft Fabric 的独立投影与建造辅助模组，集成投影查看、编辑、材料统计和打印功能，不依赖 Litematica 或 MaLiLib。当前版本为 **0.4.8**。
+面向 Minecraft Fabric 的独立投影与建造辅助模组，集成投影查看、编辑、材料统计和打印功能，不依赖 Litematica 或 MaLiLib。当前版本为 **0.4.13**。
 
 ## 核心功能
 

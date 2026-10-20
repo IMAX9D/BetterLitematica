@@ -69,7 +69,13 @@ def verifyPlacementStroke = tasks.register('verifyPlacementStroke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'dev.betterlitematica.fabric.PlacementStrokeCheck'
 }
-tasks.named('check') { dependsOn verifySettings, verifyPlacementStroke }
+def verifyUserFlows = tasks.register('verifyUserFlows', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.betterlitematica.fabric.UserFlowRegressionCheck'
+}
+tasks.named('check') { dependsOn verifySettings, verifyPlacementStroke, verifyUserFlows }
 tasks.named('compileJava') { dependsOn prepareJava }
 tasks.named('processResources') { dependsOn prepareResources }
 def widener = roots.collect { new File(it, 'resources/betterlitematica.accesswidener') }.findAll { it.isFile() }.last()

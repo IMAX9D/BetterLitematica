@@ -32,6 +32,7 @@ abstract class MenuScreen extends UiScreen {
     private Button back;
     private AbstractWidget hintTarget;private long hintSince;private String lastDynamicHint="";
     private static final long HINT_DELAY=350_000_000L;
+    private static final String AUTHOR="@IMAX9D";
     MenuScreen(String title,String description,Screen parent,ProjectionController controller,boolean wide){super(Component.literal(title));this.description=description;this.parent=parent;this.controller=controller;this.wide=wide;sessionEpoch=controller.sessionEpoch();}
     @Override protected final void init(){
         cancelPreviewCapture();
@@ -68,14 +69,18 @@ abstract class MenuScreen extends UiScreen {
     protected void enableSetting(SettingId id,boolean enabled){for(var item:body)if(settingIds.get(item.widget)==id){item.widget.active=enabled;if(item.widget instanceof EditBox field)field.setEditable(enabled);}}
     protected abstract void buildMenu();
     protected boolean showBack(){return true;}
-    protected String backLabel(){return parent==null?"返回游戏":"返回";}
+    private boolean discardDraft;
+    protected boolean draftDirty(){return false;}
+    protected final void draftEdited(){discardDraft=false;}
+    protected final boolean submitField(int key,EditBox... fields){return (key==dev.betterlitematica.fabric.NativeInput.GLFW_KEY_ENTER||key==dev.betterlitematica.fabric.NativeInput.GLFW_KEY_KP_ENTER)&&Arrays.stream(fields).anyMatch(f->f!=null&&getFocused()==f);}
+    protected String backLabel(){return discardDraft&&draftDirty()?"确认放弃":draftDirty()?"放弃":parent==null?"返回游戏":"返回";}
     protected int preferredHeight(){return wide?560:430;}
     protected int footerHeight(){return 49;}
     protected final void refresh(){init();}
     protected String heading(){return title.getString();}
     protected String statusLine(){return "";}
     protected void runAction(Runnable action){controller.action(action);}
-    protected String displayedStatus(){return controller.actionError().isEmpty()?statusLine():controller.actionError();}
+    protected String displayedStatus(){return !controller.actionError().isEmpty()?controller.actionError():discardDraft&&draftDirty()?"再次返回将放弃未保存的更改":statusLine();}
     protected int statusColor(){return controller.actionError().isEmpty()?UiTheme.MUTED:UiTheme.ERROR;}
     protected void updateMenu(){}
     /** Optional isolated control preview: no menu panel, captions or background dimming. */
@@ -225,7 +230,7 @@ abstract class MenuScreen extends UiScreen {
         }
         try{
             if(preview!=null){
-                if(preview instanceof OverlayOpacitySlider){double l=preview.getX()-8,t=preview.getY()-6,r=preview.getX()+preview.getWidth()+8,b=preview.getY()+preview.getHeight()+6;ui.shadow(l,t,r,b,UiTheme.CARD_RADIUS);ui.roundRect(l,t,r,b,UiTheme.CARD_RADIUS,UiTheme.OVERLAY_PANEL);ui.roundFrame(l,t,r,b,UiTheme.CARD_RADIUS,UiTheme.BORDER);}
+                if(preview instanceof OverlayOpacitySlider){double l=preview.getX()-8,t=preview.getY()-6,r=preview.getX()+preview.getWidth()+8,b=preview.getY()+preview.getHeight()+6;ui.roundRect(l,t,r,b,UiTheme.CARD_RADIUS,UiTheme.OVERLAY_PANEL);ui.roundFrame(l,t,r,b,UiTheme.CARD_RADIUS,UiTheme.BORDER);}
                 preview.extractRenderState(ctx,x,y,delta);
             }else{ui.effect(animatedX,animatedY,frame.alpha());renderCanvas(ctx,x,y,delta,ui);}
         }finally{ui.end();}
@@ -237,7 +242,7 @@ abstract class MenuScreen extends UiScreen {
     }
     private void renderCanvas(GuiGraphicsExtractor ctx,int mouseX,int mouseY,float delta,IndependentUi ui){
         double l=left-14,r=left+innerWidth+14,radius=UiTheme.PANEL_RADIUS,footerTop=panelBottom-footerHeight();
-        ui.elevation(l,panelTop,r,panelBottom,radius);
+
         ui.roundRect(l,panelTop,r,panelBottom,radius,UiTheme.PANEL);
         // Footer band: same silhouette, square top edge, one tone deeper.
         ui.roundRect(l,footerTop,r,panelBottom,radius,UiTheme.FOOTER);ui.rect(l,footerTop,r,footerTop+radius,UiTheme.FOOTER);
@@ -247,12 +252,15 @@ abstract class MenuScreen extends UiScreen {
         // Header: brand mark, breadcrumb and title on one optical baseline.
         double headerMid=panelTop+(bodyTop-8-panelTop)/2d,titleY=headerMid-ui.titleLineHeight()/2-.5;
         ui.glyph(dev.betterlitematica.runtime.UiGlyphArt.Kind.BRAND,left,headerMid-7,14,UiTheme.ACCENT);
+        // Reserve the author label in the panel header; HUD/preview overlays never enter this path.
+        double authorWidth=ui.measureSmall(AUTHOR),authorX=left+innerWidth-authorWidth;
         double tx=left+21;String crumb=crumb();
         if(!crumb.isEmpty()){
             double cw=Math.min(innerWidth*.35,ui.measure(crumb)+1),ty=headerMid-ui.lineHeight()/2-.5;ui.text(crumb,tx,ty,cw,UiTheme.MUTED);tx+=cw+6;
             ui.text("/",tx,ty,10,UiMotion.alpha(UiTheme.MUTED,.6));tx+=ui.measure("/")+6;
         }
-        ui.title(heading(),tx,titleY,left+innerWidth-tx,UiTheme.TEXT);
+        ui.title(heading(),tx,titleY,Math.max(0,authorX-12-tx),UiTheme.TEXT);
+        ui.smallText(AUTHOR,authorX,panelTop+7,authorWidth+ui.pixel(),UiTheme.MUTED);
         if(!description.isEmpty())ui.text(description,left,panelTop+34,innerWidth,UiTheme.SECONDARY);
         ui.rect(l,bodyTop-8,r,bodyTop-8+ui.pixel(),UiTheme.DIVIDER);
         ui.clip(left-4,bodyTop,left+innerWidth+4,bodyBottom);
@@ -292,7 +300,7 @@ abstract class MenuScreen extends UiScreen {
             tooltip(ui,x,y,328,h);double lineY=y+6;for(String line:lines){ui.text(line,x+5,lineY,320,UiTheme.TEXT);lineY+=step;}break;
         }
     }
-    static void tooltip(IndependentUi ui,double x,double y,double w,double h){ui.shadow(x,y,x+w,y+h,6);ui.roundRect(x,y,x+w,y+h,6,UiTheme.TOOLTIP);ui.roundFrame(x,y,x+w,y+h,6,UiTheme.BORDER);ui.sheen(x,y+ui.pixel(),x+w,6);}
+    static void tooltip(IndependentUi ui,double x,double y,double w,double h){ui.roundRect(x,y,x+w,y+h,6,UiTheme.TOOLTIP);ui.roundFrame(x,y,x+w,y+h,6,UiTheme.BORDER);ui.sheen(x,y+ui.pixel(),x+w,6);}
     private final IdentityHashMap<EditBox,UiMotion> fieldMotion=new IdentityHashMap<>();
     private void paintField(IndependentUi ui,EditBox field,int mouseX,int mouseY){
         var motion=fieldMotion.computeIfAbsent(field,f->new UiMotion());double focus=motion.hover(field.isFocused());
@@ -307,7 +315,7 @@ abstract class MenuScreen extends UiScreen {
         if(field.isFocused())ui.ring(l,t,r,b,UiTheme.BUTTON_RADIUS,1);
         ui.roundRect(l,t,r,b,UiTheme.BUTTON_RADIUS,UiTheme.INPUT);ui.roundFrame(l,t,r,b,UiTheme.BUTTON_RADIUS,field.isFocused()?UiTheme.ACCENT:UiTheme.BORDER);
     }
-    @Override public void onClose(){ClientUi.setScreen(minecraft,parent);}
+    @Override public void onClose(){if(draftDirty()&&!discardDraft){discardDraft=true;return;}discardDraft=false;ClientUi.setScreen(minecraft,parent);}
     @Override public void removed(){cancelPreviewCapture();presented=false;departed=new java.lang.ref.WeakReference<>(this);departureTime=System.nanoTime();super.removed();}
     @Override public boolean isPauseScreen(){return false;}
     enum Look { STANDARD, PRIMARY, ACCENT, GHOST, TAB, TAB_SELECTED }
@@ -368,7 +376,6 @@ abstract class MenuScreen extends UiScreen {
             }
             fill=UiMotion.mix(fill,look==Look.ACCENT?UiTheme.FOCUS:look==Look.PRIMARY?UiTheme.PRESSED:UiTheme.HOVER,press*.8);
             if(focused)ui.ring(l,top,r,b,radius,1);
-            if(look!=Look.GHOST&&!UiTheme.DARK)ui.contact(l,top,r,b,radius);
             if((fill>>>24)!=0)ui.roundRect(l,top,r,b,radius,fill);
             if((edge>>>24)!=0)ui.roundFrame(l,top,r,b,radius,focused?UiTheme.ACCENT:edge);
             if(look!=Look.GHOST)ui.sheen(l,top+ui.pixel(),r,radius);

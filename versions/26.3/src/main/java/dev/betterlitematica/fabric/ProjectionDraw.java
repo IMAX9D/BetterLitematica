@@ -3,6 +3,7 @@ import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
+import com.mojang.renderpearl.api.textures.GpuSampler;
 import dev.betterlitematica.core.QuadVisibility;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
@@ -14,6 +15,7 @@ final class ProjectionDraw {
  private static final int MAX_COMMANDS=65536,MAX_RANGE_INTS=4*1024*1024,UNIFORM_BYTES=288;
  private static final List<Object> commands=new ArrayList<>();private static int ranges;
  private static ProjectionComposite composite;
+ private record TextureBinding(GpuTextureView view,GpuSampler sampler){}
  private record Draw(ProjectionGpuMesh mesh,RenderPipeline pipeline,Matrix4f view,Matrix4f projection,Identifier texture,GpuTextureView direct,float opacity,int intensity,int red,boolean mask,boolean near,ProjectionClip clip,ProjectionComposite target,int[] ranges){}
  static void beginFrame(){clear();composite=null;EntityOverlayMask.prepare();}
  static void target(ProjectionComposite value){composite=value;}
@@ -41,8 +43,11 @@ final class ProjectionDraw {
   var worldProjection=RenderSystem.getProjectionMatrixBuffer();
   var data=MemoryUtil.memCalloc(Math.multiplyExact(draws,stride));GpuBuffer uniforms=null;Batch batch=null;
   try{
-   int index=0;
+   int index=0;var textures=new HashMap<Identifier,TextureBinding>();
    for(var value:commands)if(value instanceof Draw draw){
+    // A cold entity/block-entity texture may upload GPU data. Resolve it before any pass,
+    // then bind only prepared handles below. Keep the cache frame-local for resource reloads.
+    if(draw.texture!=null)textures.computeIfAbsent(draw.texture,id->{var texture=client.getTextureManager().getTexture(id);return new TextureBinding(texture.getTextureView(),texture.getSampler());});
     // Grow shared indices before opening a render pass; later draws only bind them.
     RenderSystem.getSequentialBuffer(draw.mesh.mode).getBuffer(draw.mesh.indexCount);
     int at=index++*stride;draw.view.get(at,data);draw.projection.get(at+64,data);
@@ -60,7 +65,7 @@ final class ProjectionDraw {
     pass.setUniform("Projection",uniforms.slice((long)index++*stride,UNIFORM_BYTES));
     if(draw.pipeline!=ProjectionShaders.COMPOSITE)pass.setUniform("WorldProjection",worldProjection);pass.setVertexBuffer(0,draw.mesh.vertices.slice());
     var indices=RenderSystem.getSequentialBuffer(draw.mesh.mode);var indexBuffer=indices.getBuffer(draw.mesh.indexCount);pass.setIndexBuffer(indexBuffer,indices.type());
-    if(draw.texture!=null){var texture=client.getTextureManager().getTexture(draw.texture);pass.setUniform("Sampler0",texture.getTextureView(),texture.getSampler());}
+    if(draw.texture!=null){var texture=textures.get(draw.texture);pass.setUniform("Sampler0",texture.view,texture.sampler);}
     else if(draw.direct!=null)pass.setUniform("Sampler0",draw.direct,RenderSystem.getSamplerCache().getClampToEdge(com.mojang.renderpearl.api.textures.FilterMode.NEAREST));
     if(draw.pipeline!=ProjectionShaders.SURFACE&&draw.pipeline!=ProjectionShaders.COMPOSITE)EntityOverlayMask.bind(pass);
     if(draw.ranges==null){pass.drawIndexed(draw.mesh.indexCount,1,0,0,0);}

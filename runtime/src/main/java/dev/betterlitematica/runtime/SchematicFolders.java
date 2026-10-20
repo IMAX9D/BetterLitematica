@@ -22,9 +22,26 @@ public final class SchematicFolders {
     private final Path local,settings;
     private volatile List<Folder> mounted=List.of();
     private boolean writable;
+    private volatile String problem="";
     public SchematicFolders(Path local,Path settings){this.local=local.toAbsolutePath().normalize();this.settings=settings;}
     /** Run on the ordered settings worker before any mutations. Invalid settings are preserved. */
     public synchronized void load()throws IOException {
+        writable=false;
+        try{loadChecked();problem="";}
+        catch(IOException|IllegalArgumentException failure){
+            problem="投影文件夹配置读取失败，本实例目录仍可使用；请重试或重置挂载配置";
+            throw new IOException(problem,failure);
+        }
+    }
+    /** A failed external configuration must not prevent browsing the instance's own files. */
+    public void loadSafely(){try{load();}catch(IOException ignored){}}
+    public String problem(){return problem;}
+    /** Explicit UI recovery: retain the original bytes before replacing any directory links. */
+    public synchronized void resetPreservingOriginal()throws IOException {
+        if(Files.exists(settings))Files.copy(settings,settings.resolveSibling(settings.getFileName()+".backup-"+UUID.randomUUID()));
+        save(List.of());mounted=List.of();writable=true;problem="";
+    }
+    private void loadChecked()throws IOException {
         var next=new ArrayList<Folder>();
         if(Files.exists(settings)){
             if(Files.size(settings)>262144)throw new IOException("挂载配置过大，原文件已保留");

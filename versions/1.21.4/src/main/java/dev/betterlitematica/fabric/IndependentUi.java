@@ -127,19 +127,6 @@ final class IndependentUi implements AutoCloseable {
         // batch per shape; texture tint, scissor and matrix changes still flush at their boundaries.
         context.draw(ignored->rounded(x,y,right,bottom,radius,color,outline));
     }
-    /** Small controls: a tight contact shadow. */
-    void shadow(double x,double y,double right,double bottom,double radius){
-        roundRect(x-2,y+1,right+2,bottom+4,radius+2,UiTheme.SHADOW_AMBIENT);
-        roundRect(x-1,y+1,right+1,bottom+2.5,radius+1,UiTheme.SHADOW_AMBIENT);
-        roundRect(x-.5,y+.5,right+.5,bottom+1.5,radius+.5,UiMotion.alpha(UiTheme.SHADOW,.55));
-    }
-    /** Resting controls on light paper: one crisp pixel of contact, no blur. */
-    void contact(double x,double y,double right,double bottom,double radius){roundRect(x,y+1,right,bottom+1,radius,UiMotion.alpha(UiTheme.SHADOW,.7));}
-    /** Floating surfaces: a wide, soft ambient falloff under a crisp key shadow. */
-    void elevation(double x,double y,double right,double bottom,double radius){
-        for(int i=6;i>=1;i--){double spread=i*3.2;roundRect(x-spread,y-spread*.45+i*1.4,right+spread,bottom+spread+i*1.6,radius+spread,UiMotion.alpha(UiTheme.SHADOW_AMBIENT,1.15-i*.12));}
-        roundRect(x-1,y+1,right+1,bottom+3,radius+1,UiMotion.alpha(UiTheme.SHADOW,.6));
-    }
     /** Soft focus halo drawn outside a control. */
     void ring(double x,double y,double right,double bottom,double radius,double strength){
         if(strength<=.01)return;
@@ -217,6 +204,7 @@ final class IndependentUi implements AutoCloseable {
     void text(String text,double x,double y,double maxWidth,int color){draw(trimAt(text,textPixels,maxWidth),px(x),py(y),textPixels,color);}
     private int smallPixels(){return Math.max(10,(int)Math.round(textPixels*.78));}
     void smallText(String text,double x,double y,double maxWidth,int color){int size=smallPixels();while(size>10&&measurePixels(text,size)>maxWidth*view.scale())size--;draw(trimAt(text,size,maxWidth),px(x),py(y),size,color);}
+    double measureSmall(String text){return ready()?measurePixels(bounded(text),smallPixels())/view.scale():0;}
     double smallLineHeight(){return font.lineHeight(smallPixels())/view.scale();}
     void title(String text,double x,double y,double maxWidth,int color){int size=UiTypography.titlePixels(view.scale(),font);draw(trimAt(text,size,maxWidth),px(x),py(y),size,color);}
     void centered(String text,double x,double y,double width,double height,int color){String shown=trim(text,width-12);int left=px(x)+(int)Math.round((width*view.scale()-measurePixels(shown,textPixels))/2);int top=py(y)+(int)Math.round((height*view.scale()-font.lineHeight(textPixels))/2);draw(shown,left,top,textPixels,color);}

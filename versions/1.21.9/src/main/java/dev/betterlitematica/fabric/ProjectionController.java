@@ -94,6 +94,7 @@ final class ProjectionController implements AutoCloseable {
     private final Map<String, CompletableFuture<String>> background = new LinkedHashMap<>();
     private final Map<UUID,CompletableFuture<String>> editingJobs=new HashMap<>();
     private AreaSelection selection = AreaSelection.EMPTY;
+    private final ArrayDeque<AreaSelection> selectionHistory=new ArrayDeque<>();
     private SelectionTarget selectionTarget;
     private CompletableFuture<AreaSelection> selectionRestoring;
     private Path selectionFile;
@@ -131,7 +132,7 @@ final class ProjectionController implements AutoCloseable {
         schematicDirectory = game.resolve("schematics"); cacheDirectory = game.resolve(".betterlitematica-cache");
         temporarySources=new TemporarySources(cacheDirectory);
         folders=new SchematicFolders(schematicDirectory,game.resolve("config/betterlitematica/folders.properties"));
-        foldersLoading=io.submit(()->{folders.load();return null;});
+        foldersLoading=io.submit(()->{folders.loadSafely();return null;});
         filePreviews=new FilePreviews(cacheDirectory);
         settingsDirectory = game.resolve("config/betterlitematica/placements");
         optionsFile=game.resolve("config/betterlitematica/options.json");optionsLoading=io.submit(()->InteractionOptions.read(optionsFile));
@@ -263,10 +264,10 @@ final class ProjectionController implements AutoCloseable {
             guardEditing(pending.id());
             if(!loaded.detailsError().isEmpty())throw new IllegalStateException(loaded.detailsError());loaded=canonicalResource(next.placement.source(),loaded);next.metadata=loaded.cache().metadata();next.counts=loaded.cache().copyBlockStateCounts();
             next.renderer=new ProjectionRenderer1201(client,loaded,gpuResources);next.renderer.place(next.placement);next.renderer.layer(pending.settings().layer());next.renderer.visible(next.placement.enabled()&&next.placement.renderBlocks());next.renderer.opacity(next.placement.opacity());
-            printer.stop();cancelPaste();cancelCommands();cancelAnalysis();layer=pending.settings().layer();opacity=pending.settings().opacity();rendering=pending.settings().rendering();
-            entries.put(pending.id(),next);for(var entry:entries.values())apply(entry);next.state="Ready";selected=pending.id();rebuildScene();dirty=true;
+            if(pending.existing()){printer.stop();cancelPaste();cancelCommands();cancelAnalysis();layer=pending.settings().layer();opacity=pending.settings().opacity();rendering=pending.settings().rendering();}
+            entries.put(pending.id(),next);if(pending.existing()){for(var entry:entries.values())apply(entry);}else apply(next);next.state="Ready";selected=pending.id();rebuildScene();dirty=true;
         }catch(RuntimeException e){layer=previousLayer;opacity=previousOpacity;rendering=previousRendering;selected=previousSelection;if(old==null)entries.remove(pending.id());else entries.put(pending.id(),old);next.close();closeLoaded(loaded);for(var entry:entries.values())apply(entry);rebuildScene();fail("版本加载失败："+e.getMessage());return;}
-        if(old!=null)old.close();report("已恢复项目快照");
+        if(old!=null)old.close();report(pending.existing()?"已恢复项目快照":"已载入投影副本");
     }
     private void cancelProjectActivation(UUID id){if(projectLoading!=null&&(id==null||id.equals(projectReplacement))){projectLoading.cancel(true);projectLoading=null;projectReplacement=null;}if(projectActivation==null||id!=null&&!projectActivation.id().equals(id))return;UUID pending=projectActivation.id();if(pending.equals(importing)){loader.cancel();importing=null;}queued.remove(pending);projectActivation=null;}
     private void closeLoaded(LoadCoordinator.Loaded loaded) { try { loaded.close(); } catch (IOException e) { report(e.toString()); } }
@@ -350,7 +351,7 @@ final class ProjectionController implements AutoCloseable {
     LayerRange layerRange() { return layer; }
     float opacity() { return opacity; }
     InteractionOptions options(){return options;}
-    void saveOptions(){if(!optionsWritable)throw new IllegalStateException("设置原文件损坏，已禁用覆盖保存");var snapshot=options.snapshot();submit("设置保存",()->{InteractionOptions.write(optionsFile,snapshot);return "设置已保存";});}
+    void saveOptions(){if(!optionsWritable)throw new IllegalStateException("设置原文件损坏，已禁用覆盖保存");var snapshot=options.snapshot();persist("设置保存",()->{InteractionOptions.write(optionsFile,snapshot);return "设置已保存";});}
     /** Bounded hit lookup with the same overlap ordering as the renderer. */
     ProjectionScene.Cell informationCell(Vec3i position){
         var parts=new ArrayList<ProjectionScene.Part>();
@@ -408,7 +409,7 @@ final class ProjectionController implements AutoCloseable {
     PlacementAnalysis analysis() { return analysis; }
     void worldBlockChanged(net.minecraft.world.BlockView world,BlockPos pos){
         if(world!=client.world||client.world==null||!client.isOnThread())return;
-        nearbyHighlights.changed(pos,client.world.getBlockState(pos));
+        nearbyHighlights.changed(pos,client.world.getBlockState(pos));printer.feedbackChanged(pos);
         if(!entries.isEmpty()){var state=client.world.getBlockState(pos);for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldBlockChanged(pos,state);}
         if(analysis!=null&&analysis.world(client.world))analysis.changed(pos);
     }
@@ -416,7 +417,7 @@ final class ProjectionController implements AutoCloseable {
         if(world!=client.world||client.world==null||!client.isOnThread())return;
         boolean loaded=client.world.getChunkManager().isChunkLoaded(x,z);
         if(commands!=null&&loaded)commands.chunkLoaded(x,z);
-        nearbyHighlights.chunkChanged(x,z,loaded);
+        nearbyHighlights.chunkChanged(x,z,loaded);printer.feedbackChunkChanged(x,z);
         if(!loaded)for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldChunkUnloaded(x,z);
         if(!entries.isEmpty())renderChanges.chunk(x,z,client.world.getBottomY(),(client.world.getTopYInclusive()+1));
         if(analysis!=null&&analysis.world(client.world))analysis.chunkChanged(x,z);
@@ -581,14 +582,17 @@ final class ProjectionController implements AutoCloseable {
     void restoreVersion(String project,String version){restoreVersion(project,version,null);}
     void restoreVersion(String project,String version,UUID target){requireWorld();if(target!=null)guardEditing(target);if(projectLoading!=null||projectActivation!=null)throw new IllegalStateException("版本正在加载");if(target!=null&&!entries.containsKey(target))throw new IllegalStateException("目标摆放已移除");projectReplacement=target;projectLoading=io.submit(()->ProjectVersions.load(schematicDirectory,project,version));}
     private CompletableFuture<String> submit(String label, Callable<String> task) { if (background.size() >= 16) throw new IllegalStateException("后台任务已满");var job=io.submit(task);background.put(label + "-" + UUID.randomUUID(),job);return job; }
+    private CompletableFuture<String> persist(String label,Callable<String> task){var job=io.persist(task);background.put(label+"-"+UUID.randomUUID(),job);return job;}
     Placement selectedPlacement() { Entry entry = entries.get(selected); return entry == null ? null : entry.placement; }
     String entryStatus(UUID id) { Entry entry = entries.get(id); return entry == null ? "已移除" : switch(entry.state){case "Queued"->"排队中";case "Loading"->"加载中";case "Ready"->"已加载";default->entry.state;}; }
     CompletableFuture<SessionIo.Listing> files(String relative) { return files(relative, ""); }
-    CompletableFuture<SessionIo.Listing> files(String relative,String query) { return foldersLoading.thenCompose(v->folders.list(io,relative,query)); }
+    CompletableFuture<SessionIo.Listing> files(String relative,String query) { return SchematicFolders.external(relative)?foldersLoading.thenCompose(v->folders.list(io,relative,query)):folders.list(io,relative,query); }
     private TemporarySources.Reference sourceReference(String source){
         return TemporarySources.temporary(source)?temporarySources.reference(schematicDirectory,source):folders.reference(source);
     }
     List<SchematicFolders.Folder> schematicFolders(){return folders.folders();}
+    String folderProblem(){return folders.problem();}
+    CompletableFuture<Void> reloadFolders(boolean reset){return io.submit(()->{if(reset)folders.resetPreservingOriginal();else folders.load();return null;});}
     String folderLabel(String source){return folders.label(source);}
     String parentFolder(String source){return folders.parent(source);}
     String schematicFolderPath(String source){var directory=folders.directory(source);return directory.root().resolve(directory.relative()).toString();}
@@ -680,7 +684,10 @@ final class ProjectionController implements AutoCloseable {
     void selectionAdd(String name) { requireSelection(); Vec3i here=playerPosition();selection=selection.add(new SelectionBox(name,here,here));selectionTarget=null;selectionDirty=true; }
     void selectionRename(String name){requireSelection();selection=selection.rename(name);selectionTarget=null;selectionDirty=true;}
     void selectionCoordinates(Vec3i first,Vec3i second,Vec3i origin){requireSelection();var box=new SelectionBox(selection.current().name(),first,second);box.region();selection=selection.put(box).origin(origin);selectionDirty=true;}
-    void selectionApply(AreaSelection value){requireSelection();selection=value;selectionTarget=null;selectionDirty=true;}
+    void selectionApply(AreaSelection value){requireSelection();rememberSelection();selection=value;selectionTarget=null;selectionDirty=true;}
+    private void rememberSelection(){if(selectionHistory.size()==16)selectionHistory.removeFirst();selectionHistory.addLast(selection);}
+    boolean canUndoSelection(){return !selectionHistory.isEmpty();}
+    void undoSelection(){requireSelection();if(selectionHistory.isEmpty())return;selection=selectionHistory.removeLast();selectionTarget=null;selectionDirty=true;}
     SelectionTarget selectionTarget(){return selectionTarget;}
     void selectionTarget(SelectionTarget value){requireSelection();selectionTarget=value;if(value==null)selection=selection.select("");if(value!=null&&value.part()!=SelectionTarget.Part.ORIGIN)selection=selection.select(value.name());selectionDirty=true;}
     void selectionDrag(AreaSelection original,SelectionTarget target,Vec3i offset){requireSelection();selection=target.translate(original,offset);selectionDirty=true;}
@@ -688,14 +695,14 @@ final class ProjectionController implements AutoCloseable {
     private Path selectionLibrary(){requireSelection();return settingsDirectory.resolve("selections").resolve(worldKey());}
     CompletableFuture<List<String>> selectionNames(){Path directory=selectionLibrary();return io.submit(()->SelectionLibrary.list(directory));}
     CompletableFuture<AreaSelection> selectionLoad(String name){Path directory=selectionLibrary();return io.submit(()->SelectionLibrary.load(directory,name));}
-    CompletableFuture<String> selectionSave(String name){Path directory=selectionLibrary();AreaSelection value=selection;return io.submit(()->{SelectionLibrary.save(directory,name,value);return name;});}
+    CompletableFuture<String> selectionSave(String name){Path directory=selectionLibrary();AreaSelection value=selection;return io.persist(()->{SelectionLibrary.save(directory,name,value);return name;});}
     CompletableFuture<String> selectionLibraryRename(String name,String next){Path directory=selectionLibrary();return io.submit(()->{SelectionLibrary.rename(directory,name,next);return next;});}
     CompletableFuture<String> selectionDelete(String name){Path directory=selectionLibrary();return io.submit(()->{SelectionLibrary.delete(directory,name);return "";});}
     void selectionSelect(String name) { requireSelection();selectionTarget=null;selection=selection.select(name);selectionDirty=true; }
     void selectionCorner(boolean first) { selectionCorner(first,playerPosition()); }
     void selectionCorner(boolean first,Vec3i pos) { requireSelection(); var box=selection.current();selection=selection.put(new SelectionBox(box.name(),first?pos:box.first(),first?box.second():pos));selectionTarget=new SelectionTarget(first?SelectionTarget.Part.FIRST:SelectionTarget.Part.SECOND,box.name(),0);selectionDirty=true; }
     void selectionOrigin() { requireSelection();selection=selection.origin(playerPosition());selectionTarget=new SelectionTarget(SelectionTarget.Part.ORIGIN,"",0);selectionDirty=true; }
-    void selectionRemove() { requireSelection();selection=selection.remove();selectionTarget=null;selectionDirty=true; }
+    void selectionRemove() { requireSelection();rememberSelection();selection=selection.remove();selectionTarget=null;selectionDirty=true; }
     void selectionMode() { requireSelection();selection=selection.toggleMode();selectionDirty=true; }
     void selectionNudge(Vec3i offset) { requireSelection();selection=selectionTarget==null?selection.put(selection.current().translate(offset)):selectionTarget.translate(selection,offset);selectionDirty=true; }
     private void requireSelection() { requireWorld(); if(selectionRestoring!=null)throw new IllegalStateException("选区正在恢复"); }
@@ -804,8 +811,8 @@ final class ProjectionController implements AutoCloseable {
         if(commandsLoading!=null&&commandsLoading.isDone()){try{commands=new CommandOperation(client,commandsLoading.join(),commandPlacement,commandLayer,commandRule,commandNbt,commandEntities,commandOutput,commandSettings);commands.paused(creativePauseRequested);}catch(RuntimeException e){creativeResult="命令任务失败："+(e.getCause()==null?e.getMessage():e.getCause().getMessage());fail(creativeResult);}commandsLoading=null;}
         if(commands!=null){commands.tick();if(commands.result().isDone()){try{creativeResult=commands.result().join();report(creativeResult);}catch(CompletionException e){creativeResult="命令任务失败："+e.getCause().getMessage();fail(creativeResult);}commands=null;}}
     }
-    List<String> tasks(){List<String> list=new ArrayList<>();if(toolWorld.busy())list.add(toolWorld.status());if(hasDraftRecovery())list.add("编辑草稿："+draftRecoveryStatus());if(editor.busy())list.add("投影编辑："+editor.status);if(projectLoading!=null||projectActivation!=null)list.add("项目版本加载中");if(printer.state()!=PrinterEngine.State.STOPPED)list.add("打印机："+printer.status());if(importing!=null)list.add("投影导入："+loader.status().phase());if(analysis!=null)list.add(analysis.status());if(capture!=null||captureStarting!=null||capturePreparing!=null)list.add(captureStatus());if(paste!=null||pasteStarting!=null)list.add(pasteStatus());if(fill!=null||fillStarting!=null)list.add(fill==null?"准备填充":fill.status());if(commands!=null)list.add(commands.status());if(commandsLoading!=null)list.add("命令任务读取中");list.addAll(background.keySet());return list;}
-    void cancelTasks(){toolWorld.cancel();editor.cancel();for(var id:List.copyOf(draftAdoptions.keySet()))draftLoadFailed(id);cancelProjectActivation(null);printer.stop();cancelAnalysis();cancelCapture();cancelPaste();loader.cancel();if(importing!=null){var entry=entries.get(importing);if(entry!=null)entry.state="已取消，可重新加载";}importing=null;for(var request:resourceRequests.entrySet())resourceFailures.put(request.getValue(),"已取消");resourceRequests.clear();for(var id:queued){var entry=entries.get(id);if(entry!=null)entry.state="已取消，可重新加载";}queued.clear();if(projectLoading!=null)projectLoading.cancel(true);projectLoading=null;if(commands!=null)commands.cancel();if(commandsLoading!=null)commandsLoading.cancel(true);commandsLoading=null;commands=null;var task=serverFill.getAndSet(null);if(task!=null)task.cancel();fillStarting=null;fill=null;for(var job:background.values())job.cancel(true);}
+    List<String> tasks(){List<String> list=new ArrayList<>();if(toolWorld.busy())list.add(toolWorld.status());if(hasDraftRecovery())list.add("编辑草稿："+draftRecoveryStatus());if(editor.busy())list.add("投影编辑："+editor.status);if(projectLoading!=null||projectActivation!=null)list.add("项目版本加载中");if(bedrock.enabled()||bedrock.queued()>0)list.add("破基岩："+bedrock.status()+" · "+bedrock.queued()+" 个目标");if(printer.state()!=PrinterEngine.State.STOPPED)list.add("打印机："+printer.status());if(importing!=null)list.add("投影导入："+loader.status().phase());if(analysis!=null)list.add(analysis.status());if(capture!=null||captureStarting!=null||capturePreparing!=null)list.add(captureStatus());if(paste!=null||pasteStarting!=null)list.add(pasteStatus());if(fill!=null||fillStarting!=null)list.add(fill==null?"准备填充":fill.status());if(commands!=null)list.add(commands.status());if(commandsLoading!=null)list.add("命令任务读取中");list.addAll(background.keySet());return list;}
+    void cancelTasks(){bedrock.pause();toolWorld.cancel();editor.cancel();for(var id:List.copyOf(draftAdoptions.keySet()))draftLoadFailed(id);cancelProjectActivation(null);printer.stop();cancelAnalysis();cancelCapture();cancelPaste();loader.cancel();if(importing!=null){var entry=entries.get(importing);if(entry!=null)entry.state="已取消，可重新加载";}importing=null;for(var request:resourceRequests.entrySet())resourceFailures.put(request.getValue(),"已取消");resourceRequests.clear();for(var id:queued){var entry=entries.get(id);if(entry!=null)entry.state="已取消，可重新加载";}queued.clear();if(projectLoading!=null)projectLoading.cancel(true);projectLoading=null;if(commands!=null)commands.cancel();if(commandsLoading!=null)commandsLoading.cancel(true);commandsLoading=null;commands=null;var task=serverFill.getAndSet(null);if(task!=null)task.cancel();fillStarting=null;fill=null;for(var job:background.values())job.cancel(true);}
     private Entry require() { requireWorld(); Entry entry = entries.get(selected); if (entry == null) throw new IllegalStateException("请先选择投影"); return entry; }
     private Entry require(UUID id){requireWorld();Entry entry=entries.get(id);if(entry==null)throw new IllegalStateException("目标投影已移除");return entry;}
     record ResourceView(String source,String name,int placements,String status){}
@@ -949,7 +956,7 @@ final class ProjectionController implements AutoCloseable {
     private void save() {
         editor.checkpoint();
         if(selectionDirty&&selectionRestoring==null&&selectionFile!=null&&selectionWritable){
-            AreaSelection snapshot=selection;Path file=selectionFile;submit("选区保存",()->{SelectionStore.write(file,snapshot);return "选区已保存";});selectionDirty=false;
+            AreaSelection snapshot=selection;Path file=selectionFile;persist("选区保存",()->{SelectionStore.write(file,snapshot);return "选区已保存";});selectionDirty=false;
         }
         if (!dirty || !ready || sessionFile == null || !writable || !draftAdoptions.isEmpty()) return;
         var persistent=placements().stream().map(p->draftAdoptions.getOrDefault(p.id(),p)).filter(p->!TemporarySources.temporary(p.source())).toList();UUID savedSelection=persistent.stream().anyMatch(p->p.id().equals(selected))?selected:null;io.save(sessionFile, new PlacementSession(persistent, savedSelection, layer, opacity, rendering)); dirty = false;
@@ -982,7 +989,7 @@ final class ProjectionController implements AutoCloseable {
         var writing=serverFill.getAndSet(null);if(writing!=null)writing.cancel();fillStarting=null;fill=null;
         cancelCapture();
         save(); restoring = null; release(); ready = false; writable = true; dirty = false; sessionFile = null; lastWorld = null;
-        editingJobs.clear();selection=AreaSelection.EMPTY;selectionTarget=null;selectionFile=null;selectionRestoring=null;selectionDirty=false;selectionWritable=true;
+        editingJobs.clear();selectionHistory.clear();selection=AreaSelection.EMPTY;selectionTarget=null;selectionFile=null;selectionRestoring=null;selectionDirty=false;selectionWritable=true;
         layer = LayerRange.ALL; opacity = DEFAULT_OPACITY; rendering = true; actionError = ""; cachedHud = "";
     }
     void resourcesReloaded() { for (Entry entry : entries.values()) if (entry.renderer != null) entry.renderer.invalidate(); }

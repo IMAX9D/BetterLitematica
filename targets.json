@@ -138,7 +138,7 @@
       "fabricApi": "0.83.0+1.20.1",
       "loader": "0.15.0",
       "overlays": [
-        "review-1.20.1"
+        "1.20.1"
       ],
       "fabricApiId": "fabric-api"
     },

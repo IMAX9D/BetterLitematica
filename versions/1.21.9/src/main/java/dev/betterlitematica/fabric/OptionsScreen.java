@@ -6,6 +6,8 @@ import java.util.*;
 final class OptionsScreen extends MenuScreen {
     @Override protected boolean isSettingsPage(){return tab!=2;}
     OptionsScreen page(int value){tab=value;return this;}
+    OptionsScreen shortcut(String id){selected=id;tab=2;return this;}
+    void focusShortcut(){if(chord!=null)focusControl(chord);}
     private TextFieldWidget chord,search;private String selected="menu",query="";private int tab;private boolean recording;private OverlayList list;
     private final Map<String,String> drafts=new HashMap<>();private final LinkedHashSet<String> pressed=new LinkedHashSet<>();
     private net.minecraft.client.gui.widget.ButtonWidget cancelRecord;
@@ -14,7 +16,7 @@ final class OptionsScreen extends MenuScreen {
     private String on(boolean v){return v?"开启":"关闭";}
     private void save(){controller.saveOptions();refresh();}
     private void selectTab(int next){recording=false;pressed.clear();tab=next;refresh();}
-    private void bind(String value){String normalized=InputBindings.normalize(value),conflict=InputBindings.conflict(controller.options().keys,selected,normalized);if(selected.equals("wheel"))ModeWheelInput.bindingCode(normalized);if(!conflict.isEmpty())throw new IllegalArgumentException("快捷键已用于："+InputBindings.label(conflict));controller.options().keys.put(selected,normalized);drafts.put(selected,normalized);controller.saveOptions();refresh();}
+    private void bind(String value){String normalized=InputBindings.normalize(value),conflict=InputBindings.conflict(controller.options().keys,selected,normalized);if(selected.equals("wheel"))ModeWheelInput.bindingCode(normalized);if(!conflict.isEmpty())throw new IllegalArgumentException("快捷键已用于："+InputBindings.label(conflict));controller.options().keys.put(selected,normalized);drafts.put(selected,normalized);draftEdited();controller.saveOptions();refresh();}
     private void rows(){if(list!=null)list.rows(controller.options().keys.keySet().stream().filter(k->SearchText.matches(InputBindings.label(k)+" "+k,query)).map(k->new OverlayList.Row(k,InputBindings.label(k),!controller.options().keys.get(k).isEmpty())).toList(),selected);}
     @Override protected void buildMenu(){
         chord=null;search=null;cancelRecord=null;
@@ -33,7 +35,7 @@ final class OptionsScreen extends MenuScreen {
             int w=180,right=left+w+18,rw=innerWidth-w-18;
             search=settingAction(searchAt("名称或拼音",query,left,54,w,100));search.setChangedListener(v->{query=v;rows();});
             double offset=list==null?0:list.scrollOffset();list=new OverlayList(left,w,Math.max(40,bodyBottom-bodyTop-88),id->{selected=id;recording=false;refresh();});rows();list.scrollOffset(offset);addBody(list,88);
-            chord=settingAction(fieldAt(InputBindings.label(selected),drafts.getOrDefault(selected,s.keys.get(selected)),right,40,rw,120));chord.setChangedListener(v->drafts.put(selected,v));chord.setEditable(!recording);
+            chord=settingAction(fieldAt(InputBindings.label(selected),drafts.getOrDefault(selected,s.keys.get(selected)),right,40,rw,120));chord.setChangedListener(v->{drafts.put(selected,v);draftEdited();});chord.setEditable(!recording);
             settingAction(buttonAt(recording?(selected.equals("wheel")?"按下按键…":"按下组合键…"):"录入按键",right,92,rw,()->{recording=true;pressed.clear();if(net.minecraft.client.MinecraftClient.getInstance().isCtrlPressed())pressed.add("CTRL");if(net.minecraft.client.MinecraftClient.getInstance().isAltPressed())pressed.add("ALT");if(net.minecraft.client.MinecraftClient.getInstance().isShiftPressed())pressed.add("SHIFT");setFocused(null);refresh();},true,recording));
             int half=(rw-8)/2;settingAction(buttonAt("保存",right,124,half,()->bind(chord.getText()),!recording,true));settingAction(buttonAt("清除",right+half+8,124,half,()->bind(""),!recording,false));
             cancelRecord=settingAction(buttonAt(recording?"取消":"恢复默认",right,156,rw,()->{if(recording){recording=false;refresh();}else bind(new InteractionOptions().keys.getOrDefault(selected,""));},true,false));
@@ -46,8 +48,9 @@ final class OptionsScreen extends MenuScreen {
             }}
         }
     }
+    @Override protected boolean draftDirty(){return drafts.entrySet().stream().anyMatch(e->!e.getValue().strip().equals(controller.options().keys.getOrDefault(e.getKey(),"")));}
     @Override protected void updateMenu(){if(recording&&!client.isWindowFocused()){recording=false;pressed.clear();refresh();}}
-    @Override public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput){int key=keyInput.key(),scan=keyInput.scancode(),modifiers=keyInput.modifiers();if(!recording)return super.keyPressed(keyInput);if(key==GLFW.GLFW_KEY_ESCAPE){recording=false;refresh();return true;}controller.action(()->{pressed.add(InputBindings.name(key));if(pressed.size()>4)throw new IllegalArgumentException("最多四键组合");});return true;}
+    @Override public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput){int key=keyInput.key(),scan=keyInput.scancode(),modifiers=keyInput.modifiers();if(!recording){if(submitField(key,chord)){controller.action(()->bind(chord.getText()));return true;}return super.keyPressed(keyInput);}if(key==GLFW.GLFW_KEY_ESCAPE){recording=false;refresh();return true;}controller.action(()->{pressed.add(InputBindings.name(key));if(pressed.size()>4)throw new IllegalArgumentException("最多四键组合");});return true;}
     @Override public boolean keyReleased(net.minecraft.client.input.KeyInput keyInput){int key=keyInput.key(),scan=keyInput.scancode(),modifiers=keyInput.modifiers();if(!recording)return super.keyReleased(keyInput);if(!pressed.isEmpty()){recording=false;controller.action(()->bind(String.join("+",pressed)));refresh();}return true;}
     @Override public boolean mouseClicked(net.minecraft.client.gui.Click click,boolean doubled){double x=click.x(),y=click.y();int button=click.button();if(!recording||hits(cancelRecord,x,y))return super.mouseClicked(new net.minecraft.client.gui.Click(x,y,click.buttonInfo()),doubled);if(button==0)for(var tab:tabs)if(hits(tab,x,y)){recording=false;pressed.clear();return super.mouseClicked(new net.minecraft.client.gui.Click(x,y,click.buttonInfo()),doubled);}if(footerHit(x,y)){recording=false;return super.mouseClicked(new net.minecraft.client.gui.Click(x,y,click.buttonInfo()),doubled);}if(button>=0&&button<8){pressed.add("MOUSE"+(button+1));recording=false;controller.action(()->bind(String.join("+",pressed)));refresh();}return true;}
     @Override public boolean charTyped(net.minecraft.client.input.CharInput charInput){return recording||super.charTyped(charInput);}

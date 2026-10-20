@@ -29,7 +29,6 @@ final class UiTheme {
     static int TEXT, SECONDARY, MUTED, DISABLED, DISABLED_TEXT;
     static int ACCENT, ACCENT_HOVER, FOCUS, ON_ACCENT, ACCENT_SOFT, SELECTION, RING;
     static int WARNING, SUCCESS, ERROR;
-    static int SHADOW, SHADOW_AMBIENT;
     static boolean DARK;
 
     static final double BUTTON_RADIUS=6, CARD_RADIUS=9, PANEL_RADIUS=14, CONTROL_HEIGHT=20;
@@ -55,7 +54,6 @@ final class UiTheme {
         TEXT=0xffeeebe5; SECONDARY=0xffa9acb4; MUTED=0xff8b8f99; DISABLED=0xff18191d; DISABLED_TEXT=0xff595d66;
         ACCENT=0xffd6b98a; ACCENT_HOVER=0xffe4cba2; FOCUS=0xffe8cfa4; ON_ACCENT=0xff1b1610; ACCENT_SOFT=0x33d6b98a; SELECTION=0xff3d3426; RING=0x55d6b98a;
         WARNING=0xffe7b660; SUCCESS=0xff74d3a0; ERROR=0xfff08a86;
-        SHADOW=0x52000000; SHADOW_AMBIENT=0x14000000;
     }
 
     private static void porcelain(){
@@ -68,6 +66,5 @@ final class UiTheme {
         TEXT=0xff1c1e24; SECONDARY=0xff50545e; MUTED=0xff676b75; DISABLED=0xfff3f1ed; DISABLED_TEXT=0xffa3a29c;
         ACCENT=0xff3b4aab; ACCENT_HOVER=0xff4a59bb; FOCUS=0xff2f3c93; ON_ACCENT=0xffffffff; ACCENT_SOFT=0x223b4aab; SELECTION=0xffd2d8f2; RING=0x403b4aab;
         WARNING=0xff8a5a0e; SUCCESS=0xff1d6a4b; ERROR=0xffb2343f;
-        SHADOW=0x1c262a36; SHADOW_AMBIENT=0x0a262a36;
     }
 }

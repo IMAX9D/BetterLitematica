@@ -96,8 +96,6 @@ final class ModeWheelScreen extends MenuScreen {
         double progress=UiMotion.easeOut(Math.min(1,(System.nanoTime()-transition)/160_000_000d));ui.effect(0,0,progress);
         try{
             double cx=centerX();
-            // Soft halo under the ring, then a hairline rim; no hard drop shadow over the world.
-            for(int i=4;i>=1;i--)ui.sector(cx,CY+2,0,OUTER+i*3,0,Math.PI*2,UiMotion.alpha(UiTheme.SHADOW_AMBIENT,UiTheme.DARK?1.6:1.2));
             double centerHover=centerMotion.hover(page!=Page.MAIN&&Math.hypot(x-cx,y-CY)<INNER-5);
             ui.sector(cx,CY,0,INNER-5,0,Math.PI*2,UiMotion.mix(UiTheme.OVERLAY_PANEL,UiTheme.OVERLAY_SELECTED,centerHover));ui.sector(cx,CY,INNER-5.6,INNER-5,0,Math.PI*2,UiMotion.mix(UiTheme.BORDER,UiTheme.ACCENT,centerHover));
             int count=page==Page.MAIN?4:page==Page.MODES?MODES.length:RENDER_MODES.length+2,hover=sectorAt(x,y,count,cx);double step=Math.PI*2/count;

@@ -8,16 +8,17 @@ import java.util.concurrent.*;
 
 final class SelectionLibraryScreen extends MenuScreen {
     private String selected="",status="",name="selection",deleting="";private List<String> names=List.of();private TextFieldWidget input;private OverlayList list;
+    private String replacing="";
     private CompletableFuture<List<String>> reading;private CompletableFuture<String> writing;private CompletableFuture<AreaSelection> loading;
     SelectionLibraryScreen(Screen parent,ProjectionController controller){super("选区库","",parent,controller,true);read();}
     private void read(){if(reading!=null)reading.cancel(true);reading=controller.selectionNames();}
     private boolean busy(){return writing!=null||loading!=null;}
     @Override protected void buildMenu(){
         int w=(innerWidth-20)/2,right=left+w+20;
-        if(list==null)list=new OverlayList(left,w,bodyBottom-bodyTop,id->{selected=id;name=id;deleting="";refresh();});list.active=!busy();list.rows(names.stream().map(n->new OverlayList.Row(n,n,true)).toList(),selected);addBody(list,0);
+        if(list==null)list=new OverlayList(left,w,bodyBottom-bodyTop,id->{selected=id;name=id;deleting="";replacing="";refresh();});list.active=!busy();list.rows(names.stream().map(n->new OverlayList.Row(n,n,true)).toList(),selected);addBody(list,0);
         input=fieldAt("名称",name,right,0,w,100);input.setChangedListener(v->name=v);input.setEditable(!busy());
         buttonAt("保存当前选区",right,48,w,()->{writing=controller.selectionSave(name);refresh();},!busy()&&!controller.selection().boxes().isEmpty(),true);
-        buttonAt("载入",right,78,w,()->{loading=controller.selectionLoad(selected);refresh();},!busy()&&!selected.isEmpty(),false);
+        buttonAt(replacing.equals(selected)&&!selected.isEmpty()?"确认替换当前选区":"载入",right,78,w,()->{if(!controller.selection().boxes().isEmpty()&&!replacing.equals(selected)){replacing=selected;refresh();return;}loading=controller.selectionLoad(selected);refresh();},!busy()&&!selected.isEmpty(),false);
         buttonAt("重命名",right,108,w,()->{writing=controller.selectionLibraryRename(selected,name);refresh();},!busy()&&!selected.isEmpty(),false);
         buttonAt(deleting.equals(selected)&&!selected.isEmpty()?"确认删除":"删除",right,138,w,()->{if(deleting.equals(selected)){writing=controller.selectionDelete(selected);deleting="";}else deleting=selected;refresh();},!busy()&&!selected.isEmpty(),false);
     }

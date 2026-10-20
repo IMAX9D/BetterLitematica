@@ -28,6 +28,7 @@ final class BugTextArea extends UiWidget {
         super(x,0,width,height,Component.literal(editable?"问题描述":"附带内容"));this.editable=editable;this.maximum=maximum;this.changed=changed;setValue(value);
     }
     String getValue(){return text;}
+    @Override protected boolean acceptsTextInput(){return visible&&active&&editable&&isFocused();}
     void resizeHeight(int value){height=value;}
     void setValue(String value){text=limited(value);cursor=anchor=Math.min(cursor,text.length());layoutPixels=-1;}
     private String limited(String value){String clean=value.replace("\r\n","\n").replace('\r','\n').replace("\0","");int end=Math.min(clean.length(),maximum);if(end>0&&end<clean.length()&&Character.isHighSurrogate(clean.charAt(end-1)))end--;return clean.substring(0,end);}

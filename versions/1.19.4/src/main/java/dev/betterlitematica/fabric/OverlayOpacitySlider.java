@@ -34,7 +34,7 @@ final class OverlayOpacitySlider extends SliderWidget {
         ui.roundRect(getX()+5,y-1.5,getX()+width-5,y+1.5,1.5,UiTheme.TRACK);
         ui.roundRect(getX()+5,y-1.5,x,y+1.5,1.5,UiTheme.ACCENT);
         ui.ring(x-radius,y-radius,x+radius,y+radius,radius,isFocused()?1:hover*.6);
-        ui.shadow(x-radius,y-radius,x+radius,y+radius,radius);
+
         ui.roundRect(x-radius,y-radius,x+radius,y+radius,radius,UiTheme.DARK?UiTheme.TEXT:UiTheme.INPUT);
         ui.roundFrame(x-radius,y-radius,x+radius,y+radius,radius,UiMotion.mix(UiTheme.BORDER_STRONG,UiTheme.ACCENT,hover));
     }

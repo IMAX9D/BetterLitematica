@@ -37,8 +37,8 @@ final class BugReportScreen extends MenuScreen {
         logToggle=buttonAt("附带日志："+(draft.logs()?"开":"关"),left,toggleY,third,()->{edit(new BugReportClient.Draft(draft.title(),draft.description(),draft.contact(),!draft.logs(),draft.crash()));refresh();},true,false);
         crashToggle=buttonAt("附带崩溃报告："+(draft.crash()?"开":"关"),cellX(1,3),toggleY,third,()->{edit(new BugReportClient.Draft(draft.title(),draft.description(),draft.contact(),draft.logs(),!draft.crash()));refresh();},true,false);
         preview=buttonAt("查看附带内容",cellX(2,3),toggleY,third,this::preview,true,false);
-        hint(logToggle,draft.previousSession()?"附带上次运行的日志；聊天、密钥、地址和个人路径会被移除。":"附带清理后的最新日志尾部；聊天、密钥、地址和个人路径会被移除。");
-        hint(crashToggle,"仅附带所选运行期间的崩溃报告，旧报告不附带；可查看清理后的内容。");hint(preview,"查看将附带的日志或崩溃报告。");
+        hint(logToggle,"附带清理后的日志；若附带上次运行的崩溃报告，也会选择上次日志。聊天、密钥、地址和个人路径会被移除。");
+        hint(crashToggle,"附带本次或上次运行的崩溃报告，更早的报告不附带；可查看来源时间和清理后的内容。");hint(preview,"查看将附带的日志或崩溃报告。");
         caption(BugReports.versionSummary(),left,toggleY+30,innerWidth);
         hint(titleInput,"可留空；报告标题将取问题描述的第一行。");hint(contactInput,"仅在希望维护者联系你时填写。");
         submit=fixedAction("提交",0,94,()->{localMessage="";submitted=true;edited=false;service.submit(draft,BugReports.environment(controller));});

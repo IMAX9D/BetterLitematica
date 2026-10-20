@@ -6,7 +6,7 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import java.util.*;
 
 final class SubregionScreen extends MenuScreen {
-    private final UUID id;private String selected;private final CoordinateDrafts drafts=new CoordinateDrafts();private TextFieldWidget px,py,pz;private OverlayList list;private boolean awaiting;
+    private final UUID id;private String selected;private final CoordinateDrafts drafts=new CoordinateDrafts();private TextFieldWidget px,py,pz;private OverlayList list;private boolean awaiting;private String resetting="";
     SubregionScreen(Screen parent,ProjectionController controller,UUID id){super("子区域","",parent,controller,true);this.id=id;}
     private void change(java.util.function.UnaryOperator<RegionPlacement> action){change(action,false);}
     private void change(java.util.function.UnaryOperator<RegionPlacement> action,boolean coordinates){if(coordinates)drafts.replaceAfter(selected,()->controller.region(id,selected,action));else controller.region(id,selected,action);refresh();}
@@ -21,18 +21,21 @@ final class SubregionScreen extends MenuScreen {
         buttonAt("旋转 "+sub.quarterTurns()*90+"°",x,174,half,()->change(p->new RegionPlacement(p.position(),p.quarterTurns()+1,p.mirrorX(),p.mirrorZ(),p.enabled(),p.locked())),movable,false);
         int mirror=(sub.mirrorX()?1:0)|(sub.mirrorZ()?2:0),next=(mirror+1)%4;
         buttonAt("镜像 "+new String[]{"无","X","Z","XZ"}[mirror],x+half+8,174,half,()->change(p->new RegionPlacement(p.position(),p.quarterTurns(),(next&1)!=0,(next&2)!=0,p.enabled(),p.locked())),movable,false);
-        buttonAt(sub.enabled()?"启用：是":"启用：否",x,202,half,()->change(p->p.enabled(!p.enabled())),true,false);
-        buttonAt(sub.locked()?"已锁定":"未锁定",x+half+8,202,half,()->change(p->new RegionPlacement(p.position(),p.quarterTurns(),p.mirrorX(),p.mirrorZ(),p.enabled(),!p.locked())),true,false);
-        buttonAt("重置",x,236,w,()->{drafts.replaceAfter(selected,()->controller.resetRegion(id,selected));refresh();},movable,false);
+        buttonAt(sub.enabled()?"启用：开":"启用：关",x,202,half,()->change(p->p.enabled(!p.enabled())),true,false);
+        buttonAt(sub.locked()?"锁定：开":"锁定：关",x+half+8,202,half,()->change(p->new RegionPlacement(p.position(),p.quarterTurns(),p.mirrorX(),p.mirrorZ(),p.enabled(),!p.locked())),true,false);
+        buttonAt(resetting.equals(selected)?"确认重置":"重置",x,236,w,()->{if(!resetting.equals(selected)){resetting=selected;refresh();return;}drafts.replaceAfter(selected,()->controller.resetRegion(id,selected));resetting="";refresh();},movable,false);
     }
+    @Override protected boolean draftDirty(){var placement=controller.placement(id);if(placement==null)return false;for(var region:controller.regions(id))if(drafts.changed(region.name(),placement.region(region).position()))return true;return false;}
+    @Override public boolean keyPressed(int key,int scan,int modifiers){if(submitField(key,px,py,pz)){controller.action(()->change(p->p.moved(drafts.position(selected)),true));return true;}return super.keyPressed(key,scan,modifiers);}
     @Override protected void updateMenu(){if(awaiting&&!controller.regions(id).isEmpty())refresh();}
-    private TextFieldWidget coordinate(String label,int axis,Vec3i value,int x,int y,int width){caption(label,x,y+2,18);var field=new OverlayTextField(x+28,0,width-34,label);field.setMaxLength(12);String region=selected;field.setText(drafts.value(region,axis,value));field.setChangedListener(text->drafts.set(region,axis,text));addBody(field,y);return field;}
+    private TextFieldWidget coordinate(String label,int axis,Vec3i value,int x,int y,int width){caption(label,x,y+2,18);var field=new OverlayTextField(x+28,0,width-34,label);field.setMaxLength(12);String region=selected;field.setText(drafts.value(region,axis,value));field.setChangedListener(text->{drafts.set(region,axis,text);draftEdited();resetting="";});addBody(field,y);return field;}
     /** Raw text survives widget rebuilds; only successful coordinate actions replace that region's draft. */
     static final class CoordinateDrafts {
         private final Map<String,String[]> values=new HashMap<>();
         String value(String region,int axis,Vec3i committed){return values.computeIfAbsent(region,key->new String[]{Integer.toString(committed.x()),Integer.toString(committed.y()),Integer.toString(committed.z())})[axis];}
         void set(String region,int axis,String text){values.get(region)[axis]=text;}
-        Vec3i position(String region){var value=values.get(region);return new Vec3i(Integer.parseInt(value[0]),Integer.parseInt(value[1]),Integer.parseInt(value[2]));}
+        boolean changed(String region,Vec3i committed){var value=values.get(region);return value!=null&&(!value[0].strip().equals(Integer.toString(committed.x()))||!value[1].strip().equals(Integer.toString(committed.y()))||!value[2].strip().equals(Integer.toString(committed.z())));}
+        Vec3i position(String region){var value=values.get(region);int[] at=new int[3];for(int a=0;a<3;a++)try{at[a]=Integer.parseInt(value[a].strip());}catch(NumberFormatException error){throw new IllegalArgumentException(new String[]{"X","Y","Z"}[a]+" 坐标须为整数");}return new Vec3i(at[0],at[1],at[2]);}
         void replaceAfter(String region,Runnable action){action.run();values.remove(region);}
     }
 }

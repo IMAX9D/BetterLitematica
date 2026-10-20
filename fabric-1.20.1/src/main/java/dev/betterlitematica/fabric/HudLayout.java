@@ -26,7 +26,7 @@ record HudLayout(UiViewport viewport,double left,double top,double right,double 
     double toolBottom(){return viewport.localPixelY(viewport.pixelHeight()-toolEdgePixels());}
     static void card(IndependentUi ui,double x,double y,double width,double height){
         double radius=UiTheme.CARD_RADIUS;
-        ui.shadow(x,y,x+width,y+height,radius);
+
         ui.roundRect(x,y,x+width,y+height,radius,UiTheme.OVERLAY_PANEL);
         ui.roundFrame(x,y,x+width,y+height,radius,UiMotion.alpha(UiTheme.BORDER,.85));
         ui.sheen(x,y+ui.pixel(),x+width,radius);

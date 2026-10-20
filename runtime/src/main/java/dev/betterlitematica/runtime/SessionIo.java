@@ -21,8 +21,13 @@ public final class SessionIo implements AutoCloseable {
         new ArrayBlockingQueue<>(8),r->{Thread t=new Thread(r,"betterlitematica-browser");t.setDaemon(true);return t;});
     private final Set<DirectoryQuery> queries=new HashSet<>();
     private boolean browserClosed;
-    public <T> CompletableFuture<T> submit(Callable<T> action) {
-        var future = new CompletableFuture<T>();
+    public <T> CompletableFuture<T> submit(Callable<T> action) { return submit(action,true); }
+    /** Accepted settings writes finish even when the player cancels construction work. */
+    public <T> CompletableFuture<T> persist(Callable<T> action) { return submit(action,false); }
+    private <T> CompletableFuture<T> submit(Callable<T> action,boolean cancellable) {
+        var future = new CompletableFuture<T>() {
+            @Override public boolean cancel(boolean interrupt) { return cancellable&&super.cancel(interrupt); }
+        };
         try { Future<?> job=worker.submit(() -> { try { future.complete(action.call()); } catch (Exception e) { future.completeExceptionally(e); } });
             future.whenComplete((value,failure)->{if(future.isCancelled())job.cancel(true);}); }
         catch (RejectedExecutionException e) { future.completeExceptionally(new IOException("Settings IO queue is full or closed", e)); }

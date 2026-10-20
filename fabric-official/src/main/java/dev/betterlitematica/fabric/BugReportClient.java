@@ -70,9 +70,9 @@ final class BugReportClient {
     void saveDraft(Draft value){draft=value;worker.execute(()->{try{write("draft.json",JSON.toJsonTree(value).getAsJsonObject());}catch(IOException e){if(!view.busy)view=new View(false,"草稿未能保存到本地，请勿丢失已填写内容。",true,view.receipt,view.retryAt);}});}
     CompletableFuture<String> attachmentNote(Draft value){return CompletableFuture.supplyAsync(()->{try{
         if(pending!=null&&pending.draft.equals(value)){var diagnostics=JsonParser.parseString(pending.body).getAsJsonObject().getAsJsonObject("diagnostics");return diagnostics!=null&&diagnostics.has("attachment_note")?diagnostics.get("attachment_note").getAsString():"";}
-        String note=value.crash?crashSelection(value).note:"";if(value.logs&&value.previousSession&&latestArchive()==null)note=notes(note,"未找到上次日志，将附带本次启动日志。");return note;
+        return attachmentSelection(value).note;
     }catch(IOException e){return "附带文件暂时无法读取，可关闭对应选项。";}},worker);}
-    CompletableFuture<Attachments> preview(Draft value){return CompletableFuture.supplyAsync(()->{try{if(pending!=null&&pending.draft.equals(value)){var body=JsonParser.parseString(pending.body).getAsJsonObject();return new Attachments(body.get("logs").getAsString(),body.get("crash_report").getAsString(),"");}return attachments(value);}catch(IOException e){throw new CompletionException(new IOException("附带内容读取失败，请关闭对应选项后重试。"));}},worker);}
+    CompletableFuture<Attachments> preview(Draft value){return CompletableFuture.supplyAsync(()->{try{if(pending!=null&&pending.draft.equals(value)){var body=JsonParser.parseString(pending.body).getAsJsonObject();var diagnostics=body.getAsJsonObject("diagnostics");String note=diagnostics!=null&&diagnostics.has("attachment_note")?diagnostics.get("attachment_note").getAsString():"";return new Attachments(body.get("logs").getAsString(),body.get("crash_report").getAsString(),note);}return attachments(value);}catch(IOException e){throw new CompletionException(new IOException("附带内容读取失败，请关闭对应选项后重试。"));}},worker);}
     void submit(Draft value,JsonObject environment){
         if(view.busy||System.currentTimeMillis()<view.retryAt)return;
         String validation=validate(value);if(!validation.isEmpty()){view=new View(false,validation,true,view.receipt,0);return;}
@@ -196,26 +196,41 @@ final class BugReportClient {
         finally{Files.deleteIfExists(temp);}
     }
     private Attachments attachments(Draft value)throws IOException {
-        String log="",report="",note="";
+        String log="",report="";var selection=attachmentSelection(value);
         var identities=new LinkedHashSet<String>();String current=playerName.get();if(current!=null&&!current.isBlank())identities.add(current);
-        Path archive=value.previousSession?latestArchive():null,file=archive==null?game.resolve("logs/latest.log"):archive;
+        Path file=selection.log;boolean compressed=selection.compressed;
         // Historical login names also clean a crash-only report; this does not attach the log.
-        if((value.logs||value.crash)&&Files.isRegularFile(file))identities.addAll(logIdentities(file,archive!=null));
+        if((value.logs||value.crash)&&Files.isRegularFile(file))identities.addAll(logIdentities(file,compressed));
         if(value.logs){
-            if(Files.isRegularFile(file))log=archive==null?tail(file,128*1024):gzipTail(file,128*1024);else note="未找到日志文件。";
-            if(value.previousSession&&archive==null)note="未找到上次日志，将附带本次启动日志。";
+            if(Files.isRegularFile(file))log=compressed?gzipTail(file,128*1024):tail(file,128*1024);
         }
-        if(value.crash){var selection=crashSelection(value);if(selection.file!=null)report=crashExcerpt(selection.file,64*1024);note=notes(note,selection.note);}
+        if(selection.crash!=null)report=crashExcerpt(selection.crash,64*1024);
         identities.addAll(identities(log+"\n"+report));
-        return new Attachments(tailBounded(sanitize(log,identities),80*1024),excerptBounded(sanitize(report,identities),40*1024),note);
+        return new Attachments(tailBounded(sanitize(log,identities),80*1024),excerptBounded(sanitize(report,identities),40*1024),selection.note);
     }
     private static String notes(String first,String next){return first.isEmpty()?next:next.isEmpty()?first:first+" "+next;}
-    private record CrashSelection(Path file,String note){}
+    private record AttachmentSelection(Path log,boolean compressed,Path crash,String note){}
+    private AttachmentSelection attachmentSelection(Draft value)throws IOException {
+        if(!value.logs&&!value.crash)return new AttachmentSelection(game.resolve("logs/latest.log"),false,null,"");
+        var crash=value.crash?crashSelection(value):new CrashSelection(null,"",false);
+        // Entering a world after restarting must not detach the crash from its original log.
+        boolean previous=crash.file!=null?crash.previousSession:value.previousSession;
+        Path archive=previous?latestArchive():null,file=archive==null?game.resolve("logs/latest.log"):archive;
+        String note=crash.note;
+        if(value.logs){
+            if(previous&&archive==null)note=notes(note,"未找到上次日志，将附带本次启动日志。");
+            else if(!Files.isRegularFile(file))note=notes(note,"未找到日志文件。");
+        }
+        return new AttachmentSelection(file,archive!=null,crash.file,note);
+    }
+    private record CrashSelection(Path file,String note,boolean previousSession){}
     private CrashSelection crashSelection(Draft value)throws IOException {
-        Path latest=latestCrash();if(latest==null)return new CrashSelection(null,"未找到崩溃报告，可照常提交日志和问题描述。");
-        long time=Files.getLastModifiedTime(latest).toMillis(),lower=value.previousSession?previousStart:startedAt;
-        if(lower==0||time<lower||value.previousSession&&time>=startedAt){String date=java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(java.time.ZoneId.systemDefault()).format(java.time.Instant.ofEpochMilli(time));return new CrashSelection(null,"崩溃报告（"+date+"）不属于所选运行，未附带。");}
-        return new CrashSelection(latest,"");
+        Path latest=latestCrash();if(latest==null)return new CrashSelection(null,"未找到崩溃报告，可照常提交日志和问题描述。",false);
+        long time=Files.getLastModifiedTime(latest).toMillis();
+        if(!value.previousSession&&time>=startedAt)return new CrashSelection(latest,"",false);
+        String date=java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(java.time.ZoneId.systemDefault()).format(java.time.Instant.ofEpochMilli(time));
+        if(previousStart>0&&time>=previousStart&&time<startedAt)return new CrashSelection(latest,"已附带上次运行的崩溃报告（"+date+"）。",true);
+        return new CrashSelection(null,"崩溃报告（"+date+"）不属于本次或上次运行，未附带。",false);
     }
     private static Set<String> logIdentities(Path file,boolean compressed)throws IOException {
         var names=new LinkedHashSet<String>();String carry="";long total=0;byte[] buffer=new byte[8192];
@@ -223,7 +238,13 @@ final class BugReportClient {
             int count;while((count=stream.read(buffer))>=0){total+=count;if(total>64L*1024*1024)throw new IOException();String text=carry+new String(buffer,0,count,StandardCharsets.UTF_8);var login=LOGIN_PLAYER.matcher(text);while(login.find()){names.add(login.group(1));if(names.size()>128)throw new IOException();}carry=text.substring(Math.max(0,text.length()-128));}
         }return names;
     }
-    private Path latestArchive()throws IOException {return newest(game.resolve("logs"),"*.log.gz");}
+    private Path latestArchive()throws IOException {
+        if(previousStart<=0)return null;
+        Path archive=newest(game.resolve("logs"),"*.log.gz");if(archive==null)return null;
+        long time=Files.getLastModifiedTime(archive).toMillis();
+        // Log4j may finish compressing the previous log shortly after this JVM starts.
+        return time>=previousStart&&time<=startedAt+120_000L?archive:null;
+    }
     private Path latestCrash()throws IOException {Path managed=newest(game.resolve("crash-reports"),"crash-*.txt"),nativeCrash=newest(game,"hs_err_pid*.log");return managed==null?nativeCrash:nativeCrash!=null&&Files.getLastModifiedTime(nativeCrash).compareTo(Files.getLastModifiedTime(managed))>0?nativeCrash:managed;}
     private static Path newest(Path directory,String glob)throws IOException {
         Path latest=null;long modified=Long.MIN_VALUE;

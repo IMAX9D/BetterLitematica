@@ -10,6 +10,7 @@ final class SchematicFoldersScreen extends MenuScreen {
     private final BlueprintBrowserScreen browser;
     private String confirming="",status="",removingSource="";
     private long confirmingSince;
+    private boolean resetConfirmed;
     private CompletableFuture<Void> pending;
     private CompletableFuture<Optional<String>> selecting;
     private CompletableFuture<SchematicFolders.Folder> loading;
@@ -31,6 +32,10 @@ final class SchematicFoldersScreen extends MenuScreen {
         }
         var load=fixedAction("加载文件夹",0,104,this::chooseFolder);load.active=!busy();
         hint(load,"使用系统文件管理器选择投影目录，重启后仍会保留");
+        if(!controller.folderProblem().isEmpty()){
+            fixed("重试读取",112,76,()->{pending=controller.reloadFolders(false);status="";resetConfirmed=false;refresh();}).active=!busy();
+            fixed(resetConfirmed?"确认重置":"重置挂载",196,88,()->{if(!resetConfirmed){resetConfirmed=true;refresh();return;}pending=controller.reloadFolders(true);status="";removingSource="";resetConfirmed=false;refresh();}).active=!busy();
+        }
     }
     private boolean busy(){return pending!=null||selecting!=null||loading!=null;}
     private void chooseFolder(){
@@ -50,12 +55,12 @@ final class SchematicFoldersScreen extends MenuScreen {
             loading=null;refresh();
         }
         if(pending!=null&&pending.isDone()){
-            try{pending.join();if(browser.inFolder(removingSource))browser.openFolder("");status="已移除文件夹";}
+            try{pending.join();if(removingSource.isEmpty()||browser.inFolder(removingSource))browser.openFolder("");status=removingSource.isEmpty()?"文件夹配置已更新":"已移除文件夹";removingSource="";}
             catch(RuntimeException e){status=reason(e,"移除文件夹失败");}
             pending=null;confirming="";refresh();
         }
     }
     static String reason(Throwable error,String fallback){while(error.getCause()!=null)error=error.getCause();String message=error.getMessage();return message!=null&&message.codePoints().anyMatch(c->c>=0x4e00&&c<=0x9fff)?message:fallback;}
     @Override public void onClose(){if(!busy())super.onClose();}
-    @Override protected String statusLine(){return selecting!=null?"请选择文件夹…":loading!=null?"正在加载…":pending!=null?"正在保存…":status;}
+    @Override protected String statusLine(){return selecting!=null?"请选择文件夹…":loading!=null?"正在加载…":pending!=null?"正在保存…":!status.isEmpty()?status:controller.folderProblem();}
 }

@@ -40,6 +40,7 @@ abstract class UiScreen extends Screen {
 
 abstract class UiWidget extends AbstractWidget {
     UiWidget(int x,int y,int width,int height,Component message){super(x,y,width,height,message);}
+    protected boolean acceptsTextInput(){return false;}
     @Override protected void extractWidgetRenderState(GuiGraphicsExtractor graphics,int x,int y,float delta){renderWidget(graphics,x,y,delta);}
     protected abstract void renderWidget(GuiGraphicsExtractor graphics,int x,int y,float delta);
     @Override public void onClick(MouseButtonEvent event,boolean doubleClick){onClick(event.x(),event.y());}

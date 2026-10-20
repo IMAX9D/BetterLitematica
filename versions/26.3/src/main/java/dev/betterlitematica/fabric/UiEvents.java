@@ -13,7 +13,13 @@ final class UiEvents {
     static final KeyEvent NONE=new KeyEvent(0,0,0);
     private UiEvents() {}
     static MouseButtonEvent mouse(double x,double y,int button){return new MouseButtonEvent(x,y,new MouseButtonInfo(NativeInput.nativeMouse(button),0));}
-    static KeyEvent key(int key,int scan,int modifiers){return new KeyEvent(NativeInput.nativeKey(key),org.lwjgl.sdl.SDLKeyboard.SDL_GetKeyFromScancode(NativeInput.nativeKey(key),(short)modifiers,false),modifiers);}
+    static KeyEvent key(int key,int keycode,int modifiers){
+        int nativeKey=NativeInput.nativeKey(key);
+        // Keep SDL's layout-aware shortcut key. Recomputing it with Caps Lock changes
+        // 'a' to 'A', breaking the editor's select/copy/paste/cut shortcuts.
+        int logical=keycode>0?keycode:org.lwjgl.sdl.SDLKeyboard.SDL_GetKeyFromScancode(nativeKey,(short)0,false);
+        return new KeyEvent(nativeKey,logical,modifiers);
+    }
     static boolean shiftDown(){return Minecraft.getInstance().hasShiftDown();}
     static boolean controlDown(){return Minecraft.getInstance().hasControlDown();}
     static boolean altDown(){return Minecraft.getInstance().hasAltDown();}
@@ -39,8 +45,20 @@ abstract class UiScreen extends Screen {
 }
 
 abstract class UiWidget extends AbstractWidget {
+    private boolean nativeTextInput;
     UiWidget(int x,int y,int width,int height,Component message){super(x,y,width,height,message);}
-    @Override protected void extractWidgetRenderState(GuiGraphicsExtractor graphics,int x,int y,float delta){renderWidget(graphics,x,y,delta);}
+    protected boolean acceptsTextInput(){return false;}
+    @Override public boolean capturesInput(){return acceptsTextInput();}
+    @Override protected void extractWidgetRenderState(GuiGraphicsExtractor graphics,int x,int y,float delta){syncTextInput();renderWidget(graphics,x,y,delta);}
+    @Override public void setFocused(boolean focused){super.setFocused(focused);syncTextInput();}
+    private void syncTextInput(){
+        boolean capturing=capturesInput();
+        if(capturing==nativeTextInput)return;
+        nativeTextInput=capturing;
+        // SDL emits character/IME events only while a text editor owns native input.
+        // Use Minecraft's owner tracking so leaving this widget cannot disable another editor.
+        Minecraft.getInstance().onTextInputFocusChange(this,capturing);
+    }
     protected abstract void renderWidget(GuiGraphicsExtractor graphics,int x,int y,float delta);
     @Override public void onClick(MouseButtonEvent event,boolean doubleClick){onClick(event.x(),event.y());}
     public void onClick(double x,double y){super.onClick(UiEvents.mouse(x,y,0),false);}

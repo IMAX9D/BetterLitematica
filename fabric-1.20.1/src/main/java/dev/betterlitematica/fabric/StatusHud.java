@@ -48,7 +48,7 @@ final class StatusHud {
         var reasonId=reason.isEmpty()?PrinterReason.Id.NONE:status.id();
         if(reasonId!=candidateReason){candidateReason=reasonId;reasonSince=now;blockedReason="";}
         if(reason.isEmpty())blockedReason="";else if(now-reasonSince>=1_000_000_000L)blockedReason=reason;
-        badgeLabel=!blockedReason.isEmpty()?blockedReason:"打印中"+(percent<0?"":" · "+percent+"%");
+        badgeLabel=!blockedReason.isEmpty()?blockedReason:"打印中"+(percent<0?"":" · "+(printer.progressEstimated()?"约 ":"")+percent+"%");
         if(detail.isEmpty()&&printerVisible)detail=switch(status.id()){
             case NONE,RUNNING,PAUSED,STOPPED,NO_WORK,LOADING,MISSING->"";
             default->!reason.isEmpty()?"":status.description();
@@ -158,7 +158,7 @@ final class StatusHud {
         int border=UiTheme.DARK?0x1effffff:0x3a8191a7;
         int idle=paused?UiTheme.WARNING:UiTheme.DARK?0xff82868f:0xff8993a1;
         int icon=UiMotion.mix(idle,blocked?UiTheme.WARNING:UiTheme.DARK?0xff6ed69c:0xff0ab463,progress);
-        ui.shadow(x,y,x+width,y+diameter,radius);
+
         ui.roundRect(x,y,x+width,y+diameter,radius,surface);
         ui.roundFrame(x,y,x+width,y+diameter,radius,border);
         ui.glyph(UiGlyphArt.Kind.PRINTER,x+5,y+5,diameter-10,icon);

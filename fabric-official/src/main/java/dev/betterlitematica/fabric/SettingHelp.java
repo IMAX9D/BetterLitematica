@@ -75,7 +75,7 @@ final class SettingHelp {
         put(SettingId.OPTIONS_TOOL,"选区工具","启用选区工具的点击与编辑操作。");
         put(SettingId.OPTIONS_TOOL_SETTINGS,"工具设置","打开工具物品和选区操作设置。");
         put(SettingId.OPTIONS_EASY_PLACE,"简单放置","用投影选择材料与放置状态。");
-        put(SettingId.OPTIONS_HOLD,"按住连续","简单放置开启时，按住左键或右键扫过投影连续放置；新位置立即尝试，同一位置短暂等待确认。");
+        put(SettingId.OPTIONS_HOLD,"按住连续","简单放置开启时，按住右键扫过投影连续放置，左键仍用于破坏；新位置立即尝试，同一位置短暂等待确认。");
         put(SettingId.OPTIONS_RESTRICTION,"放置限制","阻止在不符合投影的位置放置。");
         put(SettingId.OPTIONS_PICK,"投影拾取","允许拾取投影对应的物品。");
         put(SettingId.OPTIONS_ACCURATE,"精确放置","选择服务器支持的精确放置协议。");
@@ -102,6 +102,24 @@ final class SettingHelp {
         put(SettingId.BEDROCK_BREAK_EAST,"破坏向东","切换向东破坏目标；至少保留一个破坏方向。");
         put(SettingId.BEDROCK_PISTON_DOWN,"活塞朝下","切换初始活塞朝下；至少保留一个朝向。");
         put(SettingId.BEDROCK_PISTON_UP,"活塞朝上","切换初始活塞朝上；至少保留一个朝向。");
+        put(SettingId.INVENTORY_TOOL,"取料工具物品","设置用于投影选区与编辑的物品；可附带 NBT。");
+        put(SettingId.INVENTORY_HOTBAR,"保护快捷栏","点击 1–9 号栏位切换保护；取料和换工具时不覆盖受保护的栏位。");
+        put(SettingId.TOOL_ITEM,"工具物品","设置选区、摆放和编辑操作使用的工具物品。");
+        put(SettingId.TOOL_EXPAND,"选点模式","选择直接设置角点，或扩展当前选区。");
+        put(SettingId.TOOL_DISTANCE,"工具距离","设置工具选点和操作的距离，范围为 1–200 格。");
+        put(SettingId.TOOL_PRIMARY,"主方块","设置填充、编辑或替换使用的方块及状态。");
+        put(SettingId.TOOL_SECONDARY,"副方块","设置替换操作需要匹配的方块及状态。");
+        put(SettingId.TOOL_DELETE_SCOPE,"删除范围","选择删除当前选区或所选投影范围内的内容。");
+        put(SettingId.TOOL_DELETE_ENTITIES,"删除实体","删除范围内的实体；关闭时保留实体。");
+        put(SettingId.TOOL_PASTE_ENTITIES,"包含实体","粘贴或移动时一并处理实体。");
+        put(SettingId.TOOL_PASTE_NBT,"方块数据","粘贴时包含容器、告示牌等方块数据。");
+        put(SettingId.TOOL_PASTE_RULE,"粘贴替换规则","选择仅填充空气、忽略投影空气，或替换全部。");
+        put(SettingId.TOOL_REQUIRE,"执行需持工具","开启后，只有手持指定工具物品时才允许执行工具操作。");
+        put(SettingId.LAYER_MODE,"分层模式","选择显示全部、单层、范围，或指定层的上方／下方。");
+        put(SettingId.LAYER_AXIS,"分层轴向","选择沿 X、Y 或 Z 轴裁剪投影。");
+        put(SettingId.LAYER_FIRST,"当前层／起始层","输入需要显示的坐标；范围模式下作为起始层。");
+        put(SettingId.LAYER_LAST,"结束层","范围模式下输入结束层，不得小于起始层。");
+        put(SettingId.LAYER_FOLLOW,"跟随玩家","移动时让显示层跟随玩家位置。");
         for(var id:SettingId.values())require(id);
     }
     private static void put(SettingId id,String label,String description){if(HELP.put(id,new Definition(label,description))!=null)throw new IllegalStateException("设置说明重复："+id);}

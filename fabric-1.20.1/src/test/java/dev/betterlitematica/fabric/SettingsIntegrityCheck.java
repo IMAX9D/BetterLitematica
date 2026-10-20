@@ -25,7 +25,10 @@ public final class SettingsIntegrityCheck {
         var supplied=PrinterReason.of(PrinterReason.Id.SUPPLY_INTERRUPTED,"补给已中断");
         check(PrinterReason.failure(new PrinterReason.Failure(supplied)).equals(supplied),"Typed failure lost its cause");
         Path source=Path.of(args[0]);var compiler=ToolProvider.getSystemJavaCompiler();check(compiler!=null,"JDK compiler required");
-        var files=List.of("PrinterScreen.java","BedrockScreen.java","OptionsScreen.java","DisplayScreen.java").stream().map(source::resolve).map(Path::toFile).toList();
+        var names=new ArrayList<>(List.of("PrinterScreen.java","BedrockScreen.java","OptionsScreen.java","DisplayScreen.java"));
+        // Until promotion, inspect child-page registration only in adapters which own those settings.
+        if(Arrays.stream(SettingId.values()).anyMatch(id->id.name().equals("TOOL_REQUIRE")))names.addAll(List.of("ToolScreen.java","InventoryScreen.java","LayerScreen.java"));
+        var files=names.stream().map(source::resolve).map(Path::toFile).toList();
         var diagnostics=new DiagnosticCollector<JavaFileObject>();
         try(var manager=compiler.getStandardFileManager(diagnostics,Locale.ROOT,java.nio.charset.StandardCharsets.UTF_8)){
             var task=(JavacTask)compiler.getTask(null,manager,diagnostics,List.of("-proc:none"),null,manager.getJavaFileObjectsFromFiles(files));

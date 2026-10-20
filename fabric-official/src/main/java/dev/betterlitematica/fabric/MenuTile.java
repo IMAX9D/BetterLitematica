@@ -15,7 +15,6 @@ final class MenuTile extends UiButton {
         var ui=IndependentUi.INSTANCE;double hover=motion.hover(active&&(isHovered()||isFocused())),press=motion.pressed();
         double x=getX(),y=getY()+press*.5,r=x+width,b=y+height,radius=UiTheme.CARD_RADIUS;
         if(isFocused())ui.ring(x,y,r,b,radius,1);
-        if(!UiTheme.DARK)ui.contact(x,y,r,b,radius);
         int fill=UiMotion.mix(UiTheme.SURFACE,UiTheme.HOVER,hover);fill=UiMotion.mix(fill,UiTheme.PRESSED,press*.7);
         ui.roundRect(x,y,r,b,radius,fill);
         ui.roundFrame(x,y,r,b,radius,isFocused()?UiTheme.ACCENT:UiMotion.mix(UiTheme.BORDER,emphasis?UiTheme.ACCENT:UiTheme.BORDER_STRONG,hover*.8));
