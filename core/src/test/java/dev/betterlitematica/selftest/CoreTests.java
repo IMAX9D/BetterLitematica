@@ -58,6 +58,7 @@ public final class CoreTests {
         try{
             test("antialiased status badges and bounded physical rasters",()->{checks+=StatusBadgeChecks.run();});
             test("tintable vector glyphs at exact physical sizes",()->{checks+=UiGlyphChecks.run();});
+            test("antialiased sectors, progress rings and bounded geometry cache",()->{checks+=UiSectorChecks.run();});
             test("complete source previews, embedded digests and bounded cache",()->{checks+=SchematicPreviewChecks.run(temp.resolve("previews"));});
             test("axis handle geometry and stable signed grid dragging",()->{checks+=AxisGizmoChecks.run();});
             test("bounded bedrock construction geometry and power directions",()->{checks+=BedrockPlanChecks.run();});

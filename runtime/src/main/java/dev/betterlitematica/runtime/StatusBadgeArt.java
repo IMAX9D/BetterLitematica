@@ -4,13 +4,11 @@ import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
-import java.awt.RadialGradientPaint;
 import java.awt.RenderingHints;
 import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
 import java.awt.geom.Path2D;
-import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
@@ -20,11 +18,11 @@ import java.util.Objects;
 public final class StatusBadgeArt {
     public enum Kind { EYE_OPEN, EYE_CLOSED, PRINTER_ON, PRINTER_OFF }
     public static final int MIN_PIXELS=12,MAX_PIXELS=192,SUPERSAMPLING=4;
-    private record Style(Color eye,Color muted,Color green,Color shadow,Color top,Color bottom,Color border){}
+    private record Style(Color eye,Color muted,Color green,Color top,Color bottom,Color border){}
     private static final Style LIGHT=new Style(new Color(79,97,124),new Color(137,147,161),new Color(10,180,99),
-        new Color(61,76,101),new Color(251,253,255,229),new Color(241,245,250,221),new Color(129,145,167,58));
+        new Color(251,253,255,229),new Color(241,245,250,221),new Color(129,145,167,58));
     private static final Style DARK=new Style(new Color(236,232,224),new Color(130,134,143),new Color(110,214,156),
-        new Color(0,0,0),new Color(38,40,47,238),new Color(24,25,30,238),new Color(255,255,255,30));
+        new Color(38,40,47,238),new Color(24,25,30,238),new Color(255,255,255,30));
 
     /** Straight-alpha ARGB. The circle occupies [padding, padding + requestedDiameter). */
     public record Raster(int width,int height,int[] argb) {
@@ -33,7 +31,7 @@ public final class StatusBadgeArt {
     }
     private StatusBadgeArt() {}
 
-    /** Padding is outside the nominal circular hit target, solely for its soft shadow. */
+    /** Transparent padding preserves the physical-pixel blit origin and antialiased boundary. */
     public static int padding(int physicalPixels){
         if(physicalPixels<MIN_PIXELS||physicalPixels>MAX_PIXELS)throw new IllegalArgumentException("Badge diameter outside 12..192 physical pixels");
         return Math.max(2,(physicalPixels+7)/8);
@@ -66,12 +64,6 @@ public final class StatusBadgeArt {
     }
 
     private static void surface(Graphics2D g,int diameter,int padding,Style style){
-        Color sh=style.shadow();
-        double center=padding+diameter*.5,drop=diameter*.025;
-        float shadowRadius=(float)Math.min(diameter*.56,diameter*.5+padding-1.25-drop);
-        g.setPaint(new RadialGradientPaint(new Point2D.Double(center,center+drop),shadowRadius,
-            new float[]{0,.78f,.9f,1},new Color[]{new Color(sh.getRed(),sh.getGreen(),sh.getBlue(),dark(style)?44:24),new Color(sh.getRed(),sh.getGreen(),sh.getBlue(),dark(style)?34:21),new Color(sh.getRed(),sh.getGreen(),sh.getBlue(),dark(style)?14:9),new Color(sh.getRed(),sh.getGreen(),sh.getBlue(),0)}));
-        g.fill(new Ellipse2D.Double(center-shadowRadius,center+drop-shadowRadius,shadowRadius*2,shadowRadius*2));
         double border=Math.max(.45,diameter*.0075),inset=border*.5;
         var circle=new Ellipse2D.Double(padding+inset,padding+inset,diameter-border,diameter-border);
         g.setPaint(new GradientPaint(0,padding,style.top(),0,padding+diameter,style.bottom()));
@@ -79,7 +71,6 @@ public final class StatusBadgeArt {
         g.setColor(style.border());g.setStroke(new BasicStroke((float)border));g.draw(circle);
     }
 
-    private static boolean dark(Style style){return style==DARK;}
     private static Path2D eyePath(){
         var path=new Path2D.Double();path.moveTo(.235,.5);
         path.curveTo(.315,.369,.402,.323,.5,.323);path.curveTo(.598,.323,.685,.369,.765,.5);

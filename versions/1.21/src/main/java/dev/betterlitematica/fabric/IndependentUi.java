@@ -3,6 +3,7 @@ package dev.betterlitematica.fabric;
 import dev.betterlitematica.core.UiViewport;
 import dev.betterlitematica.runtime.OutlineFont;
 import dev.betterlitematica.runtime.WeightedLru;
+import dev.betterlitematica.runtime.UiSectorMesh;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.texture.*;
@@ -23,6 +24,7 @@ final class IndependentUi implements AutoCloseable {
     private final Map<Key,CompletableFuture<OutlineFont.Raster>> pending=new LinkedHashMap<>();
     private final WeightedLru<Key,Texture> textures=new WeightedLru<>(16L<<20,256,Texture::bytes,t->MinecraftClient.getInstance().getTextureManager().destroyTexture(t.id()));
     private final StatusBadgeTextures statusBadges=new StatusBadgeTextures();
+    private final UiSectorMesh.Cache sectors=new UiSectorMesh.Cache();
     private record GlyphKey(dev.betterlitematica.runtime.UiGlyphArt.Kind kind,int pixels){}
     private final Map<GlyphKey,CompletableFuture<dev.betterlitematica.runtime.UiGlyphArt.Raster>> pendingGlyphs=new LinkedHashMap<>();
     private final WeightedLru<GlyphKey,Texture> glyphs=new WeightedLru<>(4L<<20,192,Texture::bytes,t->MinecraftClient.getInstance().getTextureManager().destroyTexture(t.id()));
@@ -162,21 +164,18 @@ final class IndependentUi implements AutoCloseable {
         if(last>whole)context.fill(whole,y,last,y+1,color);
         if(right>last)context.fill(last,y,last+1,y+1,UiMotion.alpha(color,right-last));
     }
-    /** Physical-pixel annular sector, also used for discs (inner=0). Angles are radians. */
+    /** Cached physical-pixel coverage keeps both circular and radial edges smooth. */
     void sector(double cx,double cy,double inner,double outer,double start,double end,int color){
-        if(outer<=inner||end<=start)return;
-        color=UiMotion.alpha(color,opacity);
+        var mesh=sectors.get(inner*view.scale(),outer*view.scale(),start,end);
+        int tint=UiMotion.alpha(color,opacity);if(mesh.vertexCount()==0||(tint>>>24)==0)return;
+        float ox=(float)view.pixelX(cx+offsetX),oy=(float)view.pixelY(cy+offsetY);
         context.draw();boolean depth=org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_DEPTH_TEST),cull=org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_CULL_FACE);
         RenderSystem.disableDepthTest();RenderSystem.disableCull();RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();
         try{
             RenderSystem.setShader(net.minecraft.client.render.GameRenderer::getPositionColorProgram);
             var matrix=context.getMatrices().peek().getPositionMatrix();
             var buffer=net.minecraft.client.render.Tessellator.getInstance().begin(net.minecraft.client.render.VertexFormat.DrawMode.QUADS,net.minecraft.client.render.VertexFormats.POSITION_COLOR);
-            int steps=Math.max(1,Math.min(256,(int)Math.ceil((end-start)*outer*view.scale()/5)));
-            for(int i=0;i<steps;i++){
-                double a=start+(end-start)*i/steps,b=start+(end-start)*(i+1)/steps;
-                for(int v=0;v<4;v++){double r=v==1||v==2?outer:inner,t=v<2?a:b;buffer.vertex(matrix,(float)view.pixelX(cx+offsetX+Math.cos(t)*r),(float)view.pixelY(cy+offsetY+Math.sin(t)*r),0).color((color>>>16)&255,(color>>>8)&255,color&255,(color>>>24)&255);}
-            }
+            for(int i=0;i<mesh.vertexCount();i++)buffer.vertex(matrix,ox+mesh.x(i),oy+mesh.y(i),0).color((tint>>>16)&255,(tint>>>8)&255,tint&255,mesh.color(i,tint)>>>24);
             net.minecraft.client.render.BufferRenderer.drawWithGlobalProgram(buffer.end());
         }finally{RenderSystem.disableBlend();if(depth)RenderSystem.enableDepthTest();if(cull)RenderSystem.enableCull();}
     }
@@ -225,6 +224,6 @@ final class IndependentUi implements AutoCloseable {
     double titleLineHeight(){return font.lineHeight(UiTypography.titlePixels(view.scale(),font))/view.scale();}
     double measureTitle(String text){if(!ready())return 0;int size=UiTypography.titlePixels(view.scale(),font);return measurePixels(bounded(text),size)/view.scale();}
     double pixel(){return 1/view.scale();}
-    void clearTextures(){for(var future:pending.values())future.cancel(false);pending.clear();worker.getQueue().clear();textures.close();widths.clear();trims.clear();statusBadges.clear();for(var future:pendingGlyphs.values())future.cancel(false);pendingGlyphs.clear();glyphs.close();}
+    void clearTextures(){sectors.close();for(var future:pending.values())future.cancel(false);pending.clear();worker.getQueue().clear();textures.close();widths.clear();trims.clear();statusBadges.clear();for(var future:pendingGlyphs.values())future.cancel(false);pendingGlyphs.clear();glyphs.close();}
     @Override public void close(){worker.shutdownNow();pending.clear();clearTextures();statusBadges.close();}
 }

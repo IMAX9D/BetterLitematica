@@ -3,6 +3,7 @@ package dev.betterlitematica.fabric;
 import dev.betterlitematica.core.UiViewport;
 import dev.betterlitematica.runtime.OutlineFont;
 import dev.betterlitematica.runtime.WeightedLru;
+import dev.betterlitematica.runtime.UiSectorMesh;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.texture.*;
@@ -27,6 +28,7 @@ final class IndependentUi implements AutoCloseable {
     private DrawContext frameContext;
     private final WeightedLru<Key,Texture> textures=new WeightedLru<>(16L<<20,256,Texture::bytes,t->retiredTextures.add(t.id()));
     private final StatusBadgeTextures statusBadges=new StatusBadgeTextures();
+    private final UiSectorMesh.Cache sectors=new UiSectorMesh.Cache();
     private record GlyphKey(dev.betterlitematica.runtime.UiGlyphArt.Kind kind,int pixels){}
     private final Map<GlyphKey,CompletableFuture<dev.betterlitematica.runtime.UiGlyphArt.Raster>> pendingGlyphs=new LinkedHashMap<>();
     private final WeightedLru<GlyphKey,Texture> glyphs=new WeightedLru<>(4L<<20,192,Texture::bytes,t->retiredTextures.add(t.id()));
@@ -169,24 +171,21 @@ final class IndependentUi implements AutoCloseable {
         if(last>whole)context.fill(whole,y,last,y+1,color);
         if(right>last)context.fill(last,y,last+1,y+1,UiMotion.alpha(color,right-last));
     }
-    /** Physical-pixel annular sector, also used for discs (inner=0). Angles are radians. */
+    /** Cached physical-pixel coverage keeps both circular and radial edges smooth. */
     void sector(double cx,double cy,double inner,double outer,double start,double end,int color){
-        if(outer<=inner||end<=start)return;
-        int steps=Math.max(1,Math.min(256,(int)Math.ceil((end-start)*outer*view.scale()/5)));
-        float[] points=new float[steps*8];
-        for(int i=0;i<steps;i++){
-            double a=start+(end-start)*i/steps,b=start+(end-start)*(i+1)/steps;
-            for(int v=0;v<4;v++){double r=v==1||v==2?outer:inner,t=v<2?a:b;points[i*8+v*2]=(float)view.pixelX(cx+offsetX+Math.cos(t)*r);points[i*8+v*2+1]=(float)view.pixelY(cy+offsetY+Math.sin(t)*r);}
-        }
+        var mesh=sectors.get(inner*view.scale(),outer*view.scale(),start,end);
+        int tint=UiMotion.alpha(color,opacity);if(mesh.vertexCount()==0||(tint>>>24)==0)return;
+        float ox=(float)view.pixelX(cx+offsetX),oy=(float)view.pixelY(cy+offsetY);
         var pose=new Matrix3x2f(context.getMatrices());ScreenRect clip=clips.peek();
-        ScreenRect bounds=new ScreenRect(px(cx-outer),py(cy-outer),Math.max(1,px(cx+outer)-px(cx-outer)),Math.max(1,py(cy+outer)-py(cy-outer))).transform(pose);
+        double extent=mesh.extent();int l=(int)Math.floor(ox-extent),t=(int)Math.floor(oy-extent),r=(int)Math.ceil(ox+extent),b=(int)Math.ceil(oy+extent);
+        ScreenRect bounds=new ScreenRect(l,t,r-l,b-t).transform(pose);
         if(clip!=null)bounds=bounds.intersection(clip);
-        if(bounds!=null)context.state.addSimpleElement(new Sector(pose,points,UiMotion.alpha(color,opacity),clip,bounds));
+        if(bounds!=null)context.state.addSimpleElement(new Sector(pose,mesh,ox,oy,tint,clip,bounds));
     }
-    private record Sector(Matrix3x2f pose,float[] points,int color,ScreenRect scissorArea,ScreenRect bounds) implements SimpleGuiElementRenderState {
+    private record Sector(Matrix3x2f pose,UiSectorMesh mesh,float ox,float oy,int color,ScreenRect scissorArea,ScreenRect bounds) implements SimpleGuiElementRenderState {
         public com.mojang.blaze3d.pipeline.RenderPipeline pipeline(){return RenderPipelines.GUI;}
         public TextureSetup textureSetup(){return TextureSetup.empty();}
-        public void setupVertices(VertexConsumer consumer,float depth){for(int i=0;i<points.length;i+=2)consumer.vertex(pose,points[i],points[i+1],depth).color(color);}
+        public void setupVertices(VertexConsumer consumer,float depth){for(int i=0;i<mesh.vertexCount();i++)consumer.vertex(pose,ox+mesh.x(i),oy+mesh.y(i),depth).color(mesh.color(i,color));}
     }
     void frame(double x,double y,double right,double bottom,int color){double line=1/view.scale();rect(x,y,right,y+line,color);rect(x,bottom-line,right,bottom,color);rect(x,y,x+line,bottom,color);rect(right-line,y,right,bottom,color);}
     void image(Identifier id,int pixels,double x,double y,double width,double height){
@@ -227,6 +226,6 @@ final class IndependentUi implements AutoCloseable {
     double titleLineHeight(){return font.lineHeight(UiTypography.titlePixels(view.scale(),font))/view.scale();}
     double measureTitle(String text){if(!ready())return 0;int size=UiTypography.titlePixels(view.scale(),font);return measurePixels(bounded(text),size)/view.scale();}
     double pixel(){return 1/view.scale();}
-    void clearTextures(){for(var future:pending.values())future.cancel(false);pending.clear();worker.getQueue().clear();textures.close();widths.clear();trims.clear();statusBadges.clear();for(var future:pendingGlyphs.values())future.cancel(false);pendingGlyphs.clear();glyphs.close();}
+    void clearTextures(){sectors.close();for(var future:pending.values())future.cancel(false);pending.clear();worker.getQueue().clear();textures.close();widths.clear();trims.clear();statusBadges.clear();for(var future:pendingGlyphs.values())future.cancel(false);pendingGlyphs.clear();glyphs.close();}
     @Override public void close(){worker.shutdownNow();pending.clear();clearTextures();statusBadges.close();releaseRetiredTextures();frameContext=null;}
 }

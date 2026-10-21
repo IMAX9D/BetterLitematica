@@ -7,11 +7,14 @@ import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import org.joml.Matrix3x2f;
+import dev.betterlitematica.runtime.UiSectorMesh;
 
 /** Immutable physical-pixel geometry submitted during UI extraction. */
-record UiMeshState(float[] coordinates,int color,Matrix3x2f pose,ScreenRectangle scissorArea,ScreenRectangle bounds) implements GuiElementRenderState {
-    UiMeshState {coordinates=coordinates.clone();pose=new Matrix3x2f(pose);}
+record UiMeshState(UiSectorMesh mesh,float ox,float oy,int color,Matrix3x2f pose,ScreenRectangle scissorArea,ScreenRectangle bounds) implements GuiElementRenderState {
+    UiMeshState {pose=new Matrix3x2f(pose);}
     @Override public RenderPipeline pipeline(){return RenderPipelines.GUI;}
     @Override public TextureSetup textureSetup(){return TextureSetup.noTexture();}
-    @Override public void buildVertices(VertexConsumer consumer){for(int i=0;i<coordinates.length;i+=2)consumer.addVertexWith2DPose(pose,coordinates[i],coordinates[i+1]).setColor(color);}
+    @Override public void buildVertices(VertexConsumer consumer){
+        for(int i=0;i<mesh.vertexCount();i++)consumer.addVertexWith2DPose(pose,ox+mesh.x(i),oy+mesh.y(i)).setColor(mesh.color(i,color));
+    }
 }

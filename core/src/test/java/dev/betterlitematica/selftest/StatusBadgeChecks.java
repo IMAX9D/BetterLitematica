@@ -18,7 +18,7 @@ public final class StatusBadgeChecks {
                 var image=StatusBadgeArt.raster(kind,diameter);states.put(kind,image);
                 check(image.width()==edge&&image.height()==edge&&image.argb().length==edge*edge,"Nominal diameter includes only documented padding");
                 check(image.bytes()==4L*edge*edge&&image.bytes()<=230400,"Bounded final raster byte weight");
-                boolean clearBorder=true,canonicalAlpha=true,fringe=true;int partial=0,green=0;var alphas=new HashSet<Integer>();
+                boolean clearBorder=true,canonicalAlpha=true,fringe=true,noShadow=true;int partial=0,green=0;var alphas=new HashSet<Integer>();
                 for(int y=0;y<edge;y++)for(int x=0;x<edge;x++){
                     int p=image.argb()[x+y*edge],a=p>>>24,r=(p>>>16)&255,g=(p>>>8)&255,b=p&255;
                     if(x==0||y==0||x==edge-1||y==edge-1)clearBorder&=p==0;
@@ -26,11 +26,12 @@ public final class StatusBadgeChecks {
                     if(a<255)partial++;
                     if(a>220&&g>r+35&&g>b+20)green++;
                     double radius=Math.hypot(x+.5-(pad+diameter*.5),y+.5-(pad+diameter*.5));
+                    if(radius>diameter*.5+.75)noShadow=false;
                     if(Math.abs(radius-diameter*.5)<1.5){alphas.add(a);if(a>8)fringe&=r>20&&g>30&&b>40;}
                 }
-                check(clearBorder,"Shadow never clips at bitmap boundary");
+                check(clearBorder&&noShadow,"Badge has no ink outside its antialiased circle");
                 check(canonicalAlpha,"Zero-alpha RGB is canonical transparent");
-                check(fringe,"Circle and shadow have no black fringe");
+                check(fringe,"Circle coverage has no black fringe");
                 check(alphas.size()>=8,"Circle boundary contains fractional coverage");
                 check(partial>diameter*diameter*.55,"Porcelain surface remains translucent");
                 check(kind==StatusBadgeArt.Kind.PRINTER_ON?green>0:green==0,"Only running printer is bright green");
@@ -50,7 +51,9 @@ public final class StatusBadgeChecks {
             int green=0;for(int p:on){int a=p>>>24,r=(p>>>16)&255,g=(p>>>8)&255,b=p&255;if(a>220&&g>r+35&&g>b+20)green++;}
             int offGreen=0;for(int p:off){int a=p>>>24,r=(p>>>16)&255,g=(p>>>8)&255,b=p&255;if(a>220&&g>r+35&&g>b+20)offGreen++;}
             check(green>0&&offGreen==0,"Only the running dark printer is green");
-            boolean clear=true;for(int n=0;n<edge;n++)clear&=on[n]==0&&on[on.length-1-n]==0;check(clear,"Dark shadow stays inside its padding");
+            boolean clear=true;for(int n=0;n<edge;n++)clear&=on[n]==0&&on[on.length-1-n]==0;
+            for(int y=0;y<edge;y++)for(int x=0;x<edge;x++)if(Math.hypot(x+.5-edge/2d,y+.5-edge/2d)>diameter*.5+.75)clear&=on[x+y*edge]==0;
+            check(clear,"Dark badge has transparent padding and no outer shadow");
         }
         for(int diameter:new int[]{Integer.MIN_VALUE,-1,0,11,193,Integer.MAX_VALUE}){
             try{StatusBadgeArt.raster(StatusBadgeArt.Kind.EYE_OPEN,diameter);throw new AssertionError("Unsupported diameter accepted");}
