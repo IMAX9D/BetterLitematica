@@ -12,3 +12,6 @@ accessible method net/minecraft/client/gl/RenderPipelines register (Lcom/mojang/
 accessible method net/minecraft/client/render/entity/EntityRenderer getBoundingBox (Lnet/minecraft/entity/Entity;)Lnet/minecraft/util/math/Box;
 accessible field net/minecraft/client/gui/DrawContext state Lnet/minecraft/client/gui/render/state/GuiRenderState;
 accessible method net/minecraft/client/world/ClientWorld getPendingUpdateManager ()Lnet/minecraft/client/network/PendingUpdateManager;
+accessible field net/minecraft/client/render/chunk/ChunkRenderData chunkOcclusionData Lnet/minecraft/client/render/chunk/ChunkOcclusionData;
+accessible field net/minecraft/client/render/chunk/ChunkOcclusionData visibility Ljava/util/BitSet;
+accessible method net/minecraft/client/render/BuiltChunkStorage getRenderedChunk (Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/client/render/chunk/ChunkBuilder$BuiltChunk;

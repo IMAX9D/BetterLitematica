@@ -14,3 +14,6 @@ accessible field net/minecraft/client/gui/DrawContext state Lnet/minecraft/clien
 accessible field net/minecraft/client/render/OutlineVertexConsumerProvider plainDrawer Lnet/minecraft/client/render/VertexConsumerProvider$Immediate;
 accessible field net/minecraft/client/render/VertexConsumerProvider$Immediate allocator Lnet/minecraft/client/util/BufferAllocator;
 accessible method net/minecraft/client/world/ClientWorld getPendingUpdateManager ()Lnet/minecraft/client/network/PendingUpdateManager;
+accessible field net/minecraft/client/render/chunk/ChunkRenderData chunkOcclusionData Lnet/minecraft/client/render/chunk/ChunkOcclusionData;
+accessible field net/minecraft/client/render/chunk/ChunkOcclusionData visibility Ljava/util/BitSet;
+accessible method net/minecraft/client/render/BuiltChunkStorage getRenderedChunk (Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/client/render/chunk/ChunkBuilder$BuiltChunk;

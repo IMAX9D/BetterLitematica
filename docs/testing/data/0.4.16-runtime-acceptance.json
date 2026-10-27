@@ -1,0 +1,1623 @@
+[
+  {
+    "minecraft": "1.18.1",
+    "label": "1.18.1",
+    "sha256": "f572af466acc50958683f323ca8c99ccb8b9f89832babacf27b7e1f53d1cff3e",
+    "runtimeApi": "0.46.6+1.18",
+    "snapshotStates": 2551,
+    "snapshotComparisons": 71428,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 6,
+      "reservedBytes": 4087808,
+      "drawnSections": 167272,
+      "uploadedBytes": 19260032,
+      "walks": 143,
+      "reuses": 2290,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 391812,
+      "uploadedBytes": 35170564,
+      "walks": 227,
+      "reuses": 6252,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.18.2",
+    "label": "1.18.2",
+    "sha256": "9ac51bda85f2b98c3e777c112977ff0176763c57684107ef501b880e47e4f893",
+    "runtimeApi": "0.77.0+1.18.2",
+    "snapshotStates": 2551,
+    "snapshotComparisons": 71428,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 165144,
+      "uploadedBytes": 20512512,
+      "walks": 143,
+      "reuses": 2281,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 390047,
+      "uploadedBytes": 34672816,
+      "walks": 226,
+      "reuses": 6239,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.19",
+    "label": "1.19",
+    "sha256": "8c83f8f086c3a7d9bcd7935ad4984e29f86cd33a2e4b7d2a6f3aa1d88acf3087",
+    "runtimeApi": "0.58.0+1.19",
+    "snapshotStates": 2673,
+    "snapshotComparisons": 74844,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 160172,
+      "uploadedBytes": 16618784,
+      "walks": 130,
+      "reuses": 2270,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 383837,
+      "uploadedBytes": 35238896,
+      "walks": 224,
+      "reuses": 6212,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.19.1",
+    "label": "1.19.1",
+    "sha256": "c7574ff1d4b59a76d67635b9886772c4544bf0235d72b0396a9442b3bd7296ec",
+    "runtimeApi": "0.58.5+1.19.1",
+    "snapshotStates": 2673,
+    "snapshotComparisons": 74844,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 163955,
+      "uploadedBytes": 19657024,
+      "walks": 119,
+      "reuses": 2285,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 388183,
+      "uploadedBytes": 33921024,
+      "walks": 210,
+      "reuses": 6231,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.19.2",
+    "label": "1.19.2",
+    "sha256": "6ac149f78fc9ac0cdf9e2a7a67310c812cf21821a1750b02cecdd851e12cb519",
+    "runtimeApi": "0.77.0+1.19.2",
+    "snapshotStates": 2673,
+    "snapshotComparisons": 74844,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 160124,
+      "uploadedBytes": 19296768,
+      "walks": 114,
+      "reuses": 2278,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 384018,
+      "uploadedBytes": 33342108,
+      "walks": 209,
+      "reuses": 6218,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.19.3",
+    "label": "1.19.3",
+    "sha256": "f44177908df358ac78529367f09dc4325de4a5cb9b2a8b985c9dcbe42942384e",
+    "runtimeApi": "0.76.1+1.19.3",
+    "snapshotStates": 2743,
+    "snapshotComparisons": 76804,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 6,
+      "reservedBytes": 4087808,
+      "drawnSections": 161599,
+      "uploadedBytes": 18023904,
+      "walks": 126,
+      "reuses": 2288,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 386367,
+      "uploadedBytes": 34906124,
+      "walks": 222,
+      "reuses": 6233,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.19.4",
+    "label": "1.19.4",
+    "sha256": "6a99c71216c94fd89767d9ceb4bd6e5d4e32e3f7b365a34298a32cf5dff89fcc",
+    "runtimeApi": "0.87.2+1.19.4",
+    "snapshotStates": 2824,
+    "snapshotComparisons": 79072,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 166238,
+      "uploadedBytes": 18292352,
+      "walks": 117,
+      "reuses": 2282,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 390079,
+      "uploadedBytes": 34578120,
+      "walks": 215,
+      "reuses": 6210,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.20",
+    "label": "1.20",
+    "sha256": "9611443ecd155051abf214f5239dc5fc7346491f1f546cde06309e681104b1a7",
+    "runtimeApi": "0.83.0+1.20",
+    "snapshotStates": 2844,
+    "snapshotComparisons": 79632,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 159486,
+      "uploadedBytes": 16532448,
+      "walks": 108,
+      "reuses": 2285,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 383747,
+      "uploadedBytes": 31351992,
+      "walks": 166,
+      "reuses": 6262,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.20.1",
+    "label": "1.20.1",
+    "sha256": "278af4b0f9b09bc2816aa5a727faa514e28988419bafa0db8a708353d747a74d",
+    "runtimeApi": "0.92.2+1.20.1",
+    "snapshotStates": 2844,
+    "snapshotComparisons": 79632,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 161693,
+      "uploadedBytes": 17983136,
+      "walks": 107,
+      "reuses": 2299,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 386033,
+      "uploadedBytes": 32749488,
+      "walks": 158,
+      "reuses": 6280,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.20.2",
+    "label": "1.20.2",
+    "sha256": "a6ea93ad000105ca7d86fbef7785305aa1bbcb5a3177dca631d81861646bb0f0",
+    "runtimeApi": "0.91.6+1.20.2",
+    "snapshotStates": 2844,
+    "snapshotComparisons": 79632,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 163528,
+      "uploadedBytes": 18297344,
+      "walks": 82,
+      "reuses": 2327,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 387657,
+      "uploadedBytes": 29128064,
+      "walks": 115,
+      "reuses": 6331,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.20.3",
+    "label": "1.20.3",
+    "sha256": "611de94284bcc52914ed896e3e0698120eba8151c1abd7ef11da63878fecbe7c",
+    "runtimeApi": "0.91.1+1.20.3",
+    "snapshotStates": 3066,
+    "snapshotComparisons": 85848,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 165429,
+      "uploadedBytes": 16252320,
+      "walks": 95,
+      "reuses": 2369,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 388511,
+      "uploadedBytes": 30175384,
+      "walks": 128,
+      "reuses": 6356,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.20.4",
+    "label": "1.20.4",
+    "sha256": "418f5cfeafe683e47d2aa39b3e090f64b6983c2b68363a54f881b514f5708175",
+    "runtimeApi": "0.97.3+1.20.4",
+    "snapshotStates": 3066,
+    "snapshotComparisons": 85848,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 162970,
+      "uploadedBytes": 17039712,
+      "walks": 96,
+      "reuses": 2340,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 386692,
+      "uploadedBytes": 30916772,
+      "walks": 131,
+      "reuses": 6331,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.20.5",
+    "label": "1.20.5",
+    "sha256": "6aebf90443823753ddb4f2766191eb14caf39c5e94ae877c4349af135b35eada",
+    "runtimeApi": "0.97.8+1.20.5",
+    "snapshotStates": 3074,
+    "snapshotComparisons": 86072,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 161029,
+      "uploadedBytes": 17366912,
+      "walks": 69,
+      "reuses": 2353,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 384616,
+      "uploadedBytes": 33390404,
+      "walks": 100,
+      "reuses": 6354,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.20.6",
+    "label": "1.20.6",
+    "sha256": "637135f079ee2cf84d46606e0a79711eab3c4a97749b6477a3256b65e84a5175",
+    "runtimeApi": "0.100.8+1.20.6",
+    "snapshotStates": 3074,
+    "snapshotComparisons": 86072,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 160661,
+      "uploadedBytes": 18502272,
+      "walks": 73,
+      "reuses": 2352,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 384460,
+      "uploadedBytes": 32180592,
+      "walks": 104,
+      "reuses": 6355,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.21",
+    "label": "1.21",
+    "sha256": "ad5fc87d8cfdecd0798810fa4e5a9fd872a8fa4a53578d52fe99d9dd84aab9e5",
+    "runtimeApi": "0.102.0+1.21",
+    "snapshotStates": 3074,
+    "snapshotComparisons": 86072,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 149120,
+      "uploadedBytes": 19313888,
+      "walks": 101,
+      "reuses": 2301,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 373724,
+      "uploadedBytes": 34673284,
+      "walks": 130,
+      "reuses": 6300,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.21.1",
+    "label": "1.21.1",
+    "sha256": "9d7754ba4d6bd113ff6ac3d034a7a430c2f1f108f6493ba66bb607492c54a587",
+    "runtimeApi": "0.116.17+1.21.1",
+    "snapshotStates": 3074,
+    "snapshotComparisons": 86072,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 153285,
+      "uploadedBytes": 21253856,
+      "walks": 103,
+      "reuses": 2342,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 377909,
+      "uploadedBytes": 34310372,
+      "walks": 133,
+      "reuses": 6341,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.21.2",
+    "label": "1.21.2",
+    "sha256": "50c688b1bc15a9c80075a4a6a536d862626f792033e8fdf7a16acbc8de169d06",
+    "runtimeApi": "0.106.1+1.21.2",
+    "snapshotStates": 3155,
+    "snapshotComparisons": 88340,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 162137,
+      "uploadedBytes": 17576576,
+      "walks": 95,
+      "reuses": 2335,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 377980,
+      "uploadedBytes": 30884292,
+      "walks": 132,
+      "reuses": 6187,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.21.3",
+    "label": "1.21.3",
+    "sha256": "ac0c662b22f49adc9e6644a6bbbeeabae81fafab3b9509d041835a77a9e9a5c0",
+    "runtimeApi": "0.114.1+1.21.3",
+    "snapshotStates": 3155,
+    "snapshotComparisons": 88340,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 6,
+      "reservedBytes": 4087808,
+      "drawnSections": 161261,
+      "uploadedBytes": 16558144,
+      "walks": 93,
+      "reuses": 2328,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 376398,
+      "uploadedBytes": 30351988,
+      "walks": 131,
+      "reuses": 6167,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.21.4",
+    "label": "1.21.4",
+    "sha256": "19093a89f715c9c53a607fe7d20dba30924c2bb224f31a4a2da5f79e98d14c0a",
+    "runtimeApi": "0.119.4+1.21.4",
+    "snapshotStates": 3942,
+    "snapshotComparisons": 110376,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 160505,
+      "uploadedBytes": 15438048,
+      "walks": 83,
+      "reuses": 2339,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 375738,
+      "uploadedBytes": 30310396,
+      "walks": 118,
+      "reuses": 6181,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    }
+  },
+  {
+    "minecraft": "1.21.5",
+    "label": "1.21.5",
+    "sha256": "ba06f8010e424a45af7dc8e7abcae2ba3fdee3b4b9371d707c97bd470f811958",
+    "runtimeApi": "0.128.2+1.21.5",
+    "snapshotStates": 3964,
+    "snapshotComparisons": 110992,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 8,
+      "reservedBytes": 2490368,
+      "drawnSections": 144086,
+      "uploadedBytes": 17909552,
+      "multiDrawCalls": 28582,
+      "multiDrawSections": 144086,
+      "walks": 85,
+      "reuses": 2105,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 360943,
+      "uploadedBytes": 34053936,
+      "multiDrawCalls": 74086,
+      "multiDrawSections": 360943,
+      "walks": 122,
+      "reuses": 5967,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "1.21.6",
+    "label": "1.21.6",
+    "sha256": "f02d7cd21a7732a938b1deb023c0b89cee082d689d6ec37243ec73c77b9baa2a",
+    "runtimeApi": "0.128.2+1.21.6",
+    "snapshotStates": 3970,
+    "snapshotComparisons": 111160,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 8,
+      "reservedBytes": 2490368,
+      "drawnSections": 143102,
+      "uploadedBytes": 18646144,
+      "multiDrawCalls": 28863,
+      "multiDrawSections": 143102,
+      "walks": 89,
+      "reuses": 2067,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 358524,
+      "uploadedBytes": 33727912,
+      "multiDrawCalls": 74261,
+      "multiDrawSections": 358524,
+      "walks": 127,
+      "reuses": 5912,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "1.21.7",
+    "label": "1.21.7",
+    "sha256": "666d44137c3cb56729fef22baf4f3f7324c90555432174b2641f4718d221fb47",
+    "runtimeApi": "0.129.0+1.21.7",
+    "snapshotStates": 3970,
+    "snapshotComparisons": 111160,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 8,
+      "reservedBytes": 2490368,
+      "drawnSections": 143075,
+      "uploadedBytes": 17618776,
+      "multiDrawCalls": 28920,
+      "multiDrawSections": 143075,
+      "walks": 82,
+      "reuses": 2086,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 358998,
+      "uploadedBytes": 32107896,
+      "multiDrawCalls": 73676,
+      "multiDrawSections": 358998,
+      "walks": 117,
+      "reuses": 5939,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "1.21.8",
+    "label": "1.21.8",
+    "sha256": "6fa6fad1850d432c17ee060a74aa6be08c8c712836492eb7bd05d3ec4c74a8b8",
+    "runtimeApi": "0.136.1+1.21.8",
+    "snapshotStates": 3970,
+    "snapshotComparisons": 111160,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 10,
+      "reservedBytes": 3112960,
+      "drawnSections": 140189,
+      "uploadedBytes": 16892368,
+      "multiDrawCalls": 28072,
+      "multiDrawSections": 140189,
+      "walks": 89,
+      "reuses": 2061,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 356377,
+      "uploadedBytes": 30282680,
+      "multiDrawCalls": 71704,
+      "multiDrawSections": 356377,
+      "walks": 124,
+      "reuses": 5920,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "1.21.9",
+    "label": "1.21.9",
+    "sha256": "1c28a92cd57b84bd7279da8d9f5b3a85439c7d3673d76c2549e88ff7430a184e",
+    "runtimeApi": "0.134.1+1.21.9",
+    "snapshotStates": 4313,
+    "snapshotComparisons": 120764,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 8,
+      "reservedBytes": 2490368,
+      "drawnSections": 126893,
+      "uploadedBytes": 17596432,
+      "multiDrawCalls": 22993,
+      "multiDrawSections": 126893,
+      "walks": 82,
+      "reuses": 1952,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 340375,
+      "uploadedBytes": 33906816,
+      "multiDrawCalls": 66168,
+      "multiDrawSections": 340375,
+      "walks": 123,
+      "reuses": 5763,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "1.21.10",
+    "label": "1.21.10",
+    "sha256": "643f33b8beae7bacc3c88931a7f65796d5dec176031a470cd8ada7e06d896af4",
+    "runtimeApi": "0.138.4+1.21.10",
+    "snapshotStates": 4313,
+    "snapshotComparisons": 120764,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 8,
+      "reservedBytes": 2490368,
+      "drawnSections": 133209,
+      "uploadedBytes": 18436536,
+      "multiDrawCalls": 25336,
+      "multiDrawSections": 133209,
+      "walks": 86,
+      "reuses": 2038,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 348486,
+      "uploadedBytes": 34643240,
+      "multiDrawCalls": 73161,
+      "multiDrawSections": 348486,
+      "walks": 126,
+      "reuses": 5879,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "1.21.11",
+    "label": "1.21.11",
+    "sha256": "1acff3a16c8a64b21297acf5628167505b8fd3fb892864fb86484717547efb88",
+    "runtimeApi": "0.141.6+1.21.11",
+    "snapshotStates": 4313,
+    "snapshotComparisons": 120764,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 8,
+      "reservedBytes": 2490368,
+      "drawnSections": 127186,
+      "uploadedBytes": 15857704,
+      "multiDrawCalls": 21137,
+      "multiDrawSections": 127186,
+      "walks": 82,
+      "reuses": 1992,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 326197,
+      "uploadedBytes": 30558272,
+      "multiDrawCalls": 56301,
+      "multiDrawSections": 326197,
+      "walks": 120,
+      "reuses": 5784,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "26.1",
+    "label": "26.1",
+    "sha256": "05db900e067a1e2e30ef2a8284c57ff7539e052186e60680d0d8a54ff98311c9",
+    "runtimeApi": "0.145.1+26.1",
+    "snapshotStates": 4315,
+    "snapshotComparisons": 120820,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "graphWalks": 126,
+      "graphVisits": 7727,
+      "cacheReuses": 0,
+      "uploadedBytes": 12899988,
+      "pages": 4,
+      "allocations": 64,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "graphWalks": 278,
+      "graphVisits": 60196,
+      "cacheReuses": 0,
+      "uploadedBytes": 24501000,
+      "pages": 0,
+      "allocations": 0,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "26.1.1",
+    "label": "26.1.1",
+    "sha256": "6fc72f7844cafe90dc5398eebe4e0f114bf241e16472d1e1a186e16f6b2824a9",
+    "runtimeApi": "0.145.1+26.1",
+    "snapshotStates": 4315,
+    "snapshotComparisons": 120820,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "graphWalks": 135,
+      "graphVisits": 7930,
+      "cacheReuses": 0,
+      "uploadedBytes": 15386252,
+      "pages": 4,
+      "allocations": 64,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "graphWalks": 272,
+      "graphVisits": 64456,
+      "cacheReuses": 0,
+      "uploadedBytes": 26833728,
+      "pages": 0,
+      "allocations": 0,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "26.1.2",
+    "label": "26.1.2",
+    "sha256": "4838936f1a3b52a72060c8f35cc958018fa931c699431e3e204068ac1076df69",
+    "runtimeApi": "0.145.4+26.1.2",
+    "snapshotStates": 4315,
+    "snapshotComparisons": 120820,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "graphWalks": 135,
+      "graphVisits": 7757,
+      "cacheReuses": 0,
+      "uploadedBytes": 14585756,
+      "pages": 4,
+      "allocations": 64,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "graphWalks": 281,
+      "graphVisits": 55228,
+      "cacheReuses": 0,
+      "uploadedBytes": 25417076,
+      "pages": 0,
+      "allocations": 0,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "26.2",
+    "label": "26.2",
+    "sha256": "0f0ad00a37fb4c70a0c511c28aaefa9d1a2b780aa7850492a4695c734c7ffd40",
+    "runtimeApi": "0.161.0+26.2",
+    "snapshotStates": 4442,
+    "snapshotComparisons": 124376,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "graphWalks": 100,
+      "graphVisits": 11385,
+      "cacheReuses": 0,
+      "uploadedBytes": 14413428,
+      "pages": 4,
+      "allocations": 64,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "graphWalks": 212,
+      "graphVisits": 65118,
+      "cacheReuses": 0,
+      "uploadedBytes": 26930800,
+      "pages": 0,
+      "allocations": 0,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "26.3",
+    "label": "26.3",
+    "sha256": "0bd746bbc94da03229fccc578ca7cdbbb4c1ec5ce4a2115dead44288f47320c5",
+    "runtimeApi": "0.162.0+26.3",
+    "snapshotStates": 4947,
+    "snapshotComparisons": 138516,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "graphWalks": 104,
+      "graphVisits": 11374,
+      "cacheReuses": 0,
+      "uploadedBytes": 13315960,
+      "pages": 4,
+      "allocations": 64,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "graphWalks": 224,
+      "graphVisits": 70497,
+      "cacheReuses": 0,
+      "uploadedBytes": 26618836,
+      "pages": 0,
+      "allocations": 0,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "1.20.1",
+    "label": "1.20.1-sodium",
+    "sha256": "278af4b0f9b09bc2816aa5a727faa514e28988419bafa0db8a708353d747a74d",
+    "runtimeApi": "0.92.2+1.20.1",
+    "snapshotStates": 2844,
+    "snapshotComparisons": 79632,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": false
+    },
+    "nativeClosed": {
+      "nativeEnabled": false
+    }
+  },
+  {
+    "minecraft": "1.21.1",
+    "label": "1.21.1-sodium",
+    "sha256": "9d7754ba4d6bd113ff6ac3d034a7a430c2f1f108f6493ba66bb607492c54a587",
+    "runtimeApi": "0.116.17+1.21.1",
+    "snapshotStates": 3074,
+    "snapshotComparisons": 86072,
+    "printedBlocks": 12,
+    "nativeInitial": {
+      "nativeEnabled": false
+    },
+    "nativeClosed": {
+      "nativeEnabled": false
+    }
+  },
+  {
+    "minecraft": "1.18.1",
+    "label": "visual-1.18.1-native",
+    "sha256": "f572af466acc50958683f323ca8c99ccb8b9f89832babacf27b7e1f53d1cff3e",
+    "runtimeApi": "0.46.6+1.18",
+    "snapshotStates": null,
+    "snapshotComparisons": null,
+    "printedBlocks": null,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 63830,
+      "uploadedBytes": 8636544,
+      "walks": 142,
+      "reuses": 672,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 288534,
+      "uploadedBytes": 14969264,
+      "walks": 229,
+      "reuses": 4624,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "1.18.1",
+    "label": "visual-1.18.1-vanilla",
+    "sha256": "f572af466acc50958683f323ca8c99ccb8b9f89832babacf27b7e1f53d1cff3e",
+    "runtimeApi": "0.46.6+1.18",
+    "snapshotStates": null,
+    "snapshotComparisons": null,
+    "printedBlocks": null,
+    "nativeInitial": {
+      "nativeEnabled": false
+    },
+    "nativeClosed": {
+      "nativeEnabled": false
+    }
+  },
+  {
+    "minecraft": "1.21.1",
+    "label": "visual-1.21.1-native",
+    "sha256": "9d7754ba4d6bd113ff6ac3d034a7a430c2f1f108f6493ba66bb607492c54a587",
+    "runtimeApi": "0.116.17+1.21.1",
+    "snapshotStates": null,
+    "snapshotComparisons": null,
+    "printedBlocks": null,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 5,
+      "reservedBytes": 1990656,
+      "drawnSections": 48024,
+      "uploadedBytes": 11585152,
+      "walks": 91,
+      "reuses": 706,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 272908,
+      "uploadedBytes": 15787472,
+      "walks": 125,
+      "reuses": 4707,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "1.21.1",
+    "label": "visual-1.21.1-vanilla",
+    "sha256": "9d7754ba4d6bd113ff6ac3d034a7a430c2f1f108f6493ba66bb607492c54a587",
+    "runtimeApi": "0.116.17+1.21.1",
+    "snapshotStates": null,
+    "snapshotComparisons": null,
+    "printedBlocks": null,
+    "nativeInitial": {
+      "nativeEnabled": false
+    },
+    "nativeClosed": {
+      "nativeEnabled": false
+    }
+  },
+  {
+    "minecraft": "1.21.5",
+    "label": "visual-1.21.5-native",
+    "sha256": "ba06f8010e424a45af7dc8e7abcae2ba3fdee3b4b9371d707c97bd470f811958",
+    "runtimeApi": "0.128.2+1.21.5",
+    "snapshotStates": null,
+    "snapshotComparisons": null,
+    "printedBlocks": null,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 6,
+      "reservedBytes": 1867776,
+      "drawnSections": 54977,
+      "uploadedBytes": 7746832,
+      "multiDrawCalls": 12543,
+      "multiDrawSections": 54977,
+      "walks": 86,
+      "reuses": 698,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 279626,
+      "uploadedBytes": 12672656,
+      "multiDrawCalls": 53552,
+      "multiDrawSections": 279626,
+      "walks": 126,
+      "reuses": 4686,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "1.21.5",
+    "label": "visual-1.21.5-vanilla",
+    "sha256": "ba06f8010e424a45af7dc8e7abcae2ba3fdee3b4b9371d707c97bd470f811958",
+    "runtimeApi": "0.128.2+1.21.5",
+    "snapshotStates": null,
+    "snapshotComparisons": null,
+    "printedBlocks": null,
+    "nativeInitial": {
+      "nativeEnabled": false
+    },
+    "nativeClosed": {
+      "nativeEnabled": false
+    }
+  },
+  {
+    "minecraft": "1.21.11",
+    "label": "visual-1.21.11-native",
+    "sha256": "1acff3a16c8a64b21297acf5628167505b8fd3fb892864fb86484717547efb88",
+    "runtimeApi": "0.141.6+1.21.11",
+    "snapshotStates": null,
+    "snapshotComparisons": null,
+    "printedBlocks": null,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "pages": 6,
+      "reservedBytes": 1867776,
+      "drawnSections": 42112,
+      "uploadedBytes": 6630848,
+      "multiDrawCalls": 8586,
+      "multiDrawSections": 42112,
+      "walks": 73,
+      "reuses": 656,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "pages": 0,
+      "reservedBytes": 0,
+      "drawnSections": 252082,
+      "uploadedBytes": 11582064,
+      "multiDrawCalls": 41720,
+      "multiDrawSections": 252082,
+      "walks": 107,
+      "reuses": 4639,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "1.21.11",
+    "label": "visual-1.21.11-vanilla",
+    "sha256": "1acff3a16c8a64b21297acf5628167505b8fd3fb892864fb86484717547efb88",
+    "runtimeApi": "0.141.6+1.21.11",
+    "snapshotStates": null,
+    "snapshotComparisons": null,
+    "printedBlocks": null,
+    "nativeInitial": {
+      "nativeEnabled": false
+    },
+    "nativeClosed": {
+      "nativeEnabled": false
+    }
+  },
+  {
+    "minecraft": "26.1",
+    "label": "visual-26.1-native",
+    "sha256": "05db900e067a1e2e30ef2a8284c57ff7539e052186e60680d0d8a54ff98311c9",
+    "runtimeApi": "0.145.1+26.1",
+    "snapshotStates": null,
+    "snapshotComparisons": null,
+    "printedBlocks": null,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "graphWalks": 73,
+      "graphVisits": 7680,
+      "cacheReuses": 0,
+      "uploadedBytes": 5469576,
+      "pages": 4,
+      "allocations": 64,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "graphWalks": 161,
+      "graphVisits": 64751,
+      "cacheReuses": 0,
+      "uploadedBytes": 9157100,
+      "pages": 0,
+      "allocations": 0,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "26.1",
+    "label": "visual-26.1-vanilla",
+    "sha256": "05db900e067a1e2e30ef2a8284c57ff7539e052186e60680d0d8a54ff98311c9",
+    "runtimeApi": "0.145.1+26.1",
+    "snapshotStates": null,
+    "snapshotComparisons": null,
+    "printedBlocks": null,
+    "nativeInitial": {
+      "nativeEnabled": false
+    },
+    "nativeClosed": {
+      "nativeEnabled": false
+    }
+  },
+  {
+    "minecraft": "26.3",
+    "label": "visual-26.3-native",
+    "sha256": "0bd746bbc94da03229fccc578ca7cdbbb4c1ec5ce4a2115dead44288f47320c5",
+    "runtimeApi": "0.162.0+26.3",
+    "snapshotStates": null,
+    "snapshotComparisons": null,
+    "printedBlocks": null,
+    "nativeInitial": {
+      "nativeEnabled": true,
+      "graphWalks": 49,
+      "graphVisits": 11066,
+      "cacheReuses": 0,
+      "uploadedBytes": 5526920,
+      "pages": 4,
+      "allocations": 64,
+      "nativeWorkerThreads": [
+        "BetterLitematica-Terrain-1",
+        "BetterLitematica-Terrain-2",
+        "BetterLitematica-Terrain-3",
+        "BetterLitematica-Terrain-4",
+        "BetterLitematica-Terrain-5",
+        "BetterLitematica-Terrain-6"
+      ]
+    },
+    "nativeClosed": {
+      "nativeEnabled": true,
+      "graphWalks": 97,
+      "graphVisits": 69853,
+      "cacheReuses": 0,
+      "uploadedBytes": 9189492,
+      "pages": 0,
+      "allocations": 0,
+      "nativeWorkerThreads": []
+    }
+  },
+  {
+    "minecraft": "26.3",
+    "label": "visual-26.3-vanilla",
+    "sha256": "0bd746bbc94da03229fccc578ca7cdbbb4c1ec5ce4a2115dead44288f47320c5",
+    "runtimeApi": "0.162.0+26.3",
+    "snapshotStates": null,
+    "snapshotComparisons": null,
+    "printedBlocks": null,
+    "nativeInitial": {
+      "nativeEnabled": false
+    },
+    "nativeClosed": {
+      "nativeEnabled": false
+    }
+  }
+]

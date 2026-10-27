@@ -91,7 +91,7 @@ final class ProjectionController implements AutoCloseable {
     private boolean gpuReleaseFailure;
     private void releaseGpu(int limit,long deadline){try{gpuResources.drain(limit,deadline);gpuReleaseFailure=false;}catch(RuntimeException e){if(!gpuReleaseFailure)BetterLitematicaClient.LOGGER.error("GPU resource release will retry",e);gpuReleaseFailure=true;}}
     private ProjectionScene scene=new ProjectionScene(List.of());
-    private final WorldSectionChanges renderChanges=new WorldSectionChanges(2048);
+    private final WorldColumnChanges renderChanges=new WorldColumnChanges(2048);
     private PlacementAnalysis analysis;
     private boolean errorOverlay;
     private final Map<String, CompletableFuture<String>> background = new LinkedHashMap<>();
@@ -293,7 +293,7 @@ final class ProjectionController implements AutoCloseable {
     void render(WorldRenderContext context) {
         applyRenderBudget();gpuResources.nextFrame();
         if(renderChanges.takeAll()){for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldAllChanged();}
-        else{var changes=renderChanges.drain(64);if(!changes.isEmpty())for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldChanged(changes);}
+        else{var changes=renderChanges.drain(8);if(!changes.isEmpty())for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldChanged(changes);}
         boolean show=rendering&&!temporarilyHidden&&options.display.projection;
         // All placements publish their visibility before any one can reclaim memory.
         for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.prepareFrame(context,show&&entry.placement.enabled()&&entry.placement.renderBlocks());

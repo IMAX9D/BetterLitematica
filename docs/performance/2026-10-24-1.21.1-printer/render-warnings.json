@@ -1,0 +1,72 @@
+[
+  {
+    "case": "03-65-high-better",
+    "unsupportedModels": [
+      "minecraft:water[level=3]"
+    ]
+  },
+  {
+    "case": "04-65-high-better-sodium",
+    "unsupportedModels": [
+      "minecraft:water[level=5]"
+    ]
+  },
+  {
+    "case": "05-40-high-better",
+    "unsupportedModels": [
+      "minecraft:water[level=2]",
+      "minecraft:water[level=3]",
+      "minecraft:water[level=5]"
+    ]
+  },
+  {
+    "case": "06-40-high-better-sodium",
+    "unsupportedModels": [
+      "minecraft:water[level=3]",
+      "minecraft:water[level=5]"
+    ]
+  },
+  {
+    "case": "11-65-medium-better-sodium",
+    "unsupportedModels": [
+      "minecraft:water[level=3]",
+      "minecraft:water[level=5]"
+    ]
+  },
+  {
+    "case": "13-40-medium-better-sodium",
+    "unsupportedModels": [
+      "minecraft:water[level=3]",
+      "minecraft:water[level=5]"
+    ]
+  },
+  {
+    "case": "16-40-medium-better",
+    "unsupportedModels": [
+      "minecraft:water[level=2]",
+      "minecraft:water[level=3]",
+      "minecraft:water[level=5]"
+    ]
+  },
+  {
+    "case": "18-65-low-better",
+    "unsupportedModels": [
+      "minecraft:water[level=5]"
+    ]
+  },
+  {
+    "case": "23-40-low-better-sodium",
+    "unsupportedModels": [
+      "minecraft:water[level=3]",
+      "minecraft:water[level=5]"
+    ]
+  },
+  {
+    "case": "24-40-low-better",
+    "unsupportedModels": [
+      "minecraft:water[level=2]",
+      "minecraft:water[level=3]",
+      "minecraft:water[level=5]"
+    ]
+  }
+]

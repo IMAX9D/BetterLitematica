@@ -31,7 +31,24 @@
     "TexturePhaseAccessor",
     "RenderPhaseAccessor",
     "ProjectionWorldRenderMixin",
-    "InventoryDirectUpdateMixin"
+    "InventoryDirectUpdateMixin",
+    "WeightedModelAccessor",
+    "MultipartModelAccessor",
+    "TerrainChunkInfoAccessor",
+    "TerrainLayerIndexMixin",
+    "TerrainVisibilityGraphMixin",
+    "TerrainFrustumAccessor",
+    "TerrainDataClearMixin",
+    "TerrainDataPublishMixin",
+    "TerrainSectionBufferMixin",
+    "TerrainSortUploadMixin",
+    "TerrainUploadQueueMixin",
+    "TerrainRegionDrawMixin",
+    "TerrainGraphEventsMixin",
+    "TerrainBufferCloseMixin",
+    "TerrainMeshStoreMixin",
+    "TerrainBuilderPoolMixin",
+    "TerrainBatchDrawMixin"
   ],
   "injectors": {
     "defaultRequire": 1

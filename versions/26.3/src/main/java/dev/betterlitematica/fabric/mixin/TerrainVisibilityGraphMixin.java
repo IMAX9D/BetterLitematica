@@ -35,9 +35,12 @@ public abstract class TerrainVisibilityGraphMixin {
             Queue<SectionOcclusionGraph.Node> queue,boolean culling,Consumer<RenderSection> added,
             LongOpenHashSet empty,LongOpenHashSet loaded,CallbackInfo ci){
         ci.cancel();
+        dev.betterlitematica.fabric.TerrainNativeBudget.changing();
+        try{dev.betterlitematica.fabric.TerrainNativeBudget.graphWalks++;
         long cameraNode=SectionPos.of(camera).asLong();
         int cx=SectionPos.x(cameraNode),cy=SectionPos.y(cameraNode),cz=SectionPos.z(cameraNode);
         while(!queue.isEmpty()){
+            dev.betterlitematica.fabric.TerrainNativeBudget.graphVisits++;
             var node=queue.remove();var section=node.section;long position=section.getSectionNode();
             long column=ChunkPos.fromSectionNode(position);
             if(!loaded.contains(column)){
@@ -81,6 +84,7 @@ public abstract class TerrainVisibilityGraphMixin {
                 }
             }
         }
+            }finally{dev.betterlitematica.fabric.TerrainNativeBudget.changed();}
     }
 
     @Unique private static long betterlitematica$connections(SectionMesh mesh){

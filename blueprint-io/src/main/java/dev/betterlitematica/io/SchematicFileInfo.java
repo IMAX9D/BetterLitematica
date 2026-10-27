@@ -12,7 +12,7 @@ public record SchematicFileInfo(String name,String author,String description,int
     private static final Set<String> HEADER=Set.of("Version","MinecraftDataVersion","DataVersion","Metadata","Regions","Width","Height","Length","size","Schematic");
     private static final Set<String> METADATA=Set.of("Name","Author","Description","TotalBlocks","TotalVolume","PreviewImageData");
     public static SchematicFileInfo read(Path source,Cancellation cancel)throws IOException{
-        var root=NbtReader.readPartial(source,new NbtReader.Limits(512L<<20,8L<<20,64,4_000_000),cancel,(path,type)->{
+        var root=NbtReader.readPartial(source,SchematicReadLimits.source(8L<<20),cancel,(path,type)->{
             if(path.size()==1)return !HEADER.contains(path.get(0));
             int start=path.get(0).equals("Schematic")?1:0;if(path.size()<=start)return false;String first=path.get(start);
             if(first.equals("Metadata"))return path.size()>start+1&&!METADATA.contains(path.get(start+1));

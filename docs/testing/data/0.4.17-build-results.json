@@ -1,0 +1,187 @@
+[
+  {
+    "minecraft": "1.20.1",
+    "exitCode": 0,
+    "log": "build-1.20.1.log"
+  },
+  {
+    "minecraft": "26.3",
+    "exitCode": 0,
+    "log": "build-26.3.log",
+    "seconds": 27.52
+  },
+  {
+    "minecraft": "1.18.1",
+    "exitCode": 0,
+    "log": "build-1.18.1.log",
+    "seconds": 20.19
+  },
+  {
+    "minecraft": "1.18.2",
+    "exitCode": 0,
+    "log": "build-1.18.2.log",
+    "seconds": 24.48
+  },
+  {
+    "minecraft": "1.19",
+    "exitCode": 0,
+    "log": "build-1.19.log",
+    "seconds": 21.54
+  },
+  {
+    "minecraft": "1.19.1",
+    "exitCode": 0,
+    "log": "build-1.19.1.log",
+    "seconds": 23.51
+  },
+  {
+    "minecraft": "1.19.2",
+    "exitCode": 0,
+    "log": "build-1.19.2.log",
+    "seconds": 20.11
+  },
+  {
+    "minecraft": "1.19.3",
+    "exitCode": 0,
+    "log": "build-1.19.3.log",
+    "seconds": 24.64
+  },
+  {
+    "minecraft": "1.19.4",
+    "exitCode": 0,
+    "log": "build-1.19.4.log",
+    "seconds": 22.2
+  },
+  {
+    "minecraft": "1.20",
+    "exitCode": 0,
+    "log": "build-1.20.log",
+    "seconds": 23.76
+  },
+  {
+    "minecraft": "1.20.2",
+    "exitCode": 0,
+    "log": "build-1.20.2.log",
+    "seconds": 22.48
+  },
+  {
+    "minecraft": "1.20.3",
+    "exitCode": 0,
+    "log": "build-1.20.3.log",
+    "seconds": 24.08
+  },
+  {
+    "minecraft": "1.20.4",
+    "exitCode": 0,
+    "log": "build-1.20.4.log",
+    "seconds": 20.9
+  },
+  {
+    "minecraft": "1.20.5",
+    "exitCode": 0,
+    "log": "build-1.20.5.log",
+    "seconds": 22.86
+  },
+  {
+    "minecraft": "1.20.6",
+    "exitCode": 0,
+    "log": "build-1.20.6.log",
+    "seconds": 19.07
+  },
+  {
+    "minecraft": "1.21",
+    "exitCode": 0,
+    "log": "build-1.21.log",
+    "seconds": 25.12
+  },
+  {
+    "minecraft": "1.21.1",
+    "exitCode": 0,
+    "log": "build-1.21.1.log",
+    "seconds": 21.4
+  },
+  {
+    "minecraft": "1.21.2",
+    "exitCode": 0,
+    "log": "build-1.21.2.log",
+    "seconds": 25.84
+  },
+  {
+    "minecraft": "1.21.3",
+    "exitCode": 0,
+    "log": "build-1.21.3.log",
+    "seconds": 22.35
+  },
+  {
+    "minecraft": "1.21.4",
+    "exitCode": 0,
+    "log": "build-1.21.4.log",
+    "seconds": 26.21
+  },
+  {
+    "minecraft": "1.21.5",
+    "exitCode": 0,
+    "log": "build-1.21.5.log",
+    "seconds": 19.74
+  },
+  {
+    "minecraft": "1.21.6",
+    "exitCode": 0,
+    "log": "build-1.21.6.log",
+    "seconds": 22.61
+  },
+  {
+    "minecraft": "1.21.7",
+    "exitCode": 0,
+    "log": "build-1.21.7.log",
+    "seconds": 18.48
+  },
+  {
+    "minecraft": "1.21.8",
+    "exitCode": 0,
+    "log": "build-1.21.8.log",
+    "seconds": 22.24
+  },
+  {
+    "minecraft": "1.21.9",
+    "exitCode": 0,
+    "log": "build-1.21.9.log",
+    "seconds": 20.65
+  },
+  {
+    "minecraft": "1.21.10",
+    "exitCode": 0,
+    "log": "build-1.21.10.log",
+    "seconds": 22.72
+  },
+  {
+    "minecraft": "1.21.11",
+    "exitCode": 0,
+    "log": "build-1.21.11.log",
+    "seconds": 19.04
+  },
+  {
+    "minecraft": "26.1",
+    "exitCode": 0,
+    "log": "build-26.1.log",
+    "seconds": 21.84
+  },
+  {
+    "minecraft": "26.1.1",
+    "exitCode": 0,
+    "log": "build-26.1.1.log",
+    "seconds": 18.08
+  },
+  {
+    "minecraft": "26.1.2",
+    "exitCode": 0,
+    "log": "build-26.1.2.log",
+    "seconds": 23.57
+  },
+  {
+    "minecraft": "26.2",
+    "exitCode": 0,
+    "log": "build-26.2.log",
+    "seconds": 18.05
+  }
+]

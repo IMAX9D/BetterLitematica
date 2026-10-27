@@ -1,0 +1,278 @@
+{
+  "cases": [
+    {
+      "case": "01-65-high-original-sodium",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 219761,
+      "formalFrameIntervals": 28024,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "02-65-high-original",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 44123,
+      "formalFrameIntervals": 11353,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "03-65-high-better",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 37794,
+      "formalFrameIntervals": 6049,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "04-65-high-better-sodium",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 137849,
+      "formalFrameIntervals": 9096,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "05-40-high-better",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 32495,
+      "formalFrameIntervals": 5023,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "06-40-high-better-sodium",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 115837,
+      "formalFrameIntervals": 8494,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "07-40-high-original-sodium",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 195402,
+      "formalFrameIntervals": 25280,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "08-40-high-original",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 37899,
+      "formalFrameIntervals": 9546,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "09-65-medium-original",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 47627,
+      "formalFrameIntervals": 11885,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "10-65-medium-better",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 40023,
+      "formalFrameIntervals": 6112,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "11-65-medium-better-sodium",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 140279,
+      "formalFrameIntervals": 9491,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "12-65-medium-original-sodium",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 201141,
+      "formalFrameIntervals": 24710,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "13-40-medium-better-sodium",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 115502,
+      "formalFrameIntervals": 8387,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "14-40-medium-original-sodium",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 194283,
+      "formalFrameIntervals": 25310,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "15-40-medium-original",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 40273,
+      "formalFrameIntervals": 10503,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "16-40-medium-better",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 31843,
+      "formalFrameIntervals": 5177,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "17-65-low-better-sodium",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 141031,
+      "formalFrameIntervals": 9262,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "18-65-low-better",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 37632,
+      "formalFrameIntervals": 5839,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "19-65-low-original",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 44919,
+      "formalFrameIntervals": 11494,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "20-65-low-original-sodium",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 200875,
+      "formalFrameIntervals": 26771,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "21-40-low-original",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 38378,
+      "formalFrameIntervals": 9840,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "22-40-low-original-sodium",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 197990,
+      "formalFrameIntervals": 26215,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": true
+    },
+    {
+      "case": "23-40-low-better-sodium",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 130832,
+      "formalFrameIntervals": 9441,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    },
+    {
+      "case": "24-40-low-better",
+      "inputAndJarHashesVerified": true,
+      "effectiveParametersVerified": true,
+      "framebufferVerified": true,
+      "contiguousRawFrames": 31225,
+      "formalFrameIntervals": 4954,
+      "continuousModeFocusCollisionVerified": true,
+      "viewDirectionVerified": true,
+      "zeroPlacementOutcome": false
+    }
+  ],
+  "totalCases": 24,
+  "formalFrameIntervals": 308256,
+  "formalIntervalSeconds": 2152.2934573000002,
+  "runtimeFilesVerified": 79,
+  "driverSha256": "02ed38518ce57fb24ed26d0273b5a324543391b15eea6cb9f85d464402c70eb9",
+  "schemeSha256": "b67e199f858f9f183460ca3d919bc8afaee357824827702729c3d000a1eb2295",
+  "functionalFailures": [
+    "22-40-low-original-sodium"
+  ],
+  "note": "Measurement integrity is separate from successful construction. The zero-placement failure is retained."
+}

@@ -48,6 +48,23 @@ public final class PrinterQueue {
         if(turns.isEmpty())resetBatch();
         return job;
     }
+    /** Finish available work before requesting absent stock; an exhausted batch never holds up another material. */
+    public Job pollBatch(int heldMaterial,java.util.function.IntPredicate available){
+        Objects.requireNonNull(available);
+        if(turns.isEmpty()){resetBatch();return null;}
+        if(batchRemaining>0&&!available.test(batchMaterial))batchRemaining=0;
+        if(batchRemaining==0){
+            Integer ready=null;
+            if(!batchStarted&&buckets.containsKey(heldMaterial)&&available.test(heldMaterial))ready=heldMaterial;
+            else for(int material:turns)if(available.test(material)){ready=material;break;}
+            // Still visit unavailable work when nothing is ready, so shortages are recorded and supply can retry.
+            batchMaterial=ready!=null?ready:turns.iterator().next();
+            batchRemaining=buckets.get(batchMaterial).size();batchStarted=true;
+        }
+        var job=take(batchMaterial);batchRemaining--;
+        if(turns.isEmpty())resetBatch();
+        return job;
+    }
     private void resetBatch(){batchStarted=false;batchRemaining=0;}
     private Job take(int material){
         turns.remove(material);var queue=buckets.get(material);var job=queue.removeFirst();keys.remove(new Key(job.position(),job.kind()));

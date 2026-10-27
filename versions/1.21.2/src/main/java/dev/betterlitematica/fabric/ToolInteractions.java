@@ -185,11 +185,13 @@ final class ToolInteractions {
     }
     String targetName(){var p=controller.selectedPlacement();return usesSelection()?controller.selection().selected():p==null?"":p.name()+(subRegion.isEmpty()?"":" / "+subRegion);}
     ToolHudData.Input hudData(){
-        var p=controller.selectedPlacement();var s=settings();boolean showPrimary=true;
-        if(mode()==ToolMode.REBUILD&&client.player!=null){var hand=client.player.getMainHandStack();showPrimary=hand.isEmpty()||configuredItem().matches(hand);}
-        return new ToolHudData.Input(mode(),controller.selection(),controller.selectionTarget(),p,
+        var editor=controller.editor();boolean editing=editor.active();var mode=editing?ToolMode.REBUILD:mode();
+        var p=editing?controller.placement(editor.target()):controller.selectedPlacement();var s=settings();boolean showPrimary=true;
+        boolean fixedEditBlock=editing&&!editor.useHeld;
+        if(mode==ToolMode.REBUILD&&client.player!=null){var hand=client.player.getMainHandStack();showPrimary=fixedEditBlock||hand.isEmpty()||configuredItem().matches(hand);}
+        return new ToolHudData.Input(mode,controller.selection(),controller.selectionTarget(),p,
             p==null?List.of():controller.regions(p.id()),p!=null&&Objects.equals(subPlacement,p.id())?subRegion:"",
-            s.expandSelection,s.deletePlacement,s.pasteRule,s.pasteNbt,s.pasteEntities,s.primary,s.secondary,
-            showPrimary,grabbed!=null,Objects.requireNonNullElse(status(),""));
+            s.expandSelection,s.deletePlacement,s.pasteRule,s.pasteNbt,s.pasteEntities,fixedEditBlock?editor.block:s.primary,s.secondary,
+            showPrimary,grabbed!=null,Objects.requireNonNullElse(editing?editor.status:status(),""));
     }
 }

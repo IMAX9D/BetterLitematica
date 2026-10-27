@@ -1,0 +1,27 @@
+{
+  "revisionDate": "2026-10-25",
+  "selectedRuns": [
+    "old-native-high-h65",
+    "new-native-high-h65",
+    "new-native-high-h40-repeat3",
+    "old-native-high-h40"
+  ],
+  "replacements": [
+    {
+      "originalRun": "new-native-high-h40",
+      "replacementRun": "new-native-high-h40-repeat3",
+      "scope": "Entire run, all frames and metrics; no frame deletion or local splicing.",
+      "reason": "User requested the complete report use the latest valid same-condition repeat.",
+      "originalRunStillValid": true,
+      "originalRetained": "runs/new-native-high-h40",
+      "previousReportArchive": "history/before-h40-repeat-selection",
+      "controlsMatchOriginal": true
+    }
+  ],
+  "excludedBeforeSampling": [
+    "new-native-high-h40-repeat1",
+    "new-native-high-h40-repeat2"
+  ],
+  "exclusionReason": "Printer paused during warmup after focus loss; zero formal samples.",
+  "statisticalScope": "One selected run per cell; h40/new has two valid runs retained. Not an all-run pooled estimate."
+}

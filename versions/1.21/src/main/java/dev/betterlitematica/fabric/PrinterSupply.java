@@ -25,6 +25,7 @@ final class PrinterSupply {
     PrinterSupply(MinecraftClient client){this.client=client;stock=new MaterialStock(client);}
     String reason(){return reason.description();} PrinterReason typedReason(){return reason;}boolean active(){return wanted!=null;}
     private void cool(Item item,int tick){if(cooldown.size()>=128&&!cooldown.containsKey(item))cooldown.remove(cooldown.keySet().iterator().next());cooldown.put(item,new Cooldown(tick+100,reason));}
+    private boolean unavailable(int tick){Item item=wanted;reset(true);reason=PrinterReason.of(PrinterReason.Id.MISSING,"潜影盒中没有所需材料");cool(item,tick);return true;}
     static boolean candidate(ItemStack stack,Item item,Source source){return source==Source.AX_SHULKERS?stack.getItem() instanceof BlockItem block&&block.getBlock() instanceof ShulkerBoxBlock:inner(stack,item)>=0;}
     static int inner(ItemStack stack,Item wanted){
         if(!(stack.getItem() instanceof BlockItem block)||!(block.getBlock() instanceof ShulkerBoxBlock))return -1;
@@ -60,7 +61,7 @@ final class PrinterSupply {
         if(stage==2){
             if(client.currentScreen!=null||client.player.currentScreenHandler!=client.player.playerScreenHandler){reset(false);throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.SUPPLY_INTERRUPTED,"补给已中断"));}
             int next=-1;for(int i=0;i<36;i++)if((triedBoxes&(1L<<i))==0&&candidate(client.player.getInventory().getStack(i),wanted,Source.AX_SHULKERS)){next=i;break;}
-            if(next<0){Item item=wanted;reset(false);reason=PrinterReason.of(PrinterReason.Id.MISSING,"潜影盒中没有所需材料");cool(item,tick);return true;}
+            if(next<0)return unavailable(tick);
             boxSlot=next;triedBoxes|=1L<<next;box=identity(client.player.getInventory().getStack(next));started=tick;stage=0;
             client.getNetworkHandler().sendPacket(InventoryTransfers.click(client.player.playerScreenHandler,InventoryTransfers.playerSlot(next),1,SlotActionType.PICKUP));reason=PrinterReason.of(PrinterReason.Id.SUPPLY,"等待潜影盒");return true;
         }
@@ -69,7 +70,7 @@ final class PrinterSupply {
             if(!ownsScreen()){reset(false);throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.SUPPLY_INTERRUPTED,"补给容器已关闭"));}if(!contents)return true;
             if(!ItemStack.areEqual(box,identity(client.player.getInventory().getStack(boxSlot)))||owned.slots.size()!=63){reset(true);throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.SUPPLY_INTERRUPTED,"潜影盒已更换"));}
             int itemSlot=-1;for(int i=0;i<27;i++)if(owned.getSlot(i).getStack().isOf(wanted)){itemSlot=i;break;}
-            if(itemSlot<0){if(chosen==Source.AX_SHULKERS){if(!owned.getCursorStack().isEmpty()){reset(false);throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.SUPPLY_INTERRUPTED,"补给已由玩家接管"));}client.player.closeHandledScreen();owned=null;ownedSync=-1;contents=false;stage=2;return true;}reset(true);throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.MISSING,"潜影盒中没有所需材料"));}
+            if(itemSlot<0){if(!owned.getCursorStack().isEmpty()){reset(false);throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.SUPPLY_INTERRUPTED,"补给已由玩家接管"));}if(chosen==Source.AX_SHULKERS){client.player.closeHandledScreen();owned=null;ownedSync=-1;contents=false;stage=2;return true;}return unavailable(tick);}
             for(int i=0;i<36;i++)before[i]=InventoryReceipts.stamp(i);
             client.getNetworkHandler().sendPacket(InventoryTransfers.click(owned,itemSlot,0,SlotActionType.QUICK_MOVE));stage=1;reason=PrinterReason.of(PrinterReason.Id.SUPPLY,"等待补给确认");return true;
         }

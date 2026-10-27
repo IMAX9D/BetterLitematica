@@ -1,0 +1,22 @@
+{
+  "comparisons.csv": "b99914c759542732aa9db526451f0913bb3a73c840ca0bbd4d0c9435f38935d6",
+  "gpu-summary.csv": "a819930b265e1bca6ce57e905dfca933870474f8fb5aaa5a981da6407a80993e",
+  "integrity-audit.json": "88178ca27e323ccbfe502181ba2356cfa525a1e73319d2ae8ba323818aec6c05",
+  "per-second.csv": "fa86653aa9d93280539826054a08109c0b5e3369056b51d7f23e68b0c83cde06",
+  "render-warnings.json": "6ed0d34624273d1ca7e1966cb47d6009c7326d323261bf87661081b749edcbd2",
+  "segments.csv": "87eb6850dc13daad7b8f4ef09605d2849bf80103e44e3d6708bb94370292b2df",
+  "summary.csv": "343f510735b5095e5be98664c8122323123b933c1e64db6dd3fc5cccdb181c72",
+  "summary.json": "6ca11c856052b45f85cfd0e01dfd999045fe6c6e827fa5a87168fb4e863506c6",
+  "测试报告.md": "be216361a72b2f8d095477422f6458c3c4e2e33f4ca421f0a577eb806e755498",
+  "charts\\fps-40.png": "72d64768e382e76565ec1e8141b7adb46c591af598aef7945511d8e7fd9c1d67",
+  "charts\\fps-65.png": "faf29b726f13c4f1a79b22d421de619735dde96634b0760550bbc5d080d18c6f",
+  "charts\\frametimes-40-high.png": "f548904b069c5ea3ebcc22df1d37957d0550942f3acf8680c6023eab3e2de832",
+  "charts\\frametimes-40-low.png": "0dea605e2b83ae817614fe7f461f3ac5cd2c50e82ded6dcc5f5bed0268e40ccf",
+  "charts\\frametimes-40-medium.png": "acab488d88ef51afdd5abafa70a58de29592b97953ebb51a29ed96fc9f540bbc",
+  "charts\\frametimes-65-high.png": "66459392b27d17e52bd8fdfd2f62f248de226ee2507dc5582eafa6cb7bd8fd44",
+  "charts\\frametimes-65-low.png": "a7baa9b6f1a94cebc759a1d079b3b975c813077525b07ead31e538f7d741fba4",
+  "charts\\frametimes-65-medium.png": "0a11468c6e90dda7fe646803eadeb3d1cb5570dcdb6b1dd7aa2779ed70832017",
+  "charts\\long-frame-burden.png": "51ab9590e6bb006ee5cc9592925ed1f95239007490d2f6f818e1fe285beb3518",
+  "charts\\overview-40.png": "9fc19d844cedb6c6c372a0c76be85c8de72c951ec3aaeb316ea276712e920f85",
+  "charts\\overview-65.png": "edb60c9158c4d3b34012a5650bd3db86bf33c6e0d60ec3f41086ec13247585a2"
+}

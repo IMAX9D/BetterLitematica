@@ -29,7 +29,21 @@
     "RenderLayerAccessor",
     "RenderPhasesAccessor",
     "TexturePhaseAccessor",
-    "RenderPhaseAccessor"
+    "RenderPhaseAccessor",
+    "MultipartModelAccessor",
+    "WeightedModelAccessor",
+    "TerrainChunkInfoAccessor",
+    "TerrainLayerIndexMixin",
+    "TerrainVisibilityGraphMixin",
+    "TerrainFrustumAccessor",
+    "TerrainDataClearMixin",
+    "TerrainDataPublishMixin",
+    "TerrainBufferAllocationMixin",
+    "TerrainSectionBufferMixin",
+    "TerrainSortUploadMixin",
+    "TerrainUploadQueueMixin",
+    "TerrainRegionDrawMixin",
+    "TerrainGraphEventsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

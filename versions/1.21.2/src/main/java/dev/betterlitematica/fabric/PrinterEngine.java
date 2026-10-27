@@ -13,6 +13,7 @@ final class PrinterEngine implements AutoCloseable {
     enum State { STOPPED,RUNNING,PAUSED }
     private record Context(ClientWorld world,List<ProjectionController.PrinterSource> sources,LayerRange layer,AreaSelection selection,long revision) {}
     private final MinecraftClient client;private final ProjectionController controller;private final PrinterActions actions;
+    private final java.util.function.IntPredicate readyMaterial;
     private final PrinterContainers containers;
     private final PrinterSigns signs;
     private final NearbyBuildHud nearby;
@@ -42,7 +43,7 @@ final class PrinterEngine implements AutoCloseable {
     private BlockState fillState;
     private long operations;private PrinterReason status=PrinterReason.STOPPED;
     private PrinterQueue.Job deferredJob;private PrinterReason deferredReason=PrinterReason.NONE;private int deferredUntil;private boolean deferredMissing;
-    PrinterEngine(MinecraftClient client,ProjectionController controller){this.client=client;this.controller=controller;nearby=new NearbyBuildHud(client,controller);containers=new PrinterContainers(client,controller);signs=new PrinterSigns(client,controller);actions=new PrinterActions(client,controller.inventoryTransfers(),()->controller.options().accurate,this::externalAllowed,containers,signs,controller);}
+    PrinterEngine(MinecraftClient client,ProjectionController controller){this.client=client;this.controller=controller;nearby=new NearbyBuildHud(client,controller);containers=new PrinterContainers(client,controller);signs=new PrinterSigns(client,controller);actions=new PrinterActions(client,controller.inventoryTransfers(),()->controller.options().accurate,this::externalAllowed,containers,signs,controller);readyMaterial=actions::materialAvailable;}
     private boolean externalAllowed(){return running()&&client.world!=null&&client.player!=null&&client.currentScreen==null&&client.isWindowFocused()&&!client.player.isDead()&&!controller.worldWriteBusy()&&Objects.equals(context,current());}
     State state(){return state;}boolean acting(){return actions.acting()||containers.acting();}boolean running(){return state==State.RUNNING;}
     boolean ownsBreaking(){return running()&&actions.breaking()&&client.currentScreen==null&&client.isWindowFocused();}
@@ -243,7 +244,7 @@ final class PrinterEngine implements AutoCloseable {
     private boolean consume(PrinterWorkBudget budget){
         if(!pacing.canRun(false))return true;var s=settings();
         while(pacing.canRun(false)&&budget.attempt(System.nanoTime())){
-            boolean resuming=waiting!=null;int held=PrinterActions.heldMaterial(client.player.getMainHandStack());var job=resuming?waiting:queue.pollBatch(held);waiting=null;
+            boolean resuming=waiting!=null;int held=PrinterActions.heldMaterial(client.player.getMainHandStack());var job=resuming?waiting:queue.pollBatch(held,readyMaterial);waiting=null;
             if(job==null){status=idleReason(s);return false;}
             actions.diagnostics.attempts++;
             if(!valid(job)){actions.diagnostics.stale++;if(resuming)actions.reset();continue;}

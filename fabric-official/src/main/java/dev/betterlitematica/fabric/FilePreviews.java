@@ -69,7 +69,7 @@ final class FilePreviews implements AutoCloseable {
             SchematicPreview.OrbitModel model=null;
             if(interactive)try{model=orbitCache.read(key,cancel);if(model!=null)modelHits.incrementAndGet();}catch(InterruptedIOException e){throw e;}catch(IOException e){BetterLitematicaClient.LOGGER.debug("Orbit cache unavailable",e);}
             if(images!=null&&(!interactive||model!=null)){unchanged(source,stamp);return new Preview(images,model,detailSource);}
-            Map<String,Object> root=NbtReader.readPartial(source,SchematicImporter.SOURCE_LIMITS,cancel,FilePreviews::omitAuxiliary);
+            Map<String,Object> root=PreviewSourceReader.read(source,cancel);
             sourceReads.incrementAndGet();
             if(regions.isEmpty()&&(images==null||interactive&&model==null)&&!SourceVersions.requiresFiltering(root,cancel)){
                 var saved=EmbeddedPreviewCache.read(root,cancel);
@@ -83,10 +83,6 @@ final class FilePreviews implements AutoCloseable {
             unchanged(source,stamp);store(key,images,cancel);
             if(model!=null)try{orbitCache.write(key,model,cancel);}catch(InterruptedIOException e){throw e;}catch(IOException e){BetterLitematicaClient.LOGGER.debug("Orbit model could not be cached",e);}
             return new Preview(images,model,detailSource);
-    }
-    private static boolean omitAuxiliary(List<String> path){
-        if(path.isEmpty()||path.size()==2&&path.get(0).equals("Regions"))return false;
-        return switch(path.get(path.size()-1)){case "Entities","entities","TileEntities","BlockEntities","PendingBlockTicks","PendingFluidTicks"->true;default->false;};
     }
     private static void unchanged(Path source,BasicFileAttributes previous)throws IOException{
         var now=Files.readAttributes(source,BasicFileAttributes.class);
@@ -195,7 +191,7 @@ final class FilePreviews implements AutoCloseable {
                 if(!source.sha().equals(SchematicImporter.sha256(path,cancel)))throw new IOException("投影文件已改变，请重新选择");
                 var cachedModel=detailCache.read(source.key(),cancel);
                 if(cachedModel!=null){unchanged(path,source.stamp());detailHits.incrementAndGet();return cachedModel;}
-                var root=NbtReader.readPartial(path,SchematicImporter.SOURCE_LIMITS,cancel,FilePreviews::omitAuxiliary);sourceReads.incrementAndGet();
+                var root=PreviewSourceReader.read(path,cancel);sourceReads.incrementAndGet();
                 var geometry=SchematicPreview.readGeometry(root,source.regions(),SchematicPreview.DETAIL_LOD,cancel);root=null;
                 var fine=SchematicPreview.createOrbitModel(geometry,colors(geometry,cancel),cancel);unchanged(path,source.stamp());
                 detailBuilds.incrementAndGet();

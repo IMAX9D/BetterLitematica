@@ -15,6 +15,14 @@ in vec3 eyeOffset;
 
 out vec4 fragColor;
 void main(){
+    // Resolve which side owns a face exactly on a cut plane. Position alone also admits the
+    // neighbouring excluded block's coplanar face. Derivatives must precede divergent discards.
+    float facing=0.0;
+    if(LayerClip.x>=0.0){
+        vec3 normal=cross(dFdx(eyeOffset),dFdy(eyeOffset));
+        float magnitude=length(normal);
+        if(magnitude>1e-20)facing=normal[int(LayerClip.x+0.5)]/magnitude*(gl_FrontFacing?1.0:-1.0);
+    }
     vec4 texel=texture(Sampler0,texCoord);
     if(TextureMode==1)texel=vec4(1.0,1.0,1.0,texel.r);
     vec4 t=texel*vertexColor;
@@ -23,6 +31,7 @@ void main(){
     // w: soft edge width; a followed layer moves continuously, so its cut fades in over a fraction of a block.
     float layerFade=1.0;
     if(LayerClip.x>=0.0){int axis=int(LayerClip.x+0.5);float c=CameraPos[axis]+eyeOffset[axis];if(c<LayerClip.y-0.01||c>LayerClip.z+0.01)discard;
+        if(c<=LayerClip.y+0.01&&facing>0.999||c>=LayerClip.z-0.01&&facing< -0.999)discard;
         if(LayerClip.w>0.0){if(LayerClip.y>-1e8)layerFade*=smoothstep(LayerClip.y,LayerClip.y+LayerClip.w,c);if(LayerClip.z<1e8)layerFade*=1.0-smoothstep(LayerClip.z-LayerClip.w,LayerClip.z,c);}
         if(layerFade<=0.0)discard;}
     // Surfaces at the eye are removed rather than dimmed: the composite keeps one surface per pixel,

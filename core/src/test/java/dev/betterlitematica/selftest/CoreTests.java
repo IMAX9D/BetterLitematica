@@ -49,6 +49,7 @@ public final class CoreTests {
         }
         var closed=new SectionStreamer(BlueprintCache.open(cachePath),65536);
         try{
+            test("heap-derived source budgets and shared preview reading",()->{checks+=SourceBudgetChecks.run(temp.resolve("source-budget"));});
             var key=closed.source().index().keySet().iterator().next();var result=decoded(closed,key);var ready=streamerReady(closed);closed.close();check(ready.offer(result),"Late ready result replayed after close");closed.drain();
             check(closed.revision()==0&&closed.cachedBytes()==0&&!closed.request(key),"Closed streamer never admits or announces late data");
         }finally{closed.close();}

@@ -11,7 +11,7 @@ import java.util.function.Consumer;
 public final class SchematicImporter {
     public static final long MAX_CELLS=536_870_912L, MAX_SOURCE_BYTES=512L<<20;
     // Full schematic sources share this envelope; generic/capture NBT keeps its smaller default.
-    public static final NbtReader.Limits SOURCE_LIMITS=new NbtReader.Limits(512L<<20,512L<<20,64,4_000_000);
+    public static final NbtReader.Limits SOURCE_LIMITS=SchematicReadLimits.fullSource();
     public record Progress(String phase,long completed,long total) {}
     public record Result(Path path,boolean cacheHit,long elapsedNanos) {}
     private record RegionData(Region region,PackedBits blocks,int[] remap) {

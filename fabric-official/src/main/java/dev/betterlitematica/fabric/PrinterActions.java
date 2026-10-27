@@ -142,6 +142,7 @@ final class PrinterActions {
     }
     private static int lightKey(int level){return -2-level;}
     static int materialKey(BlockState state){return state.is(Blocks.LIGHT)?lightKey(state.getValue(LightBlock.LEVEL)):BuiltInRegistries.ITEM.getId(state.getBlock().asItem());}
+    boolean materialAvailable(int material){return material==-1||available(material<=-2?Items.LIGHT:BuiltInRegistries.ITEM.byId(material));}
     static int heldMaterial(ItemStack held){return held.is(Items.LIGHT)?lightKey(StateResolver1201.itemState(Blocks.LIGHT.defaultBlockState(),held).getValue(LightBlock.LEVEL)):BuiltInRegistries.ITEM.getId(held.getItem());}
     private BlockState placementState(BlockState actual,BlockState expected,PrinterSettings settings,BlockPos pos){
         BlockState place=expected;if(expected.getBlock() instanceof FlowerPotBlock&&!expected.is(Blocks.FLOWER_POT)&&actual.isAir())place=Blocks.FLOWER_POT.defaultBlockState();

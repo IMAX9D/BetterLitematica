@@ -24,3 +24,5 @@ accessible field net/minecraft/client/renderer/chunk/CompiledSectionMesh visibil
 accessible field net/minecraft/client/renderer/chunk/VisibilitySet data Ljava/util/BitSet;
 accessible field net/minecraft/client/renderer/block/dispatch/WeightedVariants list Lnet/minecraft/util/random/WeightedList;
 accessible field net/minecraft/client/renderer/block/dispatch/multipart/MultiPartModel models Ljava/util/List;
+
+accessible class com/mojang/blaze3d/vertex/UberGpuBuffer$StagedAllocationEntry

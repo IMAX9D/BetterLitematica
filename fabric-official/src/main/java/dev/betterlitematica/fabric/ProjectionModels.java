@@ -14,7 +14,7 @@ static float shade(net.minecraft.client.resources.model.geometry.BakedQuad quad)
  ProjectionModels(){super(new ByteBufferBuilder(256),new LinkedHashMap<>());}
  void clear(){layers.clear();untextured.clear();submits.clear();}
  Map<Material,ProjectionVertices> layers(){return layers;}
- int vertices(){return layers.values().stream().mapToInt(ProjectionVertices::size).sum();}
+ int vertices(){int total=0;for(var vertices:layers.values())total+=vertices.size();return total;}
  @Override public VertexConsumer getBuffer(RenderType layer){if(layer.mode()!=VertexFormat.Mode.QUADS)return untextured;var binding=layer.state.textures.get("Sampler0");if(binding==null)return untextured;var material=new Material(binding.location(),layer.name.startsWith("text_intensity"));if(layers.size()>=16&&!layers.containsKey(material))throw new IllegalArgumentException("模型材质超过预算");return layers.computeIfAbsent(material,id->new ProjectionVertices());}
  // Feature dispatch flushes batches normally; these batches are CPU captures, uploaded by the owner.
  @Override public void endLastBatch(){} @Override public void endBatch(){} @Override public void endBatch(RenderType type){}

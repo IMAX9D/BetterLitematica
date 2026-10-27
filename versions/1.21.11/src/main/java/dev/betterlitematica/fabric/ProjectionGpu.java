@@ -45,5 +45,34 @@ final class ProjectionGpu implements AutoCloseable {
         for(int i=0;i<ranges;i++)pass.drawIndexed(0,geometry.firstQuad(i)*6,geometry.quadCount(i)*6,1);
         return true;
     }
+
+    static ProjectionGpu page(int capacity){
+        var mode=VertexFormat.DrawMode.QUADS;int indices=capacity/4*6;
+        RenderSystem.getSequentialBuffer(mode).getIndexBuffer(indices);
+        var buffer=RenderSystem.getDevice().createBuffer(()->"BetterLitematica projection page",GpuBuffer.USAGE_VERTEX|GpuBuffer.USAGE_COPY_DST,(long)capacity*24);
+        return new ProjectionGpu(buffer,mode,indices);
+    }
+    void write(int first,java.nio.ByteBuffer data){RenderSystem.getDevice().createCommandEncoder().writeToBuffer(vertices.slice((long)first*24,data.remaining()),data);}
+    private final PageDraw[] pageDraws={new PageDraw(),new PageDraw()};
+    private static final class PageDraw {int[] ranges;GpuBuffer indices;java.util.List<RenderPass.RenderObject<Void>> commands;}
+    void drawPage(Matrix4f view,Matrix4f projection,float opacity,boolean red,int[] ranges){
+        var surface=surface(view,projection,opacity,net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,false,red);
+        var sequential=RenderSystem.getSequentialBuffer(mode);var index=sequential.getIndexBuffer(indices);var type=sequential.getIndexType();
+        var draw=pageDraws[red?1:0];
+        if(draw.ranges!=ranges||draw.indices!=index){
+            var commands=new java.util.ArrayList<RenderPass.RenderObject<Void>>(ranges.length/2);
+            for(int i=0;i<ranges.length;i+=2)commands.add(new RenderPass.RenderObject<>(0,vertices,index,type,ranges[i],ranges[i+1]));
+            draw.ranges=ranges;draw.indices=index;draw.commands=commands;
+        }
+        try(var pass=pass(ProjectionComposite.target(MinecraftClient.getInstance()),ProjectionShaders.SURFACE)){
+            surface.bind(pass);pass.drawMultipleIndexed(draw.commands,index,type,java.util.List.of(),null);
+        }
+    }
+    boolean drawSurface(Matrix4f view,Matrix4f projection,Identifier texture,boolean intensity,float opacity,QuadVisibility.Part geometry,QuadVisibility.Mask completed,QuadVisibility.Mask wrong,boolean red){
+        if(geometry.rangeCount(completed,wrong,red)==0)return false;
+        var surface=surface(view,projection,opacity,texture,intensity,red);
+        RenderSystem.getSequentialBuffer(mode).getIndexBuffer(indices);
+        try(var pass=pass(ProjectionComposite.target(MinecraftClient.getInstance()),ProjectionShaders.SURFACE)){surface.bind(pass);return draw(pass,geometry,completed,wrong,red);}
+    }
     @Override public void close(){vertices.close();}
 }

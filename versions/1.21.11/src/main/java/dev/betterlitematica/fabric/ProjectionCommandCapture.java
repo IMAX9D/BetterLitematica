@@ -25,10 +25,17 @@ final class ProjectionCommandCapture implements AutoCloseable {
         state.pos=camera.getCameraPos();state.blockPos=camera.getBlockPos();state.entityPos=state.pos;
         state.orientation=new org.joml.Quaternionf(camera.getRotation());state.initialized=true;return state;
     }
+    @SuppressWarnings({"rawtypes","unchecked"})
     void block(net.minecraft.block.entity.BlockEntity entity,ProjectionModels target){
-        var manager=MinecraftClient.getInstance().getBlockEntityRenderDispatcher();var state=manager.getRenderState(entity,0,null);
+        var manager=MinecraftClient.getInstance().getBlockEntityRenderDispatcher();
+        net.minecraft.client.render.block.entity.BlockEntityRenderer renderer=manager.get(entity);
+        if(renderer==null)return;
+        // Static projection capture has its own visibility/range. The live-world dispatcher
+        // returns null beyond its BER distance and must not decide whether this mesh exists.
+        var state=renderer.createRenderState();var camera=camera();
+        renderer.updateRenderState(entity,state,0,camera.pos,null);
         state.lightmapCoordinates=LightmapTextureManager.MAX_LIGHT_COORDINATE;
-        render(target,queue->manager.render(state,new net.minecraft.client.util.math.MatrixStack(),queue,camera()));
+        render(target,queue->renderer.render(state,new net.minecraft.client.util.math.MatrixStack(),queue,camera));
     }
     void render(ProjectionModels target,Consumer<OrderedRenderCommandQueue> submit){
         if(this.target!=null)throw new IllegalStateException("模型捕获不能重入");

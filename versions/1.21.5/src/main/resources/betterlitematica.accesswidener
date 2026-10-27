@@ -11,3 +11,8 @@ accessible method net/minecraft/server/world/ServerChunkManager getChunkFuture (
 accessible method net/minecraft/client/gl/RenderPipelines register (Lcom/mojang/blaze3d/pipeline/RenderPipeline;)Lcom/mojang/blaze3d/pipeline/RenderPipeline;
 accessible method net/minecraft/client/render/entity/EntityRenderer getBoundingBox (Lnet/minecraft/entity/Entity;)Lnet/minecraft/util/math/Box;
 accessible method net/minecraft/client/world/ClientWorld getPendingUpdateManager ()Lnet/minecraft/client/network/PendingUpdateManager;
+
+accessible field net/minecraft/client/render/chunk/ChunkBuilder$ChunkData occlusionGraph Lnet/minecraft/client/render/chunk/ChunkOcclusionData;
+accessible field net/minecraft/client/render/chunk/ChunkOcclusionData visibility Ljava/util/BitSet;
+accessible method net/minecraft/client/render/BuiltChunkStorage getRenderedChunk (Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/client/render/chunk/ChunkBuilder$BuiltChunk;
+accessible field net/minecraft/client/render/chunk/ChunkBuilder$ChunkData transparentSortingData Lnet/minecraft/client/render/BuiltBuffer$SortState;

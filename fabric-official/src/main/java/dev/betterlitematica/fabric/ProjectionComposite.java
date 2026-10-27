@@ -1,13 +1,16 @@
 package dev.betterlitematica.fabric;
 import com.mojang.blaze3d.pipeline.*;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.*;
+
 import net.minecraft.client.Minecraft;
 /** All placements share one nearest-surface image; opacity is applied once per pixel. */
 final class ProjectionComposite implements AutoCloseable {
- private RenderTarget target;private ProjectionGpuMesh quad;
+ private static ProjectionComposite open;
+ private RenderTarget target;private ProjectionGpuMesh quad;private Minecraft client;private boolean started;
  RenderTarget target(){return target;}
- void begin(Minecraft client){var main=ClientUi.target(client);if(target==null||target.width!=main.width||target.height!=main.height){close();target=new TextureTarget("BetterLitematica nearest surface",main.width,main.height,true);}ProjectionDraw.command(()->{RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(target.getColorTexture(),0,target.getDepthTexture(),1);target.copyDepthFrom(ClientUi.target(client));});ProjectionDraw.target(this);}
- void finish(Minecraft client,float opacity){ProjectionDraw.target(null);if(quad==null){try(var b=new ProjectionBuffer(256)){b.begin();b.vertex(-1,-1,0).uv(0,0).color(255,255,255,255);b.vertex(1,-1,0).uv(1,0).color(255,255,255,255);b.vertex(1,1,0).uv(1,1).color(255,255,255,255);b.vertex(-1,1,0).uv(0,1).color(255,255,255,255);quad=new ProjectionGpuMesh(b.end());}}ProjectionDraw.blit(quad,target.getColorTextureView(),opacity);}
+ void begin(Minecraft client){this.client=client;started=false;open=this;}
+ static void activate(){if(open!=null&&!open.started)open.start();}
+ private void start(){var main=ClientUi.target(client);if(target==null||target.width!=main.width||target.height!=main.height){close();target=new TextureTarget("BetterLitematica nearest surface",main.width,main.height,true);}started=true;var destination=target;ProjectionDraw.command(()->{var encoder=RenderSystem.getDevice().createCommandEncoder();encoder.clearColorAndDepthTextures(destination.getColorTexture(),0,destination.getDepthTexture(),1);destination.copyDepthFrom(main);});ProjectionDraw.target(this);}
+ void finish(Minecraft client,float opacity){if(open==this)open=null;ProjectionDraw.target(null);if(!started)return;started=false;if(quad==null){try(var b=new ProjectionBuffer(256)){b.begin();b.vertex(-1,-1,0).uv(0,0).color(255,255,255,255);b.vertex(1,-1,0).uv(1,0).color(255,255,255,255);b.vertex(1,1,0).uv(1,1).color(255,255,255,255);b.vertex(-1,1,0).uv(0,1).color(255,255,255,255);quad=new ProjectionGpuMesh(b.end());}}ProjectionDraw.blit(quad,target.getColorTextureView(),opacity);}
  @Override public void close(){if(target!=null){var old=target;RenderSystem.queueFencedTask(old::destroyBuffers);target=null;}if(quad!=null){quad.close();quad=null;}}
 }

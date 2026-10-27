@@ -26,7 +26,7 @@ public record AuxiliaryData(List<Part> parts) {
         }return new AuxiliaryData(retained);
     }
     public static AuxiliaryData read(Path path,BlueprintMetadata metadata,Cancellation cancel)throws IOException{
-        var root=NbtReader.readPartial(path,new NbtReader.Limits(512L<<20,64L<<20,64,4_000_000),cancel,(branch,type)->omit(branch)||branch.size()==1&&branch.get(0).equals("Blocks")&&type==7);
+        var root=NbtReader.readPartial(path,SchematicReadLimits.source(64L<<20),cancel,(branch,type)->omit(branch)||branch.size()==1&&branch.get(0).equals("Blocks")&&type==7);
         var result=new ArrayList<Part>();int sourceVersion=root.containsKey("MinecraftDataVersion")?NbtReader.integer(root,"MinecraftDataVersion"):root.containsKey("Schematic")?NbtReader.integer(NbtReader.compound(root.get("Schematic"),"Schematic"),"DataVersion"):root.containsKey("DataVersion")?NbtReader.integer(root,"DataVersion"):1343;
         if(root.containsKey("Regions")){
             var regions=NbtReader.compound(root.get("Regions"),"Regions");

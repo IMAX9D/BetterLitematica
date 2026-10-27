@@ -26,7 +26,17 @@
     "MiningLookMixin",
     "SupplyInteractionMixin",
     "ExternalMinerMixin",
-    "CarpetPayloadMixin"
+    "CarpetPayloadMixin",
+    "TerrainVisibilityGraphMixin",
+    "TerrainUploadQueueMixin",
+    "TerrainSectionBufferMixin",
+    "TerrainBuilderPoolMixin",
+    "TerrainMeshStampMixin",
+    "TerrainDataPublishMixin",
+    "TerrainStagingBudgetMixin",
+    "TerrainFrustumAccessor",
+    "TerrainFrustumExpandMixin",
+    "TerrainFrustumCacheMixin"
   ],
   "injectors": {
     "defaultRequire": 1

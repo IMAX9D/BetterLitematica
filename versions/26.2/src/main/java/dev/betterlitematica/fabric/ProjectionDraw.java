@@ -17,11 +17,12 @@ final class ProjectionDraw {
  private record Draw(ProjectionGpuMesh mesh,RenderPipeline pipeline,Matrix4f view,Matrix4f projection,Identifier texture,GpuTextureView direct,float opacity,int intensity,int red,boolean mask,boolean near,ProjectionClip clip,ProjectionComposite target,int[] ranges){}
  static void beginFrame(){clear();composite=null;EntityOverlayMask.prepare();}
  static void target(ProjectionComposite value){composite=value;}
+ static void page(ProjectionGpuMesh mesh,Matrix4f view,Matrix4f projection,float opacity,boolean red,int[] ranges){add(mesh,ProjectionShaders.SURFACE,view,projection,net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS,null,opacity,0,red?1:0,false,false,ranges);}
  static void command(Runnable action){if(commands.size()>=MAX_COMMANDS)throw new IllegalStateException("投影绘制指令超过预算");commands.add(action);}
  static boolean surface(ProjectionGpuMesh mesh,Matrix4f view,Matrix4f projection,Identifier texture,boolean intensity,float opacity,QuadVisibility.Part geometry,QuadVisibility.Mask hidden,QuadVisibility.Mask wrong,boolean red){int[] selected=null;if(geometry!=null){int count=geometry.rangeCount(hidden,wrong,red);if(count==0)return false;selected=new int[count*2];for(int i=0;i<count;i++){selected[i*2]=geometry.firstQuad(i)*6;selected[i*2+1]=geometry.quadCount(i)*6;}}add(mesh,ProjectionShaders.SURFACE,view,projection,texture,null,opacity,intensity?1:0,red?1:0,false,false,selected);return true;}
  static void overlay(ProjectionGpuMesh mesh,Matrix4f projection,boolean face,boolean through,boolean near){add(mesh,ProjectionShaders.overlay(face,through?1:0),new Matrix4f(),projection,null,null,1,0,0,through,near,null);}
  static void blit(ProjectionGpuMesh mesh,GpuTextureView texture,float opacity){add(mesh,ProjectionShaders.COMPOSITE,new Matrix4f(),new Matrix4f(),null,texture,opacity,0,0,false,false,null);}
- private static void add(ProjectionGpuMesh mesh,RenderPipeline pipeline,Matrix4f view,Matrix4f projection,Identifier texture,GpuTextureView direct,float opacity,int intensity,int red,boolean mask,boolean near,int[] selected){int size=selected==null?0:selected.length;if(commands.size()>=MAX_COMMANDS||ranges+size>MAX_RANGE_INTS)throw new IllegalStateException("投影绘制指令超过预算");mesh.retain();commands.add(new Draw(mesh,pipeline,new Matrix4f(view),new Matrix4f(projection),texture,direct,opacity,intensity,red,mask,near,ProjectionClip.current,composite,selected));ranges+=size;}
+ private static void add(ProjectionGpuMesh mesh,RenderPipeline pipeline,Matrix4f view,Matrix4f projection,Identifier texture,GpuTextureView direct,float opacity,int intensity,int red,boolean mask,boolean near,int[] selected){if(pipeline==ProjectionShaders.SURFACE)ProjectionComposite.activate();int size=selected==null?0:selected.length;if(commands.size()>=MAX_COMMANDS||ranges+size>MAX_RANGE_INTS)throw new IllegalStateException("投影绘制指令超过预算");mesh.retain();commands.add(new Draw(mesh,pipeline,new Matrix4f(view),new Matrix4f(projection),texture,direct,opacity,intensity,red,mask,near,ProjectionClip.current,composite,selected));ranges+=size;}
 
  private static final class Batch implements AutoCloseable {
   final com.mojang.blaze3d.pipeline.RenderTarget target;
@@ -39,6 +40,8 @@ final class ProjectionDraw {
   try{
    int index=0;
    for(var value:commands)if(value instanceof Draw draw){
+    RenderSystem.getSequentialBuffer(draw.mesh.mode).getBuffer(draw.mesh.indexCount);
+    if(draw.texture!=null)client.getTextureManager().getTexture(draw.texture);
     // Grow shared indices before opening a render pass; later draws only bind them.
     RenderSystem.getSequentialBuffer(draw.mesh.mode).getBuffer(draw.mesh.indexCount);
     int at=index++*stride;draw.view.get(at,data);draw.projection.get(at+64,data);

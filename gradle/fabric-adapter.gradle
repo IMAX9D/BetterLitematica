@@ -19,7 +19,19 @@ def javaOutput = layout.buildDirectory.dir('generated/sources/adapter')
 def resourceOutput = layout.buildDirectory.dir('generated/resources/adapter')
 def prepareJava = tasks.register('prepareAdapterSources', Sync) {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
-    roots.each { from new File(it, 'java') }
+    // 1.21.5 removed the classic VertexBuffer backend. Its native terrain implementation
+    // lives in the GPU-API adapter, rather than compiling incompatible GL-era hooks unused.
+    def gpuTerrain = remapped && (target.minecraft.tokenize('.').collect { it as int }.with { it[0] == 1 && (it[1] > 21 || (it[1] == 21 && it.size() > 2 && it[2] >= 5)) })
+    def portableTerrain = ['TerrainWorkers.java', 'TerrainBuildStamp.java', 'TerrainSectionOwner.java',
+        'TerrainExpandedBounds.java', 'TerrainView.java', 'TerrainRebuildUpdates.java', 'TerrainRenderLists.java',
+        'TerrainFrustumAccessor.java', 'TerrainChunkHandle.java'] as Set
+    roots.each { root ->
+        from(new File(root, 'java')) {
+            if (gpuTerrain && (root == baseline || !(root.parentFile.parentFile.name in ['1.21.5','1.21.6','1.21.7','1.21.8','1.21.9','1.21.10','1.21.11']))) {
+                exclude { item -> item.name.startsWith('Terrain') && !portableTerrain.contains(item.name) }
+            }
+        }
+    }
     into javaOutput
 }
 def prepareResources = tasks.register('prepareAdapterResources', Sync) {
@@ -75,7 +87,33 @@ def verifyUserFlows = tasks.register('verifyUserFlows', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'dev.betterlitematica.fabric.UserFlowRegressionCheck'
 }
-tasks.named('check') { dependsOn verifySettings, verifyPlacementStroke, verifyUserFlows }
+def verifyProjectionPipeline = tasks.register('verifyProjectionPipeline', JavaExec) {
+    group = 'verification'
+    description = 'Rejects effective overlays that omit asynchronous meshing, shared pages or column refresh.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.betterlitematica.fabric.ProjectionPipelineCheck'
+    args javaOutput.get().file('dev/betterlitematica/fabric').asFile.absolutePath
+}
+def verifyTerrainPipeline = tasks.register('verifyTerrainPipeline', JavaExec) {
+    group = 'verification'
+    description = 'Checks the registered native terrain backend and its actual game-bytecode injection targets.'
+    dependsOn tasks.named('testClasses'), prepareResources
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.betterlitematica.fabric.TerrainPipelineCheck'
+    args resourceOutput.get().file('betterlitematica.mixins.json').asFile.absolutePath,
+        javaOutput.get().file('dev/betterlitematica/fabric').asFile.absolutePath
+}
+def verifyFeaturePromotion = tasks.register('verifyFeaturePromotion', JavaExec) {
+    group = 'verification'
+    description = 'Checks promoted printer, source reader, editor HUD and shader capabilities in every effective adapter.'
+    dependsOn tasks.named('testClasses'), prepareResources
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.betterlitematica.fabric.FeaturePromotionCheck'
+    args javaOutput.get().file('dev/betterlitematica/fabric').asFile.absolutePath,
+        resourceOutput.get().file('assets/betterlitematica/shaders/core/projection_surface.fsh').asFile.absolutePath
+}
+tasks.named('check') { dependsOn verifySettings, verifyPlacementStroke, verifyUserFlows, verifyProjectionPipeline, verifyTerrainPipeline, verifyFeaturePromotion }
 tasks.named('compileJava') { dependsOn prepareJava }
 tasks.named('processResources') { dependsOn prepareResources }
 def widener = roots.collect { new File(it, 'resources/betterlitematica.accesswidener') }.findAll { it.isFile() }.last()

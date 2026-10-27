@@ -10,19 +10,22 @@ import org.joml.Matrix4f;
 
 /** All placements share one nearest-surface image; opacity is applied exactly once per pixel. */
 final class ProjectionComposite implements AutoCloseable {
-    private Framebuffer target;
+    private Framebuffer target;private MinecraftClient client;private boolean started;private static ProjectionComposite open;
     private ProjectionGpu quad;
     private static Framebuffer active;
-    static Framebuffer target(MinecraftClient client){return active==null?client.getFramebuffer():active;}
-    void begin(MinecraftClient client){
+    static Framebuffer target(MinecraftClient client){activate();return active==null?client.getFramebuffer():active;}
+    void begin(MinecraftClient client){this.client=client;started=false;open=this;}
+    static void activate(){if(open!=null&&!open.started)open.start();}
+    private void start(){
         Framebuffer main=client.getFramebuffer();
         if(target==null||target.textureWidth!=main.textureWidth||target.textureHeight!=main.textureHeight){
             close();target=new SimpleFramebuffer("BetterLitematica nearest surface",main.textureWidth,main.textureHeight,true);
         }
         RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(target.getColorAttachment(),0,target.getDepthAttachment(),1);
-        target.copyDepthFrom(main);active=target;
+        target.copyDepthFrom(main);active=target;started=true;
     }
     void finish(MinecraftClient client,float opacity){
+        if(open==this)open=null;if(!started)return;started=false;
         active=null;
         if(quad==null)try(var allocator=new BufferAllocator(256)){
             var b=new BufferBuilder(allocator,VertexFormat.DrawMode.QUADS,VertexFormats.POSITION_TEXTURE_COLOR);

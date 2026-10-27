@@ -1,0 +1,21 @@
+{
+  "build": "2026-10-25-full-stock.5-bl0.4.17",
+  "minecraft": "1.20.1",
+  "betterLitematica": "0.4.17",
+  "betterLitematicaSha256": "abf496102f612adff569d8eef8f356cd2ffa358571f4de05a93dffdd812ea70c",
+  "artifactSha256": "29aa619ca00de50f7fe3e71abaca8a8d35c51af72348ff8a487cb0a9d3c85410",
+  "originalSha256": "bbe2852e79d52dd71d6bf2c55a474782b3aaab4f21c8bf1b6fd8d8b333f1d846",
+  "preservedOriginalEntries": 31,
+  "travelersbackpack": "9.1.50",
+  "trashslot": "15.1.1",
+  "balm": "7.3.38",
+  "inventoryprofilesnext": "1.10.20 (optional)",
+  "stockChecks": 78493,
+  "batchChecks": 2799,
+  "protocolChecks": 9,
+  "bridgeFields": 17,
+  "mixinTargets": 8,
+  "mixinHandlers": 13,
+  "combinedFabricPipeline": true,
+  "gameRuntimeRetested": false
+}

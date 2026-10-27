@@ -12,7 +12,7 @@ final class ProjectionModels implements VertexConsumerProvider {
     private final ProjectionVertices untextured=new ProjectionVertices();
     void clear(){layers.clear();untextured.clear();}
     Map<Material,ProjectionVertices> layers(){return layers;}
-    int vertices(){return layers.values().stream().mapToInt(ProjectionVertices::size).sum();}
+    int vertices(){int total=0;for(var vertices:layers.values())total+=vertices.size();return total;}
     @Override public VertexConsumer getBuffer(RenderLayer layer){
         if(layer.getDrawMode()!=VertexFormat.DrawMode.QUADS||!(layer instanceof RenderLayerAccessor access))return untextured;
         var phase=((RenderPhasesAccessor)(Object)access.betterlitematica$phases()).betterlitematica$texture();var texture=((TexturePhaseAccessor)phase).betterlitematica$id();

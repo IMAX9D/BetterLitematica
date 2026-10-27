@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.retrievepanel.printer.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "plugin": "com.retrievepanel.printer.PrinterMixinPlugin",
+  "client": ["PrinterSupplyMixin", "HiddenBackpackMixin", "PrinterReceiptsMixin", "PrinterScreenInterruptionMixin", "PrinterEngineMixin", "PrinterMaterialMixin", "IpnAutoRefillMixin", "TrashPayloadMixin"],
+  "injectors": {"defaultRequire": 1}
+}

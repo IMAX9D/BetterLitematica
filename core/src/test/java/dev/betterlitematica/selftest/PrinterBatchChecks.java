@@ -19,6 +19,7 @@ public final class PrinterBatchChecks {
     }
     public static int run() {
         var checks = new Checks();
+        availableMaterials(checks);
         var longBatch = new PrinterQueue(512);
         longBatch.offer(job(900, 2), 2);
         for (int i = 0; i < 160; i++) longBatch.offer(job(i, 1), 1);
@@ -113,5 +114,30 @@ public final class PrinterBatchChecks {
                 "Remaining jobs drain exactly once");
         checks.require(pending.isEmpty(), "All accepted work accounted for");
         return checks.count;
+    }
+    private static void availableMaterials(Checks checks){
+        var queue=new PrinterQueue(4096);var stock=new HashSet<Integer>();stock.add(2);
+        for(int i=0;i<2000;i++)queue.offer(job(i,1),1);
+        queue.offer(job(3000,2),2);
+        checks.require(queue.pollBatch(1,stock::contains).position()==3000,
+                "An absent held material and a long missing batch cannot block stocked work");
+        checks.require(queue.pollBatch(1,stock::contains).position()==0,
+                "When all stock is absent a real attempt can still report shortage");
+        queue.offer(job(3001,2),2);
+        checks.require(queue.pollBatch(1,stock::contains).position()==3001,
+                "Newly discovered stocked work interrupts an unavailable batch");
+        stock.add(1);checks.require(queue.pollBatch(2,stock::contains).position()==1,
+                "Replenishment resumes retained jobs without restarting or rediscovery");
+        queue.clear();stock.clear();stock.add(1);stock.add(2);
+        for(int i=0;i<5;i++)queue.offer(job(i,1),1);
+        queue.offer(job(10,2),2);
+        checks.require(queue.pollBatch(1,stock::contains).position()==0,"Begin a stocked batch");
+        stock.remove(1);
+        checks.require(queue.pollBatch(1,stock::contains).position()==10,
+                "Consuming the last item immediately yields to another stocked material");
+        var remaining=new HashSet<Long>();for(long i=1;i<5;i++)remaining.add(i);
+        while(queue.size()>0)checks.require(remaining.remove(queue.pollBatch(1,stock::contains).position()),
+                "Deferred missing work is not lost or duplicated");
+        checks.require(remaining.isEmpty()&&queue.pollBatch(1,stock::contains)==null,"Missing work drains consistently");
     }
 }
