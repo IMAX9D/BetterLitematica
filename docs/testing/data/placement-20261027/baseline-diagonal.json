@@ -1,0 +1,30 @@
+{
+  "passed": false,
+  "checks": {
+    "connected_fence_can_start": false,
+    "connected_pane_can_start": false,
+    "wall_shape_can_settle": false,
+    "block.minecraft.oak_trapdoor_place_closed": false,
+    "block.minecraft.oak_trapdoor_must_adjust": true,
+    "block.minecraft.oak_fence_gate_place_closed": false,
+    "block.minecraft.oak_fence_gate_must_adjust": true,
+    "block.minecraft.oak_door_place_closed": false,
+    "block.minecraft.oak_door_must_adjust": true,
+    "gate_in_wall_is_derived": false,
+    "stairs_shape_is_derived": false,
+    "reject_wrong_material": true,
+    "reject_wrong_facing": true,
+    "reject_wrong_half": true,
+    "waterlog_requires_adjustment": true,
+    "iron_is_not_hand_toggle": true,
+    "gate_power_is_not_ignored": true,
+    "real_diagonal_item_conversion": true,
+    "diagonal_fence_equivalent": false,
+    "diagonal_pane_equivalent": false,
+    "diagonal_waterlog_adjust": false,
+    "diagonal_other_material_rejected": true
+  },
+  "serverStates": {},
+  "ticks": 0,
+  "operations": 0
+}

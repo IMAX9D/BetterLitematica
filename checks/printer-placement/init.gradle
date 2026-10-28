@@ -1,0 +1,22 @@
+// Optional real-client regression mod; never included in the production artifact.
+gradle.projectsEvaluated {
+    def p=gradle.rootProject.project(':fabric-1.20.1')
+    def fixtureSources=gradle.rootProject.file('checks/printer-placement')
+    def out=gradle.rootProject.file(gradle.rootProject.findProperty('regressionRoot') ?: '../output/printer-placement-check')
+    def compile=p.tasks.register('compilePlacementRegression',JavaCompile) {
+        dependsOn p.tasks.named('classes')
+        source=p.fileTree(new File(fixtureSources,'src')) { include '**/*.java' }
+        classpath=p.sourceSets.main.compileClasspath+p.sourceSets.main.output
+        destinationDirectory.set(new File(out,'classes'))
+        options.encoding='UTF-8'; options.release.set(17); options.compilerArgs+=['-proc:none']
+    }
+    def pack=p.tasks.register('jarPlacementRegression',Jar) {
+        dependsOn compile
+        from(new File(out,'classes'));from(new File(fixtureSources,'resources'))
+        archiveFileName.set('placement-regression-named.jar');destinationDirectory.set(out)
+    }
+    p.tasks.register('remapPlacementRegression',p.tasks.named('remapJar').get().getClass().getSuperclass()) {
+        dependsOn pack;inputFile.set(pack.flatMap{it.archiveFile})
+        archiveFileName.set('placement-regression.jar');destinationDirectory.set(out);addNestedDependencies.set(false)
+    }
+}
