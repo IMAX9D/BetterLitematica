@@ -78,7 +78,7 @@ public final class SchematicPreview {
     }
     /** Geometry-only overrides: locking never changes pixels or persisted cache identity. */
     public static Map<String,RegionPlacement> geometryOverrides(Map<String,RegionPlacement> values){
-        if(values.size()>1024)throw new IllegalArgumentException("Preview region limit");var copy=new TreeMap<String,RegionPlacement>();
+        if(values.size()>BlueprintMetadata.MAX_REGIONS)throw new IllegalArgumentException("Preview region limit");var copy=new TreeMap<String,RegionPlacement>();
         for(var entry:values.entrySet()){String name=entry.getKey();var v=Objects.requireNonNull(entry.getValue());if(name.isBlank()||name.length()>256)throw new IllegalArgumentException("Invalid preview region");copy.put(name,new RegionPlacement(v.position(),v.quarterTurns(),v.mirrorX(),v.mirrorZ(),v.enabled(),false));}return Collections.unmodifiableMap(copy);
     }
     public static String configuredKey(String sourceSha,Map<String,RegionPlacement> values)throws IOException{
@@ -139,7 +139,7 @@ public final class SchematicPreview {
     private static Parsed parse(Map<String,Object> input,Cancellation cancel,boolean paletteNeeded)throws IOException{
         cancel.check();Map<String,Object> root=SchematicFormats.canonical(input,cancel);
         int version=NbtReader.integer(root,"Version");SourceVersions.requireLitematicVersion(version);
-        int dataVersion=NbtReader.integer(root,"MinecraftDataVersion");var regions=NbtReader.compound(root.get("Regions"),"Regions");if(regions.isEmpty()||regions.size()>1024)throw new IOException("Invalid preview regions");
+        int dataVersion=NbtReader.integer(root,"MinecraftDataVersion");var regions=NbtReader.compound(root.get("Regions"),"Regions");if(regions.isEmpty()||regions.size()>BlueprintMetadata.MAX_REGIONS)throw new IOException("Invalid preview regions");
         MessageDigest digest=sha();var hash=new DigestOutputStream(OutputStream.nullOutputStream(),digest);var out=new DataOutputStream(hash);
         out.writeInt(VERSION);out.writeInt(version);out.writeInt(dataVersion);out.writeInt(regions.size());
         var global=new LinkedHashMap<BlockStateSpec,Integer>();var parts=new ArrayList<Part>();Vec3i min=null,max=null;long volume=0;byte[] wordsBuffer=new byte[8192];
@@ -288,7 +288,7 @@ public final class SchematicPreview {
     private static Vec3i readVector(DataInput in)throws IOException{return new Vec3i(in.readInt(),in.readInt(),in.readInt());}
     private static OrbitModel readConfigured(DataInput in,Cancellation cancel,boolean detailed)throws IOException{
         String digest=in.readUTF();if(!digest.matches("[a-f0-9]{64}"))throw new IOException("Invalid configured digest");int colorCount=in.readInt();if(colorCount<0||colorCount>MAX_PALETTE)throw new IOException("Invalid configured palette");int[] colors=new int[colorCount];for(int i=0;i<colors.length;i++){if((i&1023)==0)cancel.check();colors[i]=in.readInt();}var palette=List.copyOf(Collections.nCopies(colorCount,BlockStateSpec.AIR));
-        int count=in.readInt();if(count<1||count>1024)throw new IOException("Invalid configured regions");var parts=new ArrayList<RegionGrid>();var names=new HashSet<String>();long totalCells=0,totalBlocks=0,totalVolume=0;
+        int count=in.readInt();if(count<1||count>BlueprintMetadata.MAX_REGIONS)throw new IOException("Invalid configured regions");var parts=new ArrayList<RegionGrid>();var names=new HashSet<String>();long totalCells=0,totalBlocks=0,totalVolume=0;
         try{for(int n=0;n<count;n++){
             cancel.check();String name=in.readUTF();if(name.isBlank()||name.length()>256||!names.add(name))throw new IOException("Invalid configured region name");var r=new Region(name,readVector(in),readVector(in),readVector(in));totalVolume+=r.volume();if(totalVolume>SchematicImporter.MAX_CELLS)throw new IOException("Configured source volume exceeds limit");var position=readVector(in);int turn=in.readInt();if(turn<0||turn>3)throw new IOException("Invalid configured rotation");var setting=new RegionPlacement(position,turn,in.readBoolean(),in.readBoolean(),true,false);
             int limit=detailed?DETAIL_LOD:LOD;

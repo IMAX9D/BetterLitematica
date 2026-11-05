@@ -20,12 +20,18 @@ final class PrinterEngine implements AutoCloseable {
     private final PrinterSigns signs;
     private final NearbyBuildHud nearby;
     private final PrinterQueue queue=new PrinterQueue(4096);
+    private final PrinterMaterialBatch materialBatch=new PrinterMaterialBatch();
+    private boolean materialBatchEnabled(){return PrinterMaterialBatch.enabled(settings());}
     private final ArrayDeque<CompletableFuture<PrinterDiscovery.Result>> searches=new ArrayDeque<>();
     private final PrinterPacing pacing=new PrinterPacing();
     private final ShortageTracker<Item> missing=new ShortageTracker<>(128);
     private int feedbackTick;
     record Missing(Item item,int required){}
-    List<Missing> missingMaterials(){return missing.items().stream().map(item->new Missing(item,nearby.materialNeeds().getOrDefault(item,0))).toList();}
+    private int materialNeed(Item item){
+        if(item==net.minecraft.world.item.Items.ICE&&settings().iceWater){for(var entry:nearby.snapshot().entries())if(entry.block()==Blocks.WATER)return entry.count();return 0;}
+        return nearby.materialNeeds().getOrDefault(item,0);
+    }
+    List<Missing> missingMaterials(){return missing.items().stream().map(item->new Missing(item,materialNeed(item))).toList();}
     int progressPercent(){if(!settings().print&&!mining(settings()))return -1;int compared=nearby.compared();return compared==0?-1:(int)Math.min(nearby.completeScan()?100:99,100L*nearby.matched()/compared);}
     boolean progressEstimated(){return !nearby.completeScan();}
     void feedbackChanged(BlockPos pos){nearby.changed(pos);}
@@ -34,21 +40,22 @@ final class PrinterEngine implements AutoCloseable {
     private void recordMissing(Item item){if(item!=null&&item!=net.minecraft.world.item.Items.AIR)missing.failed(item);}
     private void refreshMissing(){
         feedbackTick++;stock().refresh(feedbackTick,settings().supply);
-        if(feedbackTick%4==0)missing.refresh(item->stock().available(item)>0,item->nearby.materialNeeds().containsKey(item),nearby.completeScan());
+        if(feedbackTick%4==0)missing.refresh(item->stock().available(item)>0,item->materialNeed(item)>0,nearby.completeScan());
     }
     private final ActionHighlights highlights=new ActionHighlights(256);
     private ThreadPoolExecutor workers;private int workerCount;
     private State state=State.STOPPED;private Context context;private long generation;private boolean startupBurst,coldBurstUsed;
-    private PrinterScan scan;private Vec3i center;private PrinterQueue.Job waiting;private long completedRounds;
+    private final PrinterRetryWindow retryWindow=new PrinterRetryWindow();
+    private PrinterMovementScan scan;private Vec3i center;private PrinterQueue.Job waiting;private long completedRounds;
     private java.util.function.Function<Vec3i,ProjectionController.PrinterSample> sampler;
     private int ticks,roundCompared,roundMatched,roundUnknown,lastCompared,lastMatched,lastUnknown;
     private BlockState fillState;
     private long operations;private PrinterReason status=PrinterReason.STOPPED;
     private PrinterQueue.Job deferredJob;private PrinterReason deferredReason=PrinterReason.NONE;private int deferredUntil;private boolean deferredMissing;
-    PrinterEngine(Minecraft client,ProjectionController controller){this.client=client;this.controller=controller;nearby=new NearbyBuildHud(client,controller);containers=new PrinterContainers(client,controller);signs=new PrinterSigns(client,controller);actions=new PrinterActions(client,controller.inventoryTransfers(),()->controller.options().accurate,this::externalAllowed,containers,signs,controller);readyMaterial=actions::materialAvailable;}
-    private boolean externalAllowed(){return running()&&client.level!=null&&client.player!=null&&ClientUi.screen(client)==null&&client.isWindowActive()&&!client.player.isDeadOrDying()&&!controller.worldWriteBusy()&&Objects.equals(context,current());}
+    PrinterEngine(Minecraft client,ProjectionController controller){this.client=client;this.controller=controller;nearby=new NearbyBuildHud(client,controller);containers=new PrinterContainers(client,controller);signs=new PrinterSigns(client,controller);actions=new PrinterActions(client,controller.inventoryTransfers(),()->controller.options().accurate,this::externalAllowed,containers,signs,controller);readyMaterial=actions::materialAvailable;BackgroundPrinting.bind(this::running);}
+    private boolean externalAllowed(){return running()&&client.level!=null&&client.player!=null&&!client.player.isDeadOrDying()&&!controller.worldWriteBusy()&&Objects.equals(context,current());}
     State state(){return state;}boolean acting(){return actions.acting()||containers.acting();}boolean running(){return state==State.RUNNING;}
-    boolean ownsBreaking(){return running()&&actions.breaking()&&ClientUi.screen(client)==null&&client.isWindowActive();}
+    boolean ownsBreaking(){return running()&&actions.breaking();}
     long operations(){return operations;}int queued(){return queue.size()+(waiting==null?0:1);}
     String status(){return status.description();} PrinterReason reason(){return status;}
     String progress(){return nearby.compared()==0?"":nearby.matched()+" / "+nearby.compared()+(nearby.snapshot().unknown()>0?" · 待加载 "+nearby.snapshot().unknown():"");}
@@ -82,7 +89,7 @@ final class PrinterEngine implements AutoCloseable {
     private void pause(RuntimeException failure){pause(PrinterReason.failure(failure));}
     void pause(PrinterReason reason){containers.pause();if(state==State.RUNNING){state=State.PAUSED;status=reason;actions.diagnostics.reset();actions.reset();if(!actions.cleanupError().isEmpty())status=PrinterReason.of(PrinterReason.Id.ERROR,actions.cleanupError());waiting=null;}}
     void sourceChanged(){pause("投影编辑");clearWork();context=null;nearby.clear();}
-    void stop(){state=State.STOPPED;startupBurst=false;status=PrinterReason.of(PrinterReason.Id.STOPPED,"已停止");clearWork();if(!actions.cleanupError().isEmpty())status=PrinterReason.of(PrinterReason.Id.ERROR,actions.cleanupError());highlights.clear();context=null;}
+    void stop(){actions.interactions.clear();state=State.STOPPED;startupBurst=false;status=PrinterReason.of(PrinterReason.Id.STOPPED,"已停止");clearWork();if(!actions.cleanupError().isEmpty())status=PrinterReason.of(PrinterReason.Id.ERROR,actions.cleanupError());highlights.clear();context=null;}
     static BlockState checkedFill(PrinterSettings settings){var resolver=new StateResolver1201(List.of(BlockStateSpec.parse(settings.fillState)),new PlacementTransform(Vec3i.ZERO,0,false,false));if(resolver.unresolved(0))throw new IllegalArgumentException("填充方块或状态不存在");var state=resolver.resolve(0);if((settings.fill||settings.fluid)&&(state.isAir()||!(state.getBlock().asItem() instanceof net.minecraft.world.item.BlockItem)))throw new IllegalArgumentException("请选择可放置的填充方块");return state;}
     void configure(PrinterSettings next){
         next.validate();var fill=checkedFill(next);if(settings().snapshot().equals(next.snapshot()))return;
@@ -95,35 +102,43 @@ final class PrinterEngine implements AutoCloseable {
     void supplyOpened(int sync,net.minecraft.world.inventory.MenuType<?> type){try{containers.opened(sync,type);actions.supplyOpened(sync,type);}catch(RuntimeException e){pause(e);}}
     void containerOpening(net.minecraft.world.inventory.MenuType<?> type){containers.opening(type);}
     void supplyInventory(int sync){actions.supplyInventory(sync);}
-    void manualInventory(){if(acting())return;try{containers.manual();actions.manualInventory();pause("已暂停");controller.inventoryTransfers().reset();}catch(RuntimeException e){pause(e);}}
-    void confirmed(BlockPos pos,BlockState value){actions.confirmed(pos,value);containers.changed(pos,value);}
+    void manualInventory(){if(acting())return;try{containers.manual();actions.manualInventory();controller.inventoryTransfers().reset();}catch(RuntimeException e){pause(e);}}
+    void confirmed(BlockPos pos,BlockState value){
+        if(materialBatchEnabled())materialBatch.confirmed(pos,value,ticks);
+        if(!retryWindow.empty()){
+            int x=pos.getX(),y=pos.getY(),z=pos.getZ();releaseRetry(pos.asLong());
+            releaseRetry(BlockPos.asLong(x+1,y,z));releaseRetry(BlockPos.asLong(x-1,y,z));
+            releaseRetry(BlockPos.asLong(x,y+1,z));releaseRetry(BlockPos.asLong(x,y-1,z));
+            releaseRetry(BlockPos.asLong(x,y,z+1));releaseRetry(BlockPos.asLong(x,y,z-1));
+        }
+        actions.confirmed(pos,value);containers.changed(pos,value);}
+    private void releaseRetry(long pos){if(retryWindow.forget(pos))pacing.defer(pos,0);}
     void containerInventory(net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket packet){containers.inventory(packet);}
     void containerCursor(net.minecraft.network.protocol.game.ClientboundSetCursorItemPacket packet){containers.cursor(packet);}
     void containerPlayerInventory(net.minecraft.network.protocol.game.ClientboundSetPlayerInventoryPacket packet){containers.playerInventory(packet);}
     void containerSlot(net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket packet){containers.slot(packet);}
-    void manualContainerInteraction(){if(containers.active()&&!acting()){containers.manualRequest();pause("已暂停");}}
+    void manualContainerInteraction(){if(containers.active()&&!acting()){containers.manualRequest();}}
     boolean signOpened(net.minecraft.world.level.block.entity.SignBlockEntity sign,boolean front){return signs.opened(sign,front);}
     void manualSignInteraction(BlockPos pos){if(!acting())signs.manual(pos);}
     Collection<ActionHighlights.Mark> actionMarks(long now){return highlights.live(now);}
     void render(ProjectionFrame context){if(settings().highlights)ProjectionOverlays.actions(client,context,highlights.live(System.nanoTime()),settings());}
-    private void clearWork(){deferredJob=null;deferredReason=PrinterReason.NONE;containers.clear();generation++;for(var future:searches)future.cancel(true);searches.clear();if(workers!=null)workers.getQueue().clear();queue.clear();pacing.reset();completedRounds=0;sampler=null;missing.clear();scan=null;center=null;waiting=null;actions.diagnostics.reset();roundCompared=roundMatched=roundUnknown=lastCompared=lastMatched=lastUnknown=0;actions.reset();}
+    private void clearWork(){materialBatch.reset();retryWindow.clear();deferredJob=null;deferredReason=PrinterReason.NONE;containers.clear();generation++;for(var future:searches)future.cancel(true);searches.clear();if(workers!=null)workers.getQueue().clear();queue.clear();pacing.reset();completedRounds=0;sampler=null;missing.clear();scan=null;center=null;waiting=null;actions.diagnostics.reset();roundCompared=roundMatched=roundUnknown=lastCompared=lastMatched=lastUnknown=0;actions.reset();}
     private void pool(){int count=settings().threads;if(workers!=null&&count==workerCount)return;if(workers!=null)workers.shutdownNow();workerCount=count;workers=new ThreadPoolExecutor(count,count,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(count),r->{Thread t=new Thread(r,"betterlitematica-printer-search");t.setDaemon(true);return t;});}
     void tickHud(){nearby.tick();refreshMissing();}
     void tick(){
         ticks++;signs.tick();
         if(client.level==null||client.player==null||client.gameMode==null){if(state!=State.STOPPED)stop();containers.tick(ticks,false);return;}
         if(state==State.STOPPED){containers.tick(ticks,false);return;}
-        if(state==State.PAUSED&&status.id()==PrinterReason.Id.RETURN_TO_GAME&&ClientUi.screen(client)==null&&client.isWindowActive())status=PrinterReason.PAUSED;
+        if(state==State.PAUSED&&status.id()==PrinterReason.Id.RETURN_TO_GAME)status=PrinterReason.PAUSED;
         if(context!=null&&context.world()!=client.level){stop();containers.tick(ticks,false);return;}
         Context next=current();
         if(!Objects.equals(context,next)){clearWork();context=next;}
-        boolean canFill=running()&&settings().containerFill&&settings().print&&ClientUi.screen(client)==null&&client.isWindowActive()
+        boolean canFill=running()&&settings().containerFill&&settings().print&&ClientUi.screen(client)==null
             &&!client.player.isSpectator()&&!client.player.isDeadOrDying()&&!controller.worldWriteBusy();
         if(containers.tick(ticks,canFill)){if(running())status=containers.typedReason();return;}
         if(!running())return;
-        if(!client.isWindowActive()){pause(PrinterReason.of(PrinterReason.Id.RETURN_TO_GAME,"等待返回游戏"));return;}
-        try{if(actions.supplyTick(ticks)){status=actions.typedReason();return;}}catch(RuntimeException e){pause(e);return;}
-        if(ClientUi.screen(client)!=null){pause(PrinterReason.of(PrinterReason.Id.RETURN_TO_GAME,"等待返回游戏"));return;}
+        if(actions.interactions.waiting()){status=PrinterReason.of(PrinterReason.Id.CONFIRMING,"等待异常交互确认");prefetchWhileWaiting();return;}
+        try{if(actions.supplyTick(ticks)){status=actions.typedReason();prefetchWhileWaiting();return;}}catch(RuntimeException e){pause(e);return;}
         if(client.player.isSpectator()||client.player.isDeadOrDying()||controller.worldWriteBusy()){pause("已暂停");return;}
         if(context.sources().isEmpty()&&!selectionWork(settings())){status=PrinterReason.of(PrinterReason.Id.NO_PROJECTION,"等待启用投影");return;}
         if(client.player.isUsingItem()){status=PrinterReason.of(PrinterReason.Id.USING_ITEM,"等待物品使用结束");return;}
@@ -136,7 +151,7 @@ final class PrinterEngine implements AutoCloseable {
             var budget=new PrinterWorkBudget(System.nanoTime(),budgetMillis);actions.prepare(ticks);pool();sampler=controller.printerSampler();
             updateCenter();collect();
             while(budget.hasTime(System.nanoTime())&&pacing.canRun(false)){
-                if(waiting==null&&queue.size()==0){collect();if(queue.size()==0&&!snapshot(budget,true))break;}
+                if(waiting==null&&queue.size()==0&&!actions.hasIceWork()){collect();if(queue.size()==0&&!snapshot(budget,true))break;}
                 if(consume(budget))break;
             }
             // Spend the shared deadline on ready work first; prefetch only spare/blocked time.
@@ -168,10 +183,27 @@ final class PrinterEngine implements AutoCloseable {
         boolean inSelection=false;for(var box:controller.selection().boxes()){var a=box.first();var b=box.second();if(pos.x()>=Math.min(a.x(),b.x())&&pos.x()<=Math.max(a.x(),b.x())&&pos.y()>=Math.min(a.y(),b.y())&&pos.y()<=Math.max(a.y(),b.y())&&pos.z()>=Math.min(a.z(),b.z())&&pos.z()<=Math.max(a.z(),b.z())){inSelection=true;break;}}
         return inSelection&&(scope!=PrinterSettings.Scope.BELOW||pos.y()<client.player.getY())&&(scope!=PrinterSettings.Scope.ABOVE||pos.y()>client.player.getY());
     }
+    /** Keep a bounded near-term material window ready while network operations own the inventory. */
+    private void prefetchWhileWaiting(){
+        if(!running()||client.player.isSpectator()||client.player.isDeadOrDying()||controller.worldWriteBusy()||queue.size()>=512)return;
+        var budget=new PrinterWorkBudget(System.nanoTime(),2);pool();sampler=controller.printerSampler();updateCenter();collect();
+        while(queue.size()<512&&budget.hasTime(System.nanoTime())&&snapshot(budget,true)){}
+    }
     private Vec3i eyeCenter(){var eye=client.player.getEyePosition();return new Vec3i((int)Math.round(eye.x),(int)Math.round(eye.y),(int)Math.round(eye.z));}
     private void updateCenter(){
         center=eyeCenter();var s=settings();double radius=s.shape==PrinterRange.Shape.SPHERE?PrinterReach.candidateRadius(range(s)):range(s);
-        if(scan==null||scan.radius()!=radius){scan=new PrinterScan(center,radius,s.shape,s.order,s.reverseX,s.reverseY,s.reverseZ);completedRounds=0;}
+        if(scan==null||scan.radius()!=radius){
+            scan=new PrinterMovementScan(center,radius,s.shape,s.order,s.reverseX,s.reverseY,s.reverseZ);completedRounds=0;
+            if(!s.fill&&!s.fluid&&!s.bedrock&&s.printScope==PrinterSettings.Scope.PROJECTION){
+                var sources=controller.printerSources();var layer=controller.layerRange();
+                scan.domain(box->{
+                    int axis=layer.axis().ordinal();int min=axis==0?box.min().x():axis==1?box.min().y():box.min().z(),max=axis==0?box.max().x():axis==1?box.max().y():box.max().z();
+                    if(max<layer.min()||min>layer.max())return false;
+                    for(var source:sources)if(source.renderer()==null||source.renderer().layout().intersects(box))return true;
+                    return false;
+                });
+            }
+        }
         scan.beginTick(center,ticks);
     }
     private double range(PrinterSettings s){double reach=client.player.blockInteractionRange();return s.range==0?reach:Math.min(reach,s.range);}
@@ -184,32 +216,51 @@ final class PrinterEngine implements AutoCloseable {
     }
     private boolean snapshotInternal(PrinterWorkBudget budget,boolean urgent){
         var s=settings();
-        if((!urgent&&searches.size()>=workerCount*2)||queue.remaining()<2048||!scan.hasNext()||!budget.scan(System.nanoTime()))return false;
+        if((!urgent&&searches.size()>=workerCount*2)||queue.remaining()<2048||!budget.scan(System.nanoTime()))return false;
+        boolean batching=materialBatchEnabled();
+        if(batching){
+            materialBatch.ensure(context.sources(),center,range(s),context.layer(),actions,s,ticks);
+            if(!materialBatch.ready(ticks)){
+                if(waiting==null&&queue.size()==0&&searches.isEmpty()&&!actions.hasIceWork()&&!controller.inventoryTransfers().inFlight())materialBatch.drained(ticks);
+                if(waiting==null&&queue.size()==0)status=materialBatch.pending()?PrinterReason.of(PrinterReason.Id.LOADING,materialBatch.status()):idleReason(s);
+                return false;
+            }
+        }else if(!scan.hasNext())return false;
         long[] positions=new long[512];int[] expected=new int[512],actual=new int[512],flags=new int[512],scopes=new int[512],fill=new int[512];int n=0,visited=0;long started=System.nanoTime();
         var eye=client.player.getEyePosition();double rangeSquared=range(s)*range(s);
-        int fillId=Block.getId(fillState);
-        while(scan.hasNext()&&n<512&&visited++<2048&&budget.hasTime(System.nanoTime())&&System.nanoTime()-started<1_000_000L){
-            var at=scan.next();if(at==null)continue;var pos=new BlockPos(at.x(),at.y(),at.z());if(s.shape==PrinterRange.Shape.SPHERE&&PrinterReach.distanceSquared(eye,pos)>rangeSquared||client.level.isOutsideBuildHeight(pos)||!client.level.getWorldBorder().isWithinBounds(pos))continue;
+        int fillId=PrinterRules.forbiddenPrint(fillState)?-1:Block.getId(fillState);
+        boolean accurateOpen=AccuratePlacement.resolve(client,controller.options().accurate)==AccuratePlacement.Mode.V3;
+        while((batching?materialBatch.ready(ticks):scan.hasNext())&&n<512&&visited++<2048&&budget.hasTime(System.nanoTime())&&System.nanoTime()-started<1_000_000L){
+            var at=batching?materialBatch.next():scan.next();if(at==null)continue;var pos=new BlockPos(at.x(),at.y(),at.z());if(s.shape==PrinterRange.Shape.SPHERE&&PrinterReach.distanceSquared(eye,pos)>rangeSquared||client.level.isOutsideBuildHeight(pos)||!client.level.getWorldBorder().isWithinBounds(pos))continue;
             var sample=sampler.apply(at);if(sample==null)continue;boolean in=sample.inside();int scope=0;
             if((s.print||mining(s))&&scope(at,s.printScope,in)&&in)scope|=1;if(s.fill&&scope(at,s.fillScope,in))scope|=2;if(s.fluid&&scope(at,s.fluidScope,in))scope|=4;if(s.bedrock&&scope(at,s.bedrockScope,in))scope|=8;
             if(scope==0)continue;int i=n++;positions[i]=pos.asLong();scopes[i]=scope;fill[i]=fillId;
             boolean needsProjection=(scope&1)!=0||((scope&8)!=0&&s.bedrockScope==PrinterSettings.Scope.PROJECTION);
             if(!WorldChunks.loaded(client.level,pos)||needsProjection&&sample!=null&&in&&sample.state()==null){flags[i]=0;continue;}
             BlockState current=client.level.getBlockState(pos),wanted=in&&sample.state()!=null?sample.state():Blocks.AIR.defaultBlockState();
-            if(s.containerFill&&s.print&&(scope&1)!=0&&!PrinterRules.filtered(wanted,s.skip)
+            // Source overlap is resolved by the normal sampler; an older source cannot schedule the winner in the wrong material pass.
+            if(batching&&PrinterMaterialBatch.key(wanted,s)!=materialBatch.material()){n--;continue;}
+            if(s.containerFill&&s.print&&(scope&1)!=0&&!PrinterRules.forbiddenPrint(wanted)&&!PrinterRules.filtered(wanted,s.skip)
                 &&!(s.skipWaterlogged&&wanted.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED)&&wanted.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED)))containers.observe(pos,wanted,current,ticks);
             boolean matches=PrinterRules.constructionMatches(current,wanted);
             // Matching dynamic properties must not produce a state-break job; keep the actual observation intact.
             actual[i]=Block.getId(current);expected[i]=matches?actual[i]:Block.getId(wanted);
-            if((s.print||mining(s))&&!s.fill&&!s.fluid&&!s.bedrock&&matches){flags[i]=PrinterDiscovery.KNOWN;continue;}
+            if((s.print||mining(s))&&!s.fill&&!s.fluid&&!s.bedrock&&matches){
+                // Completed cached cells need no discovery job. Keep their real
+                // world comparison, but reserve the 512 candidate slots for work.
+                if(batching){n--;if((scope&1)!=0){roundCompared++;roundMatched++;}}
+                else flags[i]=PrinterDiscovery.KNOWN;
+                continue;
+            }
             int f=PrinterDiscovery.KNOWN;if(wanted.isAir())f|=PrinterDiscovery.WANTED_AIR;if(current.isAir())f|=PrinterDiscovery.ACTUAL_AIR;
             if(current.isAir()||current.canBeReplaced()&&s.replace&&PrinterRules.filtered(current,s.replaceable))f|=PrinterDiscovery.REPLACEABLE;
-            if(current.getBlock()==wanted.getBlock())f|=PrinterDiscovery.SAME_BLOCK;
+            if(PrinterRules.sameBlock(current,wanted))f|=PrinterDiscovery.SAME_BLOCK;
             if(PrinterRules.adjustable(current,wanted,s))f|=PrinterDiscovery.ADJUSTABLE;
             if(s.fluid){var fluid=current.getFluidState();if(!fluid.isEmpty()&&PrinterRules.fluidMatches(BuiltInRegistries.FLUID.getKey(fluid.getType()).toString(),s.fluids))f|=PrinterDiscovery.FLUID;if(fluid.isSource())f|=PrinterDiscovery.FLUID_SOURCE;}
             if(s.bedrock&&(s.bedrockScope!=PrinterSettings.Scope.PROJECTION||current!=wanted)&&controller.bedrock().accepts(pos))f|=PrinterDiscovery.BEDROCK;
-            if(PrinterRules.filtered(wanted,s.skip)||s.skipWaterlogged&&wanted.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED)&&wanted.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED))f|=PrinterDiscovery.SKIP;
+            if(PrinterRules.forbiddenPrint(wanted)||PrinterRules.filtered(wanted,s.skip)||s.skipWaterlogged&&wanted.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED)&&wanted.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED))f|=PrinterDiscovery.SKIP;
             if(s.coralSubstitute&&actions.waitingCoral(pos,current,wanted,ticks))f|=PrinterDiscovery.SKIP;
+            if(PrinterRules.redstoneOnlyDifference(current,wanted,accurateOpen))f|=PrinterDiscovery.SKIP;
             flags[i]=f;
         }
         if(n==0){finishRound();if(waiting==null&&queue.size()==0&&searches.isEmpty())status=idleReason(s);return true;}
@@ -220,10 +271,11 @@ final class PrinterEngine implements AutoCloseable {
         return true;
     }
     private boolean valid(PrinterQueue.Job job){
-        if(job.generation()!=generation)return false;var pos=BlockPos.of(job.position());var at=new Vec3i(pos.getX(),pos.getY(),pos.getZ());
+        if(job.generation()!=generation||actions.interactions.blocked(Block.stateById(job.expected()).getBlock().asItem()))return false;var pos=BlockPos.of(job.position());var at=new Vec3i(pos.getX(),pos.getY(),pos.getZ());
         var s=settings();if(!withinRange(pos,s))return false;
         if(!WorldChunks.loaded(client.level,pos)||client.level.isOutsideBuildHeight(pos)||!client.level.getWorldBorder().isWithinBounds(pos))return false;
         if(Block.getId(client.level.getBlockState(pos))!=job.observed()&&!actions.owns(job))return false;
+        if(actions.ownsIce(job))return true; // Generation/layer/settings changes already cancel the owned batch.
         var sample=sampler.apply(at);if(sample==null)return false;boolean in=sample.inside();
         return switch(job.kind()){
             case BREAK->mining(s)&&scope(at,s.printScope,in)&&sample!=null&&sample.state()!=null&&Block.getId(sample.state())==job.expected();
@@ -232,6 +284,13 @@ final class PrinterEngine implements AutoCloseable {
             case FLUID->s.fluid&&scope(at,s.fluidScope,in);
             case BEDROCK->s.bedrock&&scope(at,s.bedrockScope,in);
         };
+    }
+    List<PrinterQueue.Job> iceCandidates(PrinterQueue.Job first,int limit){
+        var result=new ArrayList<PrinterQueue.Job>();result.add(first);var s=settings();
+        for(var job:queue.snapshot(BuiltInRegistries.ITEM.getId(net.minecraft.world.item.Items.ICE),128)){
+            if(result.size()>=limit)break;if(job.position()==first.position()||job.kind()!=PrinterQueue.Kind.PLACE||pacing.cooling(job.position())||!valid(job))continue;
+            var pos=BlockPos.of(job.position());if(actions.iceTarget(client.level.getBlockState(pos),Block.stateById(job.expected()),s))result.add(job);
+        }return result;
     }
     /** True means an owned wait/quota/time boundary; false lets the caller refill an empty queue. */
     private void deferred(PrinterQueue.Job job,PrinterReason reason,boolean material){status=reason;deferredJob=job;deferredReason=reason;deferredMissing=material;deferredUntil=ticks+20;}
@@ -246,22 +305,26 @@ final class PrinterEngine implements AutoCloseable {
     private boolean consume(PrinterWorkBudget budget){
         if(!pacing.canRun(false))return true;var s=settings();
         while(pacing.canRun(false)&&budget.attempt(System.nanoTime())){
-            boolean resuming=waiting!=null;int held=PrinterActions.heldMaterial(client.player.getMainHandItem());var job=resuming?waiting:queue.pollBatch(held,readyMaterial);waiting=null;
+            if(waiting!=null&&actions.ownsIce(waiting))waiting=null;
+            boolean resuming=waiting!=null;int held=PrinterActions.heldMaterial(client.player.getMainHandItem());var owned=actions.nextIceJob(ticks);var job=resuming?waiting:owned!=null?owned:queue.pollBatch(held,readyMaterial);waiting=null;
             if(job==null){status=idleReason(s);return false;}
             actions.diagnostics.attempts++;
-            if(!valid(job)){actions.diagnostics.stale++;if(resuming)actions.reset();continue;}
+            if(!valid(job)){actions.diagnostics.stale++;if(actions.ownsIce(job))actions.cancelIce(job);else if(resuming)actions.reset();continue;}
             if(!actions.inProgress(job)&&pacing.cooling(job.position()))continue;
             if(s.safeObserver&&Block.stateById(job.expected()).is(Blocks.OBSERVER)&&!PrinterRules.observerReady(BlockPos.of(job.position()),p->{var sample=sampler.apply(new Vec3i(p.getX(),p.getY(),p.getZ()));return sample==null?null:sample.inside()?sample.state():Blocks.AIR.defaultBlockState();},p->WorldChunks.loaded(client.level,p)?client.level.getBlockState(p):null)){deferred(job,PrinterReason.of(PrinterReason.Id.OBSERVER,"等待侦测器前方完成"),false);pacing.defer(job.position(),1);continue;}
             boolean breaking=actions.needsBreak(job);if(!pacing.canDispatch(job.position(),breaking)){if(resuming||actions.owns(job)){waiting=job;break;}queue.offer(job,actions.material(job,s));continue;}
             var outcome=actions.execute(job,s,ticks);actions.diagnostics.outcome(outcome,actions.dispatched());
-            if(actions.dispatched()){pacing.dispatched(job.position(),actions.breakDispatched());if(outcome==PrinterActions.Outcome.SENT||outcome==PrinterActions.Outcome.WAIT)operations++;}
+            if(actions.dispatched()){if(materialBatchEnabled())materialBatch.dispatched(job,ticks);pacing.dispatched(job.position(),actions.breakDispatched());if(outcome==PrinterActions.Outcome.SENT||outcome==PrinterActions.Outcome.WAIT)operations++;}
             if(s.highlights&&(actions.dispatched()||outcome==PrinterActions.Outcome.UNSUPPORTED)){var kind=outcome==PrinterActions.Outcome.UNSUPPORTED?ActionHighlights.Kind.FAILED:switch(job.kind()){case BREAK,BEDROCK->ActionHighlights.Kind.BREAK;case ADJUST->ActionHighlights.Kind.ADJUST;default->ActionHighlights.Kind.PLACE;};highlights.add(job.position(),kind,System.nanoTime(),HighlightFades.duration(kind,s.highlightMillis*1_000_000L));}
             if(outcome==PrinterActions.Outcome.WAIT){waiting=job;status=actions.typedReason();break;}
-            if(outcome==PrinterActions.Outcome.SENT){deferredJob=null;status=PrinterReason.RUNNING;}
+            if(outcome==PrinterActions.Outcome.SENT){retryWindow.forget(job.position());deferredJob=null;status=PrinterReason.RUNNING;}
             else if(outcome==PrinterActions.Outcome.MISSING){recordMissing(actions.missing());deferred(job,actions.typedReason(),true);if(resuming)actions.reset();pacing.defer(job.position(),20);}
-            else if(outcome==PrinterActions.Outcome.UNSUPPORTED||outcome==PrinterActions.Outcome.RETRY){deferred(job,actions.typedReason(),false);if(resuming)actions.reset();pacing.defer(job.position(),outcome==PrinterActions.Outcome.RETRY?1:20);}
+            else if(outcome==PrinterActions.Outcome.UNSUPPORTED||outcome==PrinterActions.Outcome.RETRY){deferred(job,actions.typedReason(),false);if(resuming)actions.reset();int delay=outcome==PrinterActions.Outcome.RETRY?1:20;
+                var why=actions.typedReason().id();
+                if(outcome==PrinterActions.Outcome.RETRY&&(why==PrinterReason.Id.NO_FACE||why==PrinterReason.Id.NO_SUPPORT))delay=retryWindow.failed(job.position(),job.expected(),job.observed(),job.generation(),why.ordinal(),ticks);
+                pacing.defer(job.position(),delay);}
         }
         return true;
     }
-    @Override public void close(){stop();nearby.clear();signs.clear();if(workers!=null){workers.shutdownNow();workers=null;}}
+    @Override public void close(){stop();materialBatch.close();nearby.clear();signs.clear();if(workers!=null){workers.shutdownNow();workers=null;}}
 }

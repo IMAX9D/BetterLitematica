@@ -8,6 +8,7 @@ public final class InventoryReceipts {
     private InventoryReceipts(){}
     static long stamp(int slot){return slot>=0&&slot<slots.length?slots[slot]:-1;}
     static long containerStamp(){return containerRevision;}
+
     static boolean completePlayerInventory(long seen){return (seen&((1L<<36)-1))==((1L<<36)-1);}
     private static void receipt(ScreenHandler handler,int slot){var player=MinecraftClient.getInstance().player;if(player==null||slot<0||slot>=handler.slots.size())return;var value=handler.getSlot(slot);int index=value.getIndex();if(value.inventory==player.getInventory()&&index>=0&&index<slots.length)slots[index]=++revision;}
     public static void inventory(InventoryS2CPacket packet){var player=MinecraftClient.getInstance().player;if(player==null)return;var handler=packet.syncId()==0?player.playerScreenHandler:player.currentScreenHandler;if(handler.syncId!=packet.syncId())return;long seen=0;for(int i=0;i<Math.min(handler.slots.size(),packet.contents().size());i++){receipt(handler,i);var slot=handler.getSlot(i);if(slot.inventory==player.getInventory()&&slot.getIndex()>=0&&slot.getIndex()<36)seen|=1L<<slot.getIndex();}if(packet.syncId()>0&&completePlayerInventory(seen))containerRevision=++revision;}

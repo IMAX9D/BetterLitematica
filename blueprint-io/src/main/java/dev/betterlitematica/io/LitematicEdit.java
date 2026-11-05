@@ -19,7 +19,7 @@ public final class LitematicEdit {
         Map<String,Object> root=SourceVersions.litematic(SchematicFormats.canonical(NbtReader.read(source,SchematicImporter.SOURCE_LIMITS,cancel),cancel),cancel);
         int version=NbtReader.integer(root,"Version");SourceVersions.requireLitematicVersion(version);int dataVersion=NbtReader.integer(root,"MinecraftDataVersion");
         var regions=NbtReader.compound(root.get("Regions"),"Regions");
-        if(regions.size()>1024)throw new IOException("区域数量超限");
+        if(regions.size()>BlueprintMetadata.MAX_REGIONS)throw new IOException("区域数量超限");
         long changed=0,removedEntities=0,removedTicks=0,totalBlocks=0,totalVolume=0;
         for(var regionEntry:regions.entrySet()){
             cancel.check();var tag=NbtReader.compound(regionEntry.getValue(),"Region");Vec3i signed=vector(tag.get("Size")),position=vector(tag.get("Position"));

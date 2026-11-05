@@ -88,10 +88,10 @@ public final class BetterLitematicaClient implements ClientModInitializer {
         }));
         IndependentUi ui=IndependentUi.INSTANCE;ProjectionInformation information=new ProjectionInformation();ToolHud toolHud=new ToolHud();statusHud=new StatusHud();final int[] informationTick={0};ClientTickEvents.END_CLIENT_TICK.register(mc->{if(++informationTick[0]%4==0)information.update(mc,controller);});
         ClientLifecycleEvents.CLIENT_STOPPING.register(mc->{modeWheelInput.clear();controller.close();ui.close();EntityOverlayMask.close();});
-        WorldRenderEvents.START.register(context->{pendingProjectionFrame=null;EntityOverlayMask.reset();interactions.frame();});
-        WorldRenderEvents.BEFORE_ENTITIES.register(context->EntityOverlayMask.before(client,controller.entityOverlayMaskNeeded(context)));
-        WorldRenderEvents.END.register(context->{pendingProjectionFrame=null;EntityOverlayMask.reset();});
-        WorldRenderEvents.LAST.register(context->pendingProjectionFrame=context);
+        WorldRenderEvents.START.register(context->{if(ProjectionShaderPass.begin()){pendingProjectionFrame=null;EntityOverlayMask.reset();interactions.frame();}});
+        WorldRenderEvents.BEFORE_ENTITIES.register(context->{if(!ProjectionShaderPass.shadowPass())EntityOverlayMask.before(client,controller.entityOverlayMaskNeeded(context));});
+        WorldRenderEvents.END.register(context->{if(!ProjectionShaderPass.shadowPass()){pendingProjectionFrame=null;if(!ProjectionShaderPass.pending())EntityOverlayMask.reset();}});
+        WorldRenderEvents.LAST.register(context->{if(ProjectionShaderPass.shadowPass())return;if(ProjectionShaderPass.enabled())ProjectionRenderStage.draw(controller,context);else pendingProjectionFrame=context;});
         HudRenderCallback.EVENT.register((context,delta)->{
             if(client.world==null||client.player==null||client.options.hudHidden||HudLayout.menuHidesHud(client.currentScreen))return;
             var layout=HudLayout.of(client,false);if(!ui.beginHud(context,layout.viewport()))return;

@@ -13,12 +13,17 @@ import java.util.*;
 /** Bounded vanilla interactions. No direct client world mutations and no invented server acknowledgements. */
 final class PrinterActions {
     enum Outcome { SENT,WAIT,MISSING,UNSUPPORTED,RETRY,STALE }
+    final PrinterInteractionGuard interactions=new PrinterInteractionGuard(MinecraftClient.getInstance());
     private final MinecraftClient client;final PrinterDiagnostics diagnostics=new PrinterDiagnostics();
     private final InventoryTransfers transfers;private final PrinterSupply supply;private final NativeMiner miner;private PrinterSettings currentSettings;private BlockPos breaking;
     private PrinterReason reason=PrinterReason.NONE;private Item missing;
     private boolean acting,dispatched,breakDispatched;private int materialTick=Integer.MIN_VALUE;private final Set<Item> inventoryItems=new HashSet<>();
-    private dev.betterlitematica.core.IceWaterPlan ice;private BlockPos icePosition;
-    private int iceNextBreak;
+    private static final class IceTask {
+        final PrinterQueue.Job job;dev.betterlitematica.core.IceWaterPlan plan;int nextBreak,instantSentAt=-1;
+        IceTask(PrinterQueue.Job job){this.job=job;}
+    }
+    private final LinkedHashMap<Long,IceTask> iceTasks=new LinkedHashMap<>();
+    private int iceTimeout;private float iceToolSpeed;
     private final LinkedHashMap<BlockPos,Integer> corals=new LinkedHashMap<>();
     private static final Direction[] SIDES=Direction.values();private static final double[] HEIGHTS={0.25,0.75};
     private final Map<BlockState,PlacementHint> placementHints=new LinkedHashMap<>();
@@ -33,7 +38,7 @@ final class PrinterActions {
     boolean supplyTick(int tick){if(NativeMiner.recoverSuspended(tick)){reason=PrinterReason.of(PrinterReason.Id.RECOVERING,"回收上次施工材料");return true;}boolean work=supply.tick(tick);if(work)reason=supply.typedReason();return work;}
     void supplyOpened(int sync,net.minecraft.screen.ScreenHandlerType<?> type){supply.opened(sync,type);}
     void supplyInventory(int sync){supply.inventory(sync);}
-    void manualInventory(){if(supply.active()){supply.reset(false);throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.SUPPLY_INTERRUPTED,"补给已由玩家接管"));}}
+    void manualInventory(){if(supply.active())supply.reset(true);}
     boolean dispatched(){return dispatched;}boolean breakDispatched(){return breakDispatched;}
     void prepare(int tick){if(materialTick==tick)return;materialTick=tick;inventoryItems.clear();if(client.player!=null)for(int i=0;i<36;i++)inventoryItems.add(client.player.getInventory().getStack(i).getItem());}
     boolean acting(){return acting||NativeMiner.acting();}
@@ -41,12 +46,14 @@ final class PrinterActions {
     String reason(){return reason.description();} PrinterReason typedReason(){return reason;}
     Item missing(){return missing;}
     MaterialStock stock(){return supply.stock();}
-    void reset(){miner.reset();supply.reset(true);transfers.reset();breaking=null;iceNextBreak=0;corals.clear();placementHints.clear();if(ice!=null)ice.cancel();ice=null;icePosition=null;if(client.interactionManager!=null)client.interactionManager.cancelBlockBreaking();}
-    boolean owns(PrinterQueue.Job job){return miner.owns(job.generation(),job.position())||ice!=null&&ice.owns(job.generation(),job.position());}
+    void reset(){interactions.cancel();miner.reset();supply.reset(true);transfers.reset();breaking=null;corals.clear();placementHints.clear();for(var task:iceTasks.values())if(task.plan!=null)task.plan.cancel();iceTasks.clear();iceToolSpeed=0;if(client.interactionManager!=null)client.interactionManager.cancelBlockBreaking();}
+    boolean ownsIce(PrinterQueue.Job job){var task=iceTasks.get(job.position());return task!=null&&task.job.generation()==job.generation();}
+    void cancelIce(PrinterQueue.Job job){var task=iceTasks.remove(job.position());if(task!=null&&task.plan!=null)task.plan.cancel();if(breaking!=null&&breaking.asLong()==job.position()){breaking=null;client.interactionManager.cancelBlockBreaking();}}
+    boolean owns(PrinterQueue.Job job){return miner.owns(job.generation(),job.position())||ownsIce(job);}
     boolean inProgress(PrinterQueue.Job job){return owns(job)||breaking!=null&&job.kind()==PrinterQueue.Kind.BREAK&&breaking.asLong()==job.position();}
-    boolean needsBreak(PrinterQueue.Job job){return job.kind()==PrinterQueue.Kind.BREAK||job.kind()==PrinterQueue.Kind.BEDROCK||ice!=null&&ice.owns(job.generation(),job.position())&&ice.requiresBreaking();}
+    boolean needsBreak(PrinterQueue.Job job){var ice=iceTasks.get(job.position());return job.kind()==PrinterQueue.Kind.BREAK||job.kind()==PrinterQueue.Kind.BEDROCK||ice!=null&&ice.plan!=null&&ice.plan.requiresBreaking();}
     boolean waitingCoral(BlockPos pos,BlockState current,BlockState wanted,int tick){Integer until=corals.get(pos);if(until==null)return false;if(tick>=until||!PrinterRules.pendingCoral(current,wanted)||!dry(pos,current)){corals.remove(pos);return false;}return true;}
-    void confirmed(BlockPos pos,BlockState value){miner.confirmed(pos,value);if(ice!=null&&pos.equals(icePosition))ice.confirm(observation(value));}
+    void confirmed(BlockPos pos,BlockState value){interactions.confirmed(pos,value);miner.confirmed(pos,value);var ice=iceTasks.get(pos.asLong());if(ice!=null&&ice.plan!=null)ice.plan.confirm(observation(value));}
     private static dev.betterlitematica.core.IceWaterPlan.Observation observation(BlockState value){return value.isOf(Blocks.ICE)?dev.betterlitematica.core.IceWaterPlan.Observation.ICE:value.isOf(Blocks.WATER)&&value.get(FluidBlock.LEVEL)==0?dev.betterlitematica.core.IceWaterPlan.Observation.WATER:value.isAir()?dev.betterlitematica.core.IceWaterPlan.Observation.AIR:dev.betterlitematica.core.IceWaterPlan.Observation.OTHER;}
     private Outcome fail(Outcome result,PrinterReason reason){this.reason=reason;return result;}
     private boolean available(Item item){return client.player.isCreative()||inventoryItems.contains(item);}
@@ -56,18 +63,18 @@ final class PrinterActions {
         missing=null;return switch(transfers.equipForPrinter(item,tick)){case READY->null;case WAIT->fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.EQUIPPING,"等待换手"));case MISSING->{if(item!=Items.AIR&&currentSettings!=null&&supply.request(item,currentSettings.supply,tick))yield fail(Outcome.WAIT,supply.typedReason());missing=item;yield fail(item==Items.AIR?Outcome.UNSUPPORTED:Outcome.MISSING,item==Items.AIR?PrinterReason.of(PrinterReason.Id.INVENTORY_FULL,"调节方块需要一个空背包格"):!supply.typedReason().isEmpty()?supply.typedReason():PrinterReason.of(PrinterReason.Id.MISSING,"缺少"+item.getName().getString()));}};
     }
     Outcome execute(PrinterQueue.Job job,PrinterSettings settings,int tick){
-        prepare(tick);dispatched=breakDispatched=false;currentSettings=settings;reason=PrinterReason.of(PrinterReason.Id.NONE,"");missing=null;var pos=BlockPos.fromLong(job.position());var expected=Block.getStateFromRawId(job.expected());var actual=client.world.getBlockState(pos);
+        prepare(tick);dispatched=breakDispatched=false;if(interactions.waiting())return fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.CONFIRMING,"等待异常交互确认"));currentSettings=settings;reason=PrinterReason.of(PrinterReason.Id.NONE,"");missing=null;var pos=BlockPos.fromLong(job.position());var expected=Block.getStateFromRawId(job.expected());var actual=client.world.getBlockState(pos);
+        if(PrinterRules.forbiddenPrint(expected))return fail(Outcome.UNSUPPORTED,PrinterReason.of(PrinterReason.Id.UNSUPPORTED,"已跳过玩家头颅"));
         if(Block.getRawIdFromState(actual)!=job.observed()&&!owns(job))return Outcome.STALE;
         double reach=client.player.getBlockInteractionRange();if(PrinterReach.distanceSquared(client.player.getEyePos(),pos)>reach*reach)return fail(Outcome.UNSUPPORTED,PrinterReason.of(PrinterReason.Id.OUT_OF_REACH,"目标超出交互距离"));
         if(job.kind()==PrinterQueue.Kind.BEDROCK){dispatched=breakDispatched=!miner.owns(job.generation(),job.position());return miner.step(job.generation(),pos,tick)?Outcome.SENT:fail(Outcome.WAIT,miner.typedReason());}
-        if(ice!=null&&ice.owns(job.generation(),job.position()))return iceWater(job,pos,actual,settings,tick);
+        if(ownsIce(job))return iceWater(job,pos,actual,settings,tick);
         if(job.kind()==PrinterQueue.Kind.BREAK)return breakBlock(pos,actual,settings);
         if(job.kind()==PrinterQueue.Kind.ADJUST){var adjusted=adjust(pos,actual,expected,settings,tick);if(adjusted!=null)return adjusted;}
-        if(expected.getBlock() instanceof FluidBlock){if(settings.iceWater&&expected.isOf(Blocks.WATER)&&expected.get(FluidBlock.LEVEL)==0&&actual.isAir()&&!client.player.isCreative()&&available(Items.ICE))return iceWater(job,pos,actual,settings,tick);return fluid(pos,expected.isOf(Blocks.LAVA)?Items.LAVA_BUCKET:Items.WATER_BUCKET,settings,tick);}
+        if(expected.getBlock() instanceof FluidBlock){if(iceTarget(actual,expected,settings))return iceWater(job,pos,actual,settings,tick);return fluid(pos,expected.isOf(Blocks.LAVA)?Items.LAVA_BUCKET:Items.WATER_BUCKET,settings,tick);}
         BlockState place=placementState(actual,expected,settings,pos);Item item=place.getBlock().asItem();boolean coral=PrinterRules.coralSubstitute(expected)!=null&&place.getBlock()!=expected.getBlock();
         if(item==Items.AIR||!(item instanceof BlockItem))return fail(Outcome.UNSUPPORTED,PrinterReason.of(PrinterReason.Id.UNSUPPORTED,"此方块不能直接放置"));
         if(settings.fallingCheck&&place.getBlock() instanceof FallingBlock&&FallingBlock.canFallThrough(client.world.getBlockState(pos.down())))return fail(Outcome.RETRY,PrinterReason.of(PrinterReason.Id.NO_SUPPORT,"等待下方支撑"));
-        if(!available(item)){var selection=equip(item,tick);if(selection!=null)return selection;}
         // Find an actionable face before selecting an item, so blocked work does not churn the hand.
         ItemStack requested=place.isOf(Blocks.LIGHT)
             ?LightBlock.addNbtForLevel(new ItemStack(item),place.get(LightBlock.LEVEL_15))
@@ -113,10 +120,11 @@ final class PrinterActions {
     }
     private ItemStack stack(Item item){var inv=client.player.getInventory();if(inv.getMainHandStack().isOf(item))return inv.getMainHandStack();for(int i=0;i<36;i++)if(inv.getStack(i).isOf(item))return inv.getStack(i);return new ItemStack(item);}
     int material(PrinterQueue.Job job,PrinterSettings settings){
+        if(PrinterRules.forbiddenPrint(Block.getStateFromRawId(job.expected())))return -1;
         if(job.kind()==PrinterQueue.Kind.BREAK||job.kind()==PrinterQueue.Kind.BEDROCK)return -1;
         var expected=Block.getStateFromRawId(job.expected());var actual=Block.getStateFromRawId(job.observed());Item item=null;
         if(job.kind()==PrinterQueue.Kind.ADJUST)item=adjustmentItem(actual,expected,settings);
-        if(item==null&&expected.getBlock() instanceof FluidBlock)item=settings.iceWater&&expected.isOf(Blocks.WATER)&&expected.get(FluidBlock.LEVEL)==0&&actual.isAir()&&!client.player.isCreative()&&available(Items.ICE)?Items.ICE:expected.isOf(Blocks.LAVA)?Items.LAVA_BUCKET:Items.WATER_BUCKET;
+        if(item==null&&expected.getBlock() instanceof FluidBlock)item=iceTarget(actual,expected,settings)?Items.ICE:expected.isOf(Blocks.LAVA)?Items.LAVA_BUCKET:Items.WATER_BUCKET;
         if(item==null){var place=placementState(actual,expected,settings,null);if(place.isOf(Blocks.LIGHT))return materialKey(place);item=place.getBlock().asItem();}
         return Registries.ITEM.getRawId(item);
     }
@@ -140,7 +148,7 @@ final class PrinterActions {
         if(s.stripLogs&&PrinterRules.isUnstripped(actual,expected))return tool(true);
         if(expected.isOf(Blocks.FARMLAND)&&actual.isOf(Blocks.DIRT))return tool(false);
         if(actual.isOf(Blocks.FLOWER_POT)&&expected.getBlock() instanceof FlowerPotBlock pot)return pot.getContent().asItem();
-        if(actual.getBlock()==expected.getBlock()&&expected.contains(Properties.WATERLOGGED)&&actual.get(Properties.WATERLOGGED)!=expected.get(Properties.WATERLOGGED))return expected.get(Properties.WATERLOGGED)?Items.WATER_BUCKET:Items.BUCKET;
+        if(PrinterRules.sameBlock(actual,expected)&&expected.contains(Properties.WATERLOGGED)&&actual.get(Properties.WATERLOGGED)!=expected.get(Properties.WATERLOGGED))return expected.get(Properties.WATERLOGGED)?Items.WATER_BUCKET:Items.BUCKET;
         if(s.bonemeal&&expected.getBlock() instanceof CropBlock)return Items.BONE_MEAL;
         if(s.composter&&expected.isOf(Blocks.COMPOSTER))return compostMaterial(client.player.getMainHandStack().getItem(),s.compostItems,this::available);
         if(actual.isOf(Blocks.NOTE_BLOCK)||actual.isOf(Blocks.REPEATER)||actual.isOf(Blocks.COMPARATOR)||actual.isOf(Blocks.LEVER)||PrinterRules.manualOpen(actual))return Items.AIR;
@@ -154,26 +162,64 @@ final class PrinterActions {
         return found!=Items.AIR?found:first;
     }
     private boolean dry(BlockPos pos,BlockState state){if(state.contains(Properties.WATERLOGGED)&&state.get(Properties.WATERLOGGED))return false;for(Direction side:Direction.values()){BlockPos next=pos.offset(side);if(!WorldChunks.loaded(client.world,next)||!client.world.getFluidState(next).isEmpty())return false;}return true;}
+    boolean iceTarget(BlockState actual,BlockState expected,PrinterSettings settings){return settings.iceWater&&expected.isOf(Blocks.WATER)&&expected.get(FluidBlock.LEVEL)==0&&(actual.isAir()||actual.isOf(Blocks.WATER)&&actual.get(FluidBlock.LEVEL)>0)&&!client.player.isCreative();}
+    boolean hasIceWork(){return !iceTasks.isEmpty();}
+    private static float iceSpeed(ItemStack stack){float speed=stack.getMiningSpeedMultiplier(Blocks.ICE.getDefaultState());int level=net.minecraft.enchantment.EnchantmentHelper.getLevel(net.minecraft.enchantment.Enchantments.EFFICIENCY,stack);return speed>1&&level>0?speed+level*level+1:speed;}
+    PrinterQueue.Job nextIceJob(int tick){
+        if(iceTasks.isEmpty())return null;
+        for(var it=iceTasks.values().iterator();it.hasNext();){var task=it.next();if(task.plan!=null&&task.plan.next(tick,observation(client.world.getBlockState(BlockPos.fromLong(task.job.position()))),true)==dev.betterlitematica.core.IceWaterPlan.Step.DONE)it.remove();}
+        for(var task:iceTasks.values())if(task.plan==null)return task.job;
+        if(breaking!=null){var task=iceTasks.get(breaking.asLong());if(task!=null&&client.world.getBlockState(breaking).isOf(Blocks.ICE))return task.job;}
+        for(var task:iceTasks.values())if((task.instantSentAt<0||tick-task.instantSentAt>=10)&&task.plan.next(tick,observation(client.world.getBlockState(BlockPos.fromLong(task.job.position()))),true)==dev.betterlitematica.core.IceWaterPlan.Step.BREAK)return task.job;
+        return iceTasks.isEmpty()?null:iceTasks.values().iterator().next().job;
+    }
+    private void startIceBatch(PrinterQueue.Job first){
+        iceToolSpeed=0;var inv=client.player.getInventory();for(int i=0;i<36;i++){var stack=inv.getStack(i);if(iceTool(stack)&&transfers.usableForPrinter(stack))iceToolSpeed=Math.max(iceToolSpeed,iceSpeed(stack));}
+        var candidates=controller==null?List.of(first):controller.printer().iceCandidates(first,iceToolSpeed>0?32:8);
+        for(var job:candidates)iceTasks.putIfAbsent(job.position(),new IceTask(job));iceTimeout=200+iceTasks.size()*40;
+    }
     private Outcome iceWater(PrinterQueue.Job job,BlockPos pos,BlockState actual,PrinterSettings settings,int tick){
         boolean eligible=!client.player.isCreative()&&!client.world.getDimension().ultrawarm()&&WorldChunks.loaded(client.world,pos.down())&&(client.world.getBlockState(pos.down()).blocksMovement()||!client.world.getFluidState(pos.down()).isEmpty());
-        if(!eligible){reset();return fail(Outcome.UNSUPPORTED,PrinterReason.of(PrinterReason.Id.UNSUPPORTED,"此处无法破冰成水"));}
-        if(ice==null){var plan=placement(pos,Blocks.ICE.getDefaultState(),settings,stack(Items.ICE));if(plan==null)return fail(Outcome.RETRY,PrinterReason.of(PrinterReason.Id.NO_FACE,"等待可用放置面"));var selected=equip(Items.ICE,tick);if(selected!=null)return selected;var placed=use(plan.hit(),plan.yaw(),plan.pitch(),plan.sneak(),pos,Blocks.ICE.getDefaultState());if(placed!=Outcome.SENT)return placed;ice=new dev.betterlitematica.core.IceWaterPlan(job.generation(),job.position(),tick);icePosition=pos.toImmutable();return fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.CONFIRMING,"等待放冰确认"));}
-        var step=ice.next(tick,observation(actual),eligible);if(step==dev.betterlitematica.core.IceWaterPlan.Step.ABORT){reset();return fail(Outcome.UNSUPPORTED,PrinterReason.of(PrinterReason.Id.UNSUPPORTED,"破冰放水未完成"));}if(step==dev.betterlitematica.core.IceWaterPlan.Step.DONE){reset();return Outcome.SENT;}
-        if(step==dev.betterlitematica.core.IceWaterPlan.Step.WAIT)return fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.BLOCK_UPDATE,"等待方块更新"));
-        if(net.minecraft.enchantment.EnchantmentHelper.getLevel(net.minecraft.enchantment.Enchantments.SILK_TOUCH,client.player.getMainHandStack())>0){
-            boolean hasPick=InventoryTransfers.find(client.player.getInventory(),PrinterActions::iceTool)>=0;
-            var selected=hasPick?transfers.equipForPrinter(PrinterActions::iceTool,tick):transfers.equipForPrinter(Items.AIR,tick);
-            if(selected!=InventoryTransfers.Result.READY)return fail(selected==InventoryTransfers.Result.WAIT?Outcome.WAIT:Outcome.UNSUPPORTED,selected==InventoryTransfers.Result.WAIT?PrinterReason.of(PrinterReason.Id.EQUIPPING,"等待换手"):PrinterReason.of(PrinterReason.Id.TOOL_REQUIRED,"需要无精准采集的工具或空背包格"));
+        if(!eligible){cancelIce(job);return fail(Outcome.UNSUPPORTED,PrinterReason.of(PrinterReason.Id.UNSUPPORTED,"此处无法破冰成水"));}
+        if(!ownsIce(job))startIceBatch(job);var task=iceTasks.get(job.position());
+        if(task.plan==null){
+            if(!iceTarget(actual,Block.getStateFromRawId(job.expected()),settings)){cancelIce(job);return Outcome.STALE;}
+            var plan=placement(pos,Blocks.ICE.getDefaultState(),settings,stack(Items.ICE));if(plan==null){cancelIce(job);return fail(Outcome.RETRY,PrinterReason.of(PrinterReason.Id.NO_FACE,"等待可用放置面"));}
+            var selected=equip(Items.ICE,tick);if(selected!=null){if(selected!=Outcome.WAIT)cancelIce(job);return selected;}
+            var placed=use(plan.hit(),plan.yaw(),plan.pitch(),plan.sneak(),pos,Blocks.ICE.getDefaultState());if(placed!=Outcome.SENT){if(placed!=Outcome.WAIT)cancelIce(job);return placed;}
+            task.plan=new dev.betterlitematica.core.IceWaterPlan(job.generation(),job.position(),tick,iceTimeout);return Outcome.SENT;
         }
-        if(tick<iceNextBreak)return fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.ICE_BREAK,"等待破冰"));iceNextBreak=tick+Math.max(1,settings.breakInterval);
-        Outcome result=breakBlock(pos,actual,settings);if(result==Outcome.UNSUPPORTED){reset();return result;}ice.breakingSent();if(!client.world.getBlockState(pos).isOf(Blocks.ICE)){breaking=null;client.interactionManager.cancelBlockBreaking();}return fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.CONFIRMING,"等待水源确认"));
+        var step=task.plan.next(tick,observation(actual),eligible);if(step==dev.betterlitematica.core.IceWaterPlan.Step.ABORT){cancelIce(job);return fail(Outcome.UNSUPPORTED,PrinterReason.of(PrinterReason.Id.UNSUPPORTED,"破冰放水未完成"));}if(step==dev.betterlitematica.core.IceWaterPlan.Step.DONE){iceTasks.remove(job.position());return Outcome.SENT;}
+        if(step==dev.betterlitematica.core.IceWaterPlan.Step.WAIT)return fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.BLOCK_UPDATE,"等待方块更新"));
+        if(task.instantSentAt>=0&&tick-task.instantSentAt<10)return fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.CONFIRMING,"等待水源确认"));
+        if(iceToolSpeed>0&&InventoryTransfers.find(client.player.getInventory(),stack->iceTool(stack)&&iceSpeed(stack)>=iceToolSpeed)<0){
+            iceToolSpeed=0;var inv=client.player.getInventory();for(int i=0;i<36;i++){var stack=inv.getStack(i);if(iceTool(stack)&&transfers.usableForPrinter(stack))iceToolSpeed=Math.max(iceToolSpeed,iceSpeed(stack));}
+        }
+        if(iceToolSpeed>0||net.minecraft.enchantment.EnchantmentHelper.getLevel(net.minecraft.enchantment.Enchantments.SILK_TOUCH,client.player.getMainHandStack())>0){
+            var selected=iceToolSpeed>0?transfers.equipForPrinter(stack->iceTool(stack)&&iceSpeed(stack)>=iceToolSpeed,tick):transfers.equipForPrinter(Items.AIR,tick);
+            if(selected!=InventoryTransfers.Result.READY){if(selected!=InventoryTransfers.Result.WAIT)cancelIce(job);return fail(selected==InventoryTransfers.Result.WAIT?Outcome.WAIT:Outcome.UNSUPPORTED,selected==InventoryTransfers.Result.WAIT?PrinterReason.of(PrinterReason.Id.EQUIPPING,"等待换手"):PrinterReason.of(PrinterReason.Id.TOOL_REQUIRED,"需要无精准采集的工具或空背包格"));}
+        }
+        if(tick<task.nextBreak)return fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.ICE_BREAK,"等待破冰"));task.nextBreak=tick+Math.max(1,settings.breakInterval);
+        // Vanilla can break this confirmed ice in one START action. Let the server apply it;
+        // do not locally erase ice or wait out the client's unrelated attack animation cooldown.
+        if(task.instantSentAt<0&&actual.calcBlockBreakingDelta(client.player,client.world,pos)>=1){
+            var delta=client.player.getEyePos().subtract(Vec3d.ofCenter(pos));var side=Direction.getFacing(delta.x,delta.y,delta.z);acting=true;
+            try{client.interactionManager.sendSequencedPacket(client.world,sequence->new PlayerActionC2SPacket(PlayerActionC2SPacket.Action.START_DESTROY_BLOCK,pos,side,sequence));dispatched=breakDispatched=true;task.plan.breakingSent();task.instantSentAt=tick;client.player.swingHand(Hand.MAIN_HAND);return Outcome.SENT;}
+            finally{acting=false;}
+        }
+        Outcome result=breakBlock(pos,actual,settings,true);if(result==Outcome.UNSUPPORTED){cancelIce(job);return result;}task.plan.breakingSent();
+        if(!client.world.getBlockState(pos).isOf(Blocks.ICE)){breaking=null;client.interactionManager.cancelBlockBreaking();return Outcome.SENT;}
+        return fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.CONFIRMING,"等待水源确认"));
     }
     private Outcome adjust(BlockPos pos,BlockState actual,BlockState expected,PrinterSettings s,int tick){
         Item item=adjustmentItem(actual,expected,s);if(item==null)return null;
         if(s.composter&&expected.isOf(Blocks.COMPOSTER)&&item==Items.AIR)return fail(Outcome.MISSING,PrinterReason.of(PrinterReason.Id.MISSING,"没有可用的堆肥材料"));
-        if(actual.getBlock()==expected.getBlock()&&expected.contains(Properties.WATERLOGGED)&&actual.get(Properties.WATERLOGGED)!=expected.get(Properties.WATERLOGGED))return fluid(pos,item,s,tick);
+        if(PrinterRules.sameBlock(actual,expected)&&expected.contains(Properties.WATERLOGGED)&&actual.get(Properties.WATERLOGGED)!=expected.get(Properties.WATERLOGGED))return fluid(pos,item,s,tick);
         var hit=new BlockHitResult(Vec3d.ofCenter(pos).add(0,0.49,0),Direction.UP,pos,false);if(client.player.getEyePos().squaredDistanceTo(hit.getPos())>Math.pow(client.player.getBlockInteractionRange(),2))return fail(Outcome.UNSUPPORTED,PrinterReason.of(PrinterReason.Id.OUT_OF_REACH,"目标超出交互距离"));
-        var selected=equip(item,tick);if(selected!=null)return selected;return use(hit,client.player.getYaw(),client.player.getPitch(),false);
+        var selected=equip(item,tick);if(selected!=null)return selected;
+        // Opening a gate while looking against its facing flips it; keep the projected facing.
+        float yaw=expected.getBlock() instanceof FenceGateBlock?expected.get(Properties.HORIZONTAL_FACING).asRotation():client.player.getYaw();
+        return use(hit,yaw,client.player.getPitch(),false);
     }
     private record PlacementPlan(BlockHitResult hit,float yaw,float pitch,boolean sneak){}
     private record PlacementHint(Direction side,double height,float yaw,float pitch,boolean followYaw,boolean followPitch){}
@@ -236,17 +282,18 @@ final class PrinterActions {
         if(player.getEyePos().squaredDistanceTo(hit.getPos())>Math.pow(client.player.getBlockInteractionRange(),2))return Outcome.UNSUPPORTED;
         var mode=AccuratePlacement.resolve(client,protocol.get());
         if(target!=null&&!AccuratePlacement.canUse(client,mode,target,wanted,hit))return fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.CONFIRMING,"等待放置确认"));
-        boolean turn=yaw!=oldYaw||pitch!=oldPitch;acting=true;
+        if(target!=null&&wanted!=null&&!interactions.allow(target,wanted))return fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.CONFIRMING,"等待异常交互确认"));
+        boolean turn=yaw!=oldYaw||pitch!=oldPitch;acting=true;interactions.sending(true);
         try{
             player.setYaw(yaw);player.setPitch(pitch);player.input.sneaking=sneak;
             if(turn)client.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(yaw,pitch,player.isOnGround()));
             if(sneak!=oldSneak)client.getNetworkHandler().sendPacket(new ClientCommandC2SPacket(player,sneak?ClientCommandC2SPacket.Mode.PRESS_SHIFT_KEY:ClientCommandC2SPacket.Mode.RELEASE_SHIFT_KEY));
-            dispatched=true;var result=target==null?client.interactionManager.interactBlock(player,Hand.MAIN_HAND,hit):AccuratePlacement.use(client,mode,target,wanted,hit);if(result.shouldSwingHand())player.swingHand(Hand.MAIN_HAND);
+            long beforePacket=PrinterInteractionGuard.blockPackets();var result=target==null?client.interactionManager.interactBlock(player,Hand.MAIN_HAND,hit):AccuratePlacement.use(client,mode,target,wanted,hit);dispatched=PrinterInteractionGuard.blockPackets()!=beforePacket;if(result.shouldSwingHand())player.swingHand(Hand.MAIN_HAND);
             return result.isAccepted()?Outcome.SENT:fail(client.getServer()!=null?Outcome.RETRY:Outcome.UNSUPPORTED,PrinterReason.of(PrinterReason.Id.REJECTED,"放置未接受"));
         }finally{
             player.setYaw(oldYaw);player.setPitch(oldPitch);player.input.sneaking=oldSneak;
             if(sneak!=oldSneak)client.getNetworkHandler().sendPacket(new ClientCommandC2SPacket(player,oldSneak?ClientCommandC2SPacket.Mode.PRESS_SHIFT_KEY:ClientCommandC2SPacket.Mode.RELEASE_SHIFT_KEY));
-            if(turn)client.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(oldYaw,oldPitch,player.isOnGround()));acting=false;
+            if(turn)client.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(oldYaw,oldPitch,player.isOnGround()));acting=false;interactions.sending(false);
         }
     }
     private Outcome fluid(BlockPos pos,Item bucket,PrinterSettings s,int tick){
@@ -268,14 +315,23 @@ final class PrinterActions {
         }finally{player.setYaw(yaw);player.setPitch(pitch);client.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(yaw,pitch,player.isOnGround()));acting=false;}
     }
     private Outcome breakBlock(BlockPos pos,BlockState actual,PrinterSettings settings){
+        return breakBlock(pos,actual,settings,false);
+    }
+    private Outcome breakBlock(BlockPos pos,BlockState actual,PrinterSettings settings,boolean ownedIce){
         if(actual.isAir()){breaking=null;return Outcome.STALE;}
         if(actual.getHardness(client.world,pos)<0)return fail(Outcome.UNSUPPORTED,PrinterReason.of(PrinterReason.Id.UNSUPPORTED,"此方块不可直接破坏"));
-        var ray=client.world.raycast(new net.minecraft.world.RaycastContext(client.player.getEyePos(),Vec3d.ofCenter(pos),net.minecraft.world.RaycastContext.ShapeType.OUTLINE,net.minecraft.world.RaycastContext.FluidHandling.NONE,client.player));
-        if(ray.getType()!=HitResult.Type.BLOCK||!ray.getBlockPos().equals(pos))return fail(Outcome.UNSUPPORTED,PrinterReason.of(PrinterReason.Id.OBSTRUCTED,"目标被遮挡"));
+        Direction side;
+        if(ownedIce&&actual.isOf(Blocks.ICE)){
+            var eye=client.player.getEyePos();var delta=eye.subtract(Vec3d.ofCenter(pos));side=Direction.getFacing(delta.x,delta.y,delta.z);
+        }else{
+            var ray=client.world.raycast(new net.minecraft.world.RaycastContext(client.player.getEyePos(),Vec3d.ofCenter(pos),net.minecraft.world.RaycastContext.ShapeType.OUTLINE,net.minecraft.world.RaycastContext.FluidHandling.NONE,client.player));
+            if(ray.getType()!=HitResult.Type.BLOCK||!ray.getBlockPos().equals(pos))return fail(Outcome.UNSUPPORTED,PrinterReason.of(PrinterReason.Id.OBSTRUCTED,"目标被遮挡"));
+            side=ray.getSide();
+        }
         acting=true;try{
             dispatched=breakDispatched=true;
-            if(!pos.equals(breaking)){client.interactionManager.cancelBlockBreaking();client.interactionManager.attackBlock(pos,ray.getSide());breaking=pos.toImmutable();}
-            else client.interactionManager.updateBlockBreakingProgress(pos,ray.getSide());
+            if(!pos.equals(breaking)){client.interactionManager.cancelBlockBreaking();client.interactionManager.attackBlock(pos,side);breaking=pos.toImmutable();}
+            else client.interactionManager.updateBlockBreakingProgress(pos,side);
             client.player.swingHand(Hand.MAIN_HAND);if(client.world.getBlockState(pos).isAir()){breaking=null;return Outcome.SENT;}
             return fail(Outcome.WAIT,PrinterReason.of(PrinterReason.Id.BREAKING,"正在破坏"));
         }finally{acting=false;}

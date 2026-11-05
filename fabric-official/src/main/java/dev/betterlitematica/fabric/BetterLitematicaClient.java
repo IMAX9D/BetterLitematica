@@ -57,7 +57,13 @@ public final class BetterLitematicaClient implements ClientModInitializer {
     public static void projectionChunkChanged(net.minecraft.world.level.BlockGetter world,int x,int z){var controller=activeController;if(controller!=null)controller.worldChunkChanged(world,x,z);}
     static int wheelKeyCode(){return activeController==null?NativeInput.GLFW_KEY_TAB:ModeWheelInput.bindingCode(activeController.options().keys.getOrDefault("wheel","TAB"));}
     static BuildingInteractions interactions;
-    public static void finishProjectionFrame(){ProjectionDraw.flush();var controller=activeController;if(controller!=null)controller.capturePreview();}
+    public static void finishProjectionFrame(){
+        if(ProjectionShaderPass.shadowPass())return;
+        var level=Minecraft.getInstance().level;
+        if(ProjectionShaderPass.enabled())ProjectionShaderPass.defer(level,BetterLitematicaClient::drawFinishedProjection);
+        else drawFinishedProjection();
+    }
+    private static void drawFinishedProjection(){ProjectionDraw.flush();var controller=activeController;if(controller!=null)controller.capturePreview();}
     public static boolean useProjection(){return interactions!=null&&interactions.use();}
     public static boolean pickProjection(){return interactions!=null&&interactions.pick();}
     public static boolean scrollTool(double amount){return interactions!=null&&interactions.scroll(amount);}
@@ -86,7 +92,7 @@ public final class BetterLitematicaClient implements ClientModInitializer {
         }));
         IndependentUi ui=IndependentUi.INSTANCE;ProjectionInformation information=new ProjectionInformation();ToolHud toolHud=new ToolHud();statusHud=new StatusHud();final int[] informationTick={0};ClientTickEvents.END_CLIENT_TICK.register(mc->{if(++informationTick[0]%4==0)information.update(mc,controller);});
         ClientLifecycleEvents.CLIENT_STOPPING.register(mc->{modeWheelInput.clear();controller.close();ui.close();EntityOverlayMask.close();});
-        net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.END_EXTRACTION.register(context->{interactions.frame();var frame=new ProjectionFrame(context);ProjectionDraw.beginFrame();maskNeeded=controller.entityOverlayMaskNeeded(frame);controller.render(frame);});
+        net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.END_EXTRACTION.register(context->{if(!ProjectionShaderPass.begin())return;interactions.frame();var frame=new ProjectionFrame(context);ProjectionDraw.beginFrame();maskNeeded=controller.entityOverlayMaskNeeded(frame);controller.render(frame);});
         net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.AFTER_OPAQUE_TERRAIN.register(context->EntityOverlayMask.before(client,maskNeeded));
         net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.AFTER_SOLID_FEATURES.register(context->EntityOverlayMask.after(client));
         net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("betterlitematica","hud"),(context,delta)->{

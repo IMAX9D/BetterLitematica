@@ -72,6 +72,12 @@ public final class PrinterQueue {
         burst=material==lastMaterial?burst+1:1;lastMaterial=material;return job;
     }
     public int size(){return keys.size();}
+    /** Read-only bounded candidates; active material turns and batch ownership are unchanged. */
+    public List<Job> snapshot(int material,int limit){
+        if(limit<1||limit>4096)throw new IllegalArgumentException("Snapshot limit");
+        var source=buckets.get(material);if(source==null)return List.of();
+        var result=new ArrayList<Job>(Math.min(limit,source.size()));for(var job:source){result.add(job);if(result.size()==limit)break;}return List.copyOf(result);
+    }
     public int remaining(){return limit-size();}
     public void clear(){keys.clear();turns.clear();buckets.clear();lastMaterial=Integer.MIN_VALUE;burst=0;resetBatch();}
 }

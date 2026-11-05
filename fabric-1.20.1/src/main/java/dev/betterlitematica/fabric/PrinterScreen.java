@@ -128,6 +128,7 @@ final class PrinterScreen extends MenuScreen {
         number(SettingId.PRINTER_BREAK_PER_TICK,"每 tick 破坏上限",draft.breakPerTick,2,3,56,v->draft.breakPerTick=v);
         number(SettingId.PRINTER_BUDGET,"工作预算 / ms",draft.workBudgetMillis,0,3,104,v->draft.workBudgetMillis=v);
         hint(fields.get("工作预算 / ms"),"每 tick 的搜索与施工时间预算");
+        toggle(SettingId.PRINTER_MATERIAL_BATCH,"按材料批量打印",0,154,()->draft.materialBatch,v->draft.materialBatch=v);
     }
     private void filtersPage(){
         listInput(SettingId.PRINTER_SKIP,"跳过方块",draft.skip,56,RegistryListScreen.Kind.BLOCK,v->draft.skip=v);

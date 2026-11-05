@@ -33,8 +33,22 @@ final class InventoryTransfers {
     static int playerSlot(int inventorySlot){if(inventorySlot<0||inventorySlot>=36)throw new IllegalArgumentException("无效背包格");return inventorySlot<9?inventorySlot+36:inventorySlot;}
     static ServerboundContainerClickPacket click(AbstractContainerMenu handler,int slot,int button,ContainerInput type){
         if(slot<0||slot>=handler.slots.size()||!handler.getCarried().isEmpty())throw new IllegalStateException("请先放下光标上的物品");
+        var displayed=new Int2ObjectOpenHashMap<net.minecraft.network.HashedStack>();
+        var hashes=net.minecraft.client.Minecraft.getInstance().getConnection().decoratedHashOpsGenenerator();
+        if(type==ContainerInput.SWAP&&button>=0&&button<9){
+            // We do not predict SWAP locally: report the client's actual displayed values.
+            // Consumption and refill may occur within one server tick, leaving its tracked
+            // hotbar stack unchanged (64 -> 0 -> 64). An empty map then loses the receipt.
+            displayed.put(slot,net.minecraft.network.HashedStack.create(handler.getSlot(slot).getItem(),hashes));
+            for(int i=0;i<handler.slots.size();i++){
+                var candidate=handler.getSlot(i);
+                if(candidate.container instanceof net.minecraft.world.entity.player.Inventory&&candidate.getContainerSlot()==button){
+                    displayed.put(i,net.minecraft.network.HashedStack.create(candidate.getItem(),hashes));break;
+                }
+            }
+        }
         if(slot>Short.MAX_VALUE||button<Byte.MIN_VALUE||button>Byte.MAX_VALUE)throw new IllegalArgumentException("无效容器点击");
-        return new ServerboundContainerClickPacket(handler.containerId,handler.getStateId(),(short)slot,(byte)button,type,new Int2ObjectOpenHashMap<>(),net.minecraft.network.HashedStack.EMPTY);
+        return new ServerboundContainerClickPacket(handler.containerId,handler.getStateId(),(short)slot,(byte)button,type,displayed,net.minecraft.network.HashedStack.EMPTY);
     }
     Result equip(Item item,int tick){
         return equip(stack->stack.is(item),item,tick,false);
@@ -91,10 +105,11 @@ final class InventoryTransfers {
     private Result equip(Predicate<ItemStack> matches,Item creativeItem,int tick,boolean retainMaterials,ItemStack exact,boolean container,int reservedSlots){
         var player=client.player;var inv=player.getInventory();
         if(pending!=null){
-            if(InventoryReceipts.containerStamp()<=containerStamp&&!confirmed(tick,startedTick,echo,stamp,InventoryReceipts.stamp(slot),pending.test(inv.getItem(slot)))){if(tick-startedTick>100)throw new IllegalStateException("换手未确认，请打开容器后重试");return Result.WAIT;}
+            if(InventoryReceipts.containerStamp()<=containerStamp&&!confirmed(tick,startedTick,echo,stamp,InventoryReceipts.stamp(slot),pending.test(inv.getItem(slot)))){if(tick-startedTick>100&&!(retainMaterials&&ClientUi.screen(client) instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>))throw new IllegalStateException("换手未确认，请打开容器后重试");return Result.WAIT;}
             clearPending();
         }
-        if(player.containerMenu!=player.inventoryMenu)return Result.WAIT;
+        var handler=player.containerMenu;
+        if(!retainMaterials&&handler!=player.inventoryMenu||!handler.getCarried().isEmpty())return Result.WAIT;
         var settings=options.get();var protection=toolProtection.get(settings.tool,settings.toolItem);var material=materialMatch(matches,protection);
         boolean localCreative=client.getSingleplayerServer()!=null&&player.isCreative()&&client.gameMode.getPlayerMode().isCreative();
         boolean creativePick=localCreative||container&&player.isCreative()&&client.gameMode.getPlayerMode().isCreative();
@@ -112,7 +127,12 @@ final class InventoryTransfers {
             return Result.READY;
         }
         // Validate before arming the in-flight transaction: an unsent click has no receipt.
-        var swap=source>=9?click(player.inventoryMenu,source,destination,ContainerInput.SWAP):null;
+        int menuSlot=source;
+        if(source>=9&&handler!=player.inventoryMenu){
+            menuSlot=-1;for(int i=0;i<handler.slots.size();i++){var candidate=handler.getSlot(i);if(candidate.container==inv&&candidate.getContainerSlot()==source){menuSlot=i;break;}}
+            if(menuSlot<0)return Result.WAIT;
+        }
+        var swap=source>=9?click(handler,menuSlot,destination,ContainerInput.SWAP):null;
         pending=matches;watched=true;startedTick=tick;slot=destination;stamp=InventoryReceipts.stamp(slot);containerStamp=InventoryReceipts.containerStamp();echo=source<0||source>=9;
         if(inv.getSelectedSlot()!=slot){inv.setSelectedSlot(slot);client.gameMode.ensureHasSentCarriedItem();}
         if(swap!=null)client.getConnection().send(swap);

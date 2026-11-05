@@ -6,7 +6,8 @@ public final class IceWaterPlan {
     public enum Step {WAIT,BREAK,DONE,ABORT}
     private enum Phase {PLACE,READY,WATER,DONE,CANCELLED}
     private final long generation,position;private final int deadline;private Phase phase=Phase.PLACE;private boolean breakingSent;
-    public IceWaterPlan(long generation,long position,int tick){this.generation=generation;this.position=position;deadline=tick+200;}
+    public IceWaterPlan(long generation,long position,int tick){this(generation,position,tick,200);}
+    public IceWaterPlan(long generation,long position,int tick,int timeout){if(timeout<1||timeout>2000)throw new IllegalArgumentException("Ice confirmation timeout");this.generation=generation;this.position=position;deadline=tick+timeout;}
     public boolean owns(long generation,long position){return phase!=Phase.CANCELLED&&this.generation==generation&&this.position==position;}
     public void confirm(Observation observation){
         if(phase==Phase.CANCELLED)return;

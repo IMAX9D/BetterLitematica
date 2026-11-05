@@ -104,7 +104,7 @@ public final class BlueprintCache implements AutoCloseable {
         String name=strings.read(in);int version=in.readInt();String hash=strings.read(in);
         int n=bounded(in.readInt(),1,65536,"palette size");List<BlockStateSpec> palette=new ArrayList<>(n);
         for(int i=0;i<n;i++)palette.add(BlockStateSpec.parse(strings.read(in)));
-        n=bounded(in.readInt(),1,1024,"region count");List<Region> regions=new ArrayList<>(n);
+        n=bounded(in.readInt(),1,BlueprintMetadata.MAX_REGIONS,"region count");List<Region> regions=new ArrayList<>(n);
         for(int i=0;i<n;i++)regions.add(new Region(strings.read(in),new Vec3i(in.readInt(),in.readInt(),in.readInt()),new Vec3i(in.readInt(),in.readInt(),in.readInt()),new Vec3i(in.readInt(),in.readInt(),in.readInt())));
         n=bounded(in.readInt(),0,1024,"warning count");List<String>warnings=new ArrayList<>(n);for(int i=0;i<n;i++)warnings.add(strings.read(in));
         var compatibility=cacheVersion>=3?new ProjectionCompatibility(in.readInt(),in.readInt(),in.readInt(),in.readInt()):ProjectionCompatibility.NONE;

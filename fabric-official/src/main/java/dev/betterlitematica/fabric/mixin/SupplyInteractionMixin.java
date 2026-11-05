@@ -9,7 +9,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(MultiPlayerGameMode.class)
 abstract class SupplyInteractionMixin {
     @Inject(method="useItemOn",at=@At("HEAD"))
-    private void betterlitematica$manualBlock(net.minecraft.client.player.LocalPlayer player,net.minecraft.world.InteractionHand hand,net.minecraft.world.phys.BlockHitResult hit,org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<net.minecraft.world.InteractionResult> callback){BetterLitematicaClient.manualSignInteraction(hit.getBlockPos());BetterLitematicaClient.manualContainerInteraction();}
+    private void betterlitematica$manualBlock(net.minecraft.client.player.LocalPlayer player,net.minecraft.world.InteractionHand hand,net.minecraft.world.phys.BlockHitResult hit,org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<net.minecraft.world.InteractionResult> callback){dev.betterlitematica.fabric.PrinterInteractionGuard.manualUse();BetterLitematicaClient.manualSignInteraction(hit.getBlockPos());BetterLitematicaClient.manualContainerInteraction();}
+    @Inject(method="useItem",at=@At("HEAD"))
+    private void betterlitematica$manualItem(Player player,net.minecraft.world.InteractionHand hand,org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<net.minecraft.world.InteractionResult> ci){dev.betterlitematica.fabric.PrinterInteractionGuard.manualUse();}
     @Inject(method="handleContainerInput",at=@At("HEAD"))
     private void betterlitematica$manual(int sync,int slot,int button,ContainerInput type,Player player,CallbackInfo callback){BetterLitematicaClient.manualInventory();}
 }

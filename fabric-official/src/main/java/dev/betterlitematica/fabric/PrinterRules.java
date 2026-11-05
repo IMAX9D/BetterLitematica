@@ -1,4 +1,8 @@
 package dev.betterlitematica.fabric;
+import net.minecraft.world.level.block.WallBlock;
+import net.minecraft.world.level.block.StairBlock;
+import net.minecraft.world.level.block.IronBarsBlock;
+import net.minecraft.world.level.block.FenceBlock;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CandleBlock;
@@ -22,6 +26,7 @@ import java.util.*;
 /** Placement prediction is the authority; unsupported target states are never reported as placed. */
 final class PrinterRules {
     private PrinterRules(){}
+    static boolean forbiddenPrint(BlockState state){return state.is(Blocks.PLAYER_HEAD)||state.is(Blocks.PLAYER_WALL_HEAD);}
     static BlockState coralSubstitute(BlockState wanted){
         var id=BuiltInRegistries.BLOCK.getKey(wanted.getBlock());String name=id.getPath();if(!id.getNamespace().equals("minecraft")||!name.startsWith("dead_")||!name.contains("coral"))return null;
         var live=BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.fromNamespaceAndPath("minecraft",name.substring(5))).defaultBlockState();if(live.isAir())return null;for(var property:wanted.getProperties())live=copyProperty(live,wanted,property);return live;
@@ -41,6 +46,7 @@ final class PrinterRules {
         for(String token:filters){String text=token.toLowerCase(Locale.ROOT);if(id.equals(text)||(!text.contains(":")&&id.endsWith(":"+text)))return true;}return false;
     }
     static boolean adjustable(BlockState actual,BlockState wanted,PrinterSettings s){
+        actual=DiagonalStateCompatibility.canonical(actual);wanted=DiagonalStateCompatibility.canonical(wanted);
         if(actual.equals(wanted)||actual.isAir())return false;
         if(actual.getBlock()!=wanted.getBlock())return s.stripLogs&&isUnstripped(actual,wanted)||actual.is(Blocks.FLOWER_POT)&&wanted.getBlock() instanceof FlowerPotBlock||actual.is(Blocks.DIRT)&&wanted.is(Blocks.FARMLAND);
         if(wanted.hasProperty(BlockStateProperties.WATERLOGGED)&&actual.getValue(BlockStateProperties.WATERLOGGED)!=wanted.getValue(BlockStateProperties.WATERLOGGED))return true;
@@ -58,13 +64,21 @@ final class PrinterRules {
         return s.composter&&wanted.is(Blocks.COMPOSTER)&&actual.getValue(ComposterBlock.LEVEL)<wanted.getValue(ComposterBlock.LEVEL);
     }
     static boolean manualOpen(BlockState state){return DoorBlock.isWoodenDoor(state)||state.getBlock() instanceof TrapDoorBlock&&!state.is(Blocks.IRON_TRAPDOOR)||state.getBlock() instanceof FenceGateBlock;}
+    /** Redstone controls iron trapdoors. Keep verifier mismatches, but do not demolish a usable placement. */
+    static boolean redstoneOnlyDifference(BlockState actual,BlockState wanted,boolean accurateOpen){
+        if(!actual.is(Blocks.IRON_TRAPDOOR)||!wanted.is(Blocks.IRON_TRAPDOOR))return false;
+        var normalized=actual.setValue(BlockStateProperties.POWERED,wanted.getValue(BlockStateProperties.POWERED));
+        if(!accurateOpen)normalized=normalized.setValue(BlockStateProperties.OPEN,wanted.getValue(BlockStateProperties.OPEN));
+        return !actual.equals(wanted)&&normalized.equals(wanted);
+    }
     static boolean isUnstripped(BlockState actual,BlockState wanted){
         String target=BuiltInRegistries.BLOCK.getKey(wanted.getBlock()).toString(),source=BuiltInRegistries.BLOCK.getKey(actual.getBlock()).toString();
         int colon=target.indexOf(':');return target.substring(colon+1).startsWith("stripped_")&&source.equals(target.substring(0,colon+1)+target.substring(colon+10));
     }
-    /** Leaf distance is world-computed; player placement always produces persistent leaves. */
+    /** Only world-derived connection shape is tolerant; material, facing, half and fluid remain checked. */
     static boolean constructionMatches(BlockState actual,BlockState wanted){
-        if(actual==null||wanted==null||actual.getBlock()!=wanted.getBlock())return false;
+        if(!sameBlock(actual,wanted))return false;
+        actual=DiagonalStateCompatibility.canonical(actual);wanted=DiagonalStateCompatibility.canonical(wanted);
         return constructionState(actual,wanted).equals(wanted);
     }
     /** Shared world comparison for rendering, nearby highlights and the full verifier. */
@@ -73,15 +87,33 @@ final class PrinterRules {
         if(constructionMatches(actual,wanted)||wanted.isAir()&&actual.isAir())return dev.betterlitematica.core.Comparison.MATCH;
         if(actual.isAir())return dev.betterlitematica.core.Comparison.MISSING;
         if(wanted.isAir())return dev.betterlitematica.core.Comparison.EXTRA;
-        return actual.getBlock()==wanted.getBlock()?dev.betterlitematica.core.Comparison.WRONG_STATE:dev.betterlitematica.core.Comparison.WRONG_BLOCK;
+        return sameBlock(actual,wanted)?dev.betterlitematica.core.Comparison.WRONG_STATE:dev.betterlitematica.core.Comparison.WRONG_BLOCK;
     }
+    static boolean sameBlock(BlockState actual,BlockState wanted){return DiagonalStateCompatibility.sameBlock(actual,wanted);}
     private static BlockState constructionState(BlockState actual,BlockState wanted){
+        if(actual.getBlock() instanceof FenceBlock||actual.getBlock() instanceof IronBarsBlock){
+            for(var property:List.of(BlockStateProperties.NORTH,BlockStateProperties.EAST,BlockStateProperties.SOUTH,BlockStateProperties.WEST))
+                actual=actual.setValue(property,wanted.getValue(property));
+        }else if(actual.getBlock() instanceof FenceGateBlock){
+            actual=actual.setValue(BlockStateProperties.IN_WALL,wanted.getValue(BlockStateProperties.IN_WALL));
+        }else if(actual.getBlock() instanceof StairBlock){
+            actual=actual.setValue(BlockStateProperties.STAIRS_SHAPE,wanted.getValue(BlockStateProperties.STAIRS_SHAPE));
+        }else if(actual.getBlock() instanceof WallBlock){
+            for(var property:List.of(BlockStateProperties.NORTH_WALL,BlockStateProperties.EAST_WALL,BlockStateProperties.SOUTH_WALL,BlockStateProperties.WEST_WALL))
+                actual=actual.setValue(property,wanted.getValue(property));
+            actual=actual.setValue(BlockStateProperties.UP,wanted.getValue(BlockStateProperties.UP));
+        }
         return actual.getBlock() instanceof net.minecraft.world.level.block.LeavesBlock
             ?actual.setValue(net.minecraft.world.level.block.LeavesBlock.DISTANCE,wanted.getValue(net.minecraft.world.level.block.LeavesBlock.DISTANCE)).setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT,wanted.getValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT)):actual;
     }
     static boolean placementMatches(BlockState predicted,BlockState wanted){
-        if(predicted==null||predicted.getBlock()!=wanted.getBlock())return false;
+        if(!sameBlock(predicted,wanted))return false;
+        predicted=DiagonalStateCompatibility.canonical(predicted);wanted=DiagonalStateCompatibility.canonical(wanted);
         BlockState normalized=constructionState(predicted,wanted);
+        if(manualOpen(wanted))normalized=normalized.setValue(BlockStateProperties.OPEN,wanted.getValue(BlockStateProperties.OPEN));
+        // A server without OPEN placement support can still place the iron trapdoor's geometry.
+        if(wanted.is(Blocks.IRON_TRAPDOOR))normalized=normalized.setValue(BlockStateProperties.OPEN,wanted.getValue(BlockStateProperties.OPEN)).setValue(BlockStateProperties.POWERED,wanted.getValue(BlockStateProperties.POWERED));
+        if(wanted.is(Blocks.LEVER))normalized=normalized.setValue(BlockStateProperties.POWERED,wanted.getValue(BlockStateProperties.POWERED));
         // A subsequent use action completes only these explicit, monotonic multi-step states.
         if(wanted.hasProperty(BlockStateProperties.WATERLOGGED))normalized=normalized.setValue(BlockStateProperties.WATERLOGGED,wanted.getValue(BlockStateProperties.WATERLOGGED));
         if(wanted.hasProperty(BlockStateProperties.SLAB_TYPE)&&wanted.getValue(BlockStateProperties.SLAB_TYPE)==SlabType.DOUBLE)normalized=normalized.setValue(BlockStateProperties.SLAB_TYPE,SlabType.DOUBLE);

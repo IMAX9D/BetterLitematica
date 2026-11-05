@@ -27,7 +27,7 @@ public final class DraftStore {
             int length=bounded(in.readInt(),1,8*1024*1024,"placement size");byte[] placement=in.readNBytes(length);if(placement.length!=length)throw new EOFException();var session=PlacementStore.decode(placement);if(session.placements().size()!=1)throw new IOException("Draft must identify one placement");
             String name=strings.read(in);int dataVersion=in.readInt();String hash=strings.read(in);int originalSize=in.readInt();long revision=in.readLong();
             int count=bounded(in.readInt(),1,65536,"palette");var palette=new ArrayList<BlockStateSpec>(count);for(int i=0;i<count;i++)palette.add(BlockStateSpec.parse(strings.read(in)));
-            count=bounded(in.readInt(),1,1024,"regions");var regions=new ArrayList<Region>(count);for(int i=0;i<count;i++)regions.add(new Region(strings.read(in),vector(in),vector(in),vector(in)));
+            count=bounded(in.readInt(),1,BlueprintMetadata.MAX_REGIONS,"regions");var regions=new ArrayList<Region>(count);for(int i=0;i<count;i++)regions.add(new Region(strings.read(in),vector(in),vector(in),vector(in)));
             count=bounded(in.readInt(),0,1024,"warnings");var warnings=new ArrayList<String>(count);for(int i=0;i<count;i++)warnings.add(strings.read(in));
             var compatibility=version>=2?new ProjectionCompatibility(in.readInt(),in.readInt(),in.readInt(),in.readInt()):ProjectionCompatibility.NONE;
             count=bounded(in.readInt(),0,SchematicEdits.MAX_SECTIONS,"sections");var sections=new HashMap<SectionKey,Map<Integer,SchematicEdits.Patch>>();int cells=0;

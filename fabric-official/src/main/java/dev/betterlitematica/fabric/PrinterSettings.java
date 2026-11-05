@@ -8,7 +8,7 @@ final class PrinterSettings {
     enum HighlightStyle { OUTLINE,FILLED,BOTH }
     boolean print=true,fill,fluid,bedrock,airPlace=true,fallingCheck=true,replace=true,skipWaterlogged;
     boolean stripLogs,noteTuning=true,bonemeal,composter,breakWrong,breakExtra,breakState,flowing=true;
-    boolean forceSneak;
+    boolean forceSneak,materialBatch;
     PrinterSupply.Source supply=PrinterSupply.Source.NONE;
     boolean iceWater,coralSubstitute,safeObserver=true,containerFill=true,highlights=true,highlightOnTop=true;
     HighlightStyle highlightStyle=HighlightStyle.OUTLINE;

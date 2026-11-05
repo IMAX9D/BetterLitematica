@@ -81,7 +81,7 @@ public final class SchematicImporter {
             dataVersion=NbtReader.integer(root,"MinecraftDataVersion");
             Map<String,Object> meta=optionalCompound(root,"Metadata");name=NbtReader.string(meta,"Name",filename);
             Map<String,Object> regionTags=NbtReader.compound(root.get("Regions"),"Regions");
-            if(regionTags.isEmpty()||regionTags.size()>1024)throw new IOException("Invalid region count");
+            if(regionTags.isEmpty()||regionTags.size()>BlueprintMetadata.MAX_REGIONS)throw new IOException("Invalid region count");
             long cumulativeVolume=0;
             for(String regionName:new TreeSet<>(regionTags.keySet())){
                 cancel.check();Map<String,Object> tag=NbtReader.compound(regionTags.get(regionName),regionName);

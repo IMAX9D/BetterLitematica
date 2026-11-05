@@ -22,7 +22,7 @@ public record SchematicDocument(int dataVersion, List<Part> parts) {
     static SchematicDocument takeSource(Map<String,Object> root,Cancellation cancel)throws IOException{
         root=SourceVersions.litematic(SchematicFormats.canonical(root,cancel),cancel);
         int version=NbtReader.integer(root,"Version");SourceVersions.requireLitematicVersion(version);int dataVersion=NbtReader.integer(root,"MinecraftDataVersion");
-        var regions=NbtReader.compound(root.get("Regions"),"Regions");if(regions.isEmpty()||regions.size()>1024)throw new IOException("Invalid region count");
+        var regions=NbtReader.compound(root.get("Regions"),"Regions");if(regions.isEmpty()||regions.size()>BlueprintMetadata.MAX_REGIONS)throw new IOException("Invalid region count");
         List<Part> parts=new ArrayList<>();long total=0;
         for(var entry:new TreeMap<>(regions).entrySet()){
             cancel.check();var tag=NbtReader.compound(entry.getValue(),"Region");Vec3i position=vector(tag.get("Position")),signed=vector(tag.get("Size"));

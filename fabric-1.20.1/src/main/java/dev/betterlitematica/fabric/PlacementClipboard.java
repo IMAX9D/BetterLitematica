@@ -4,7 +4,7 @@ import com.google.gson.*;
 import java.util.*;
 
 record PlacementClipboard(PlacementTransform transform,boolean enabled,float opacity,Map<String,RegionPlacement> regions,boolean renderBlocks,int lockedAxes,ReplaceRule overlapRule,List<String> regionNames) {
-    PlacementClipboard {var validated=new Placement(new UUID(0,0),"clipboard","clipboard.litematic",transform,enabled,false,opacity,regions,renderBlocks,lockedAxes,overlapRule);regions=validated.regions();regionNames=regionNames==null?List.of():List.copyOf(regionNames);if(regionNames.size()>1024||new HashSet<>(regionNames).size()!=regionNames.size())throw new IllegalArgumentException();for(String name:regionNames)if(name.isBlank()||name.length()>256)throw new IllegalArgumentException();}
+    PlacementClipboard {var validated=new Placement(new UUID(0,0),"clipboard","clipboard.litematic",transform,enabled,false,opacity,regions,renderBlocks,lockedAxes,overlapRule);regions=validated.regions();regionNames=regionNames==null?List.of():List.copyOf(regionNames);if(regionNames.size()>BlueprintMetadata.MAX_REGIONS||new HashSet<>(regionNames).size()!=regionNames.size())throw new IllegalArgumentException();for(String name:regionNames)if(name.isBlank()||name.length()>256)throw new IllegalArgumentException();}
     static String encode(Placement p){return encode(p,List.of());}
     static String encode(Placement p,List<Region> regions){return "BetterLitematica:placement:2;"+new Gson().toJson(new PlacementClipboard(p.transform(),p.enabled(),p.opacity(),p.regions(),p.renderBlocks(),p.lockedAxes(),p.overlapRule(),regions.stream().map(Region::name).toList()));}
     static PlacementClipboard decode(String text){
@@ -21,7 +21,7 @@ record PlacementClipboard(PlacementTransform transform,boolean enabled,float opa
         transform(root.getAsJsonObject("transform"),"origin");bool(root,"enabled");bool(root,"renderBlocks");integer(root,"lockedAxes",0,7);
         if(!root.get("opacity").isJsonPrimitive()||!root.getAsJsonPrimitive("opacity").isNumber())throw new IllegalArgumentException();
         var rule=root.getAsJsonPrimitive("overlapRule");if(!rule.isString())throw new IllegalArgumentException();ReplaceRule.valueOf(rule.getAsString());
-        var regions=root.getAsJsonObject("regions");if(regions.size()>1024)throw new IllegalArgumentException();
+        var regions=root.getAsJsonObject("regions");if(regions.size()>BlueprintMetadata.MAX_REGIONS)throw new IllegalArgumentException();
         for(var e:regions.entrySet()){var region=e.getValue().getAsJsonObject();transform(region,"position");bool(region,"enabled");bool(region,"locked");}
     }
     private static void transform(JsonObject json,String position){

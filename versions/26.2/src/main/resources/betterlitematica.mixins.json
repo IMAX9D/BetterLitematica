@@ -37,7 +37,14 @@
     "TerrainStagingBudgetMixin",
     "TerrainFrustumAccessor",
     "TerrainFrustumExpandMixin",
-    "TerrainFrustumCacheMixin"
+    "TerrainFrustumCacheMixin",
+    "BackgroundPrintingMixin",
+    "PrinterManualUseMixin",
+    "PrinterUnexpectedMenuMixin",
+    "ProjectionAfterWorldMixin",
+    "ProjectionReceiptMixin",
+    "PrinterOutgoingMixin",
+    "PrinterManualScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

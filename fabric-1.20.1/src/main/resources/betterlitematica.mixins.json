@@ -41,7 +41,13 @@
     "TerrainSectionBufferMixin",
     "TerrainSortUploadMixin",
     "TerrainUploadQueueMixin",
-    "TerrainRegionDrawMixin"
+    "TerrainRegionDrawMixin",
+    "BackgroundPrintingMixin",
+    "PrinterManualUseMixin",
+    "PrinterUnexpectedMenuMixin",
+    "ProjectionAfterWorldMixin",
+    "ProjectionReceiptMixin",
+    "PrinterOutgoingMixin"
   ],
   "injectors": {
     "defaultRequire": 1

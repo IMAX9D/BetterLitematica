@@ -9,8 +9,13 @@
 *.bpc
 *.part
 
-# Local validation captures, copied worlds and frozen binaries
+# Local development material and game data
 /validation/
+/compat/
+/checks/
+/docs/testing/
+/docs/performance/
+**/src/test/
 **/.mixin.out/
 **/crash-reports/
 **/.betterlitematica-cache/
@@ -19,7 +24,7 @@
 *.hprof
 *.jfr
 hs_err_pid*
-# Personal schematics; only generated demo fixtures belong in source control
+# Personal schematics
 *.litematic
 *.schem
 *.schematic

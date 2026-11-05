@@ -14,7 +14,7 @@ final class PrinterProjectionView implements Function<Vec3i,ProjectionController
     private final List<PlacementLayout> pending;
     private final ProjectionScene scene;
     private final boolean unboundedPending;
-    private final Map<Vec3i,Section> sections=new HashMap<>();
+    private final Map<Vec3i,Section> sections=new LinkedHashMap<>();
     PrinterProjectionView(List<ProjectionController.PrinterSource> sources){
         var ready=new ArrayList<ProjectionRenderer1201>();var pending=new ArrayList<PlacementLayout>();boolean unknown=false;
         for(var source:sources){if(!source.placement().enabled())continue;
@@ -27,7 +27,13 @@ final class PrinterProjectionView implements Function<Vec3i,ProjectionController
     @Override public ProjectionController.PrinterSample apply(Vec3i world){
         if(unboundedPending)return UNKNOWN;
         var key=new Vec3i(world.x()>>4,world.y()>>4,world.z()>>4);var section=sections.get(key);
-        if(section==null){if(sections.size()==MAX_SECTIONS)return UNKNOWN;section=section(key);sections.put(key,section);}
+        if(section==null){
+            // This is a lookup cache, not source availability. A fast sweep may
+            // cross more than 64 sections in one tick; evict an old lookup and
+            // still sample the new section instead of inventing unknown blocks.
+            if(sections.size()==MAX_SECTIONS)sections.remove(sections.keySet().iterator().next());
+            section=section(key);sections.put(key,section);
+        }
         if(section.overflow())return UNKNOWN;
         for(var part:section.pending())if(part.contains(world))return UNKNOWN;
         var cell=scene.sample(section.ready(),world);

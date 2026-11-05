@@ -51,6 +51,7 @@ final class SettingHelp {
         put(SettingId.PRINTER_FLUIDS,"清理流体","设置排流体处理的流体 ID 名单。");
         put(SettingId.PRINTER_COMPOST_ITEMS,"堆肥材料","设置可用于填充堆肥桶的物品 ID 名单。");
         put(SettingId.PRINTER_THREADS,"搜索线程","设置后台发现施工任务的线程数量。");
+        put(SettingId.PRINTER_MATERIAL_BATCH,"按材料批量打印","建立磁盘材料缓存，连续打印一种材料，再切换下一种；无法放置的位置随后复查。配合背包补货包可集中备满当前材料，保留工具和保护栏。缓存不设总容量上限。投影打印时生效；选区填充、流体清理、破基岩与清理多余方块沿用常规扫描。");
         put(SettingId.PRINTER_BREAK_INTERVAL,"破坏间隔 / tick","设置两批挖掘操作之间的等待时间。");
         put(SettingId.PRINTER_BREAK_PER_TICK,"每 tick 破坏上限","限制每 tick 的挖掘操作数；0 按时间预算执行。");
         put(SettingId.PRINTER_BUDGET,"工作预算 / ms","限制每 tick 搜索与施工消耗的时间。");

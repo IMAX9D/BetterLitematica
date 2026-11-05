@@ -11,7 +11,7 @@ public record Placement(UUID id, String name, String source, PlacementTransform 
     public Placement {
         if(!Float.isFinite(opacity)||opacity<0.05f||opacity>1f)throw new IllegalArgumentException("Opacity must be 0.05-1");
         Objects.requireNonNull(id); Objects.requireNonNull(transform);
-        Objects.requireNonNull(displayFilter);Objects.requireNonNull(overlapRule);if(lockedAxes<0||lockedAxes>7||regions.size()>1024)throw new IllegalArgumentException("Placement settings limit");regions=Collections.unmodifiableMap(new LinkedHashMap<>(regions));for(var entry:regions.entrySet())if(entry.getKey().isBlank()||entry.getKey().length()>256||entry.getValue()==null)throw new IllegalArgumentException("Invalid region override");
+        Objects.requireNonNull(displayFilter);Objects.requireNonNull(overlapRule);if(lockedAxes<0||lockedAxes>7||regions.size()>BlueprintMetadata.MAX_REGIONS)throw new IllegalArgumentException("Placement settings limit");regions=Collections.unmodifiableMap(new LinkedHashMap<>(regions));for(var entry:regions.entrySet())if(entry.getKey().isBlank()||entry.getKey().length()>256||entry.getValue()==null)throw new IllegalArgumentException("Invalid region override");
         if (name == null || name.isBlank() || name.length() > 120) throw new IllegalArgumentException("Placement name must be 1-120 characters");
         if (source == null || source.isBlank() || source.length() > 1024) throw new IllegalArgumentException("Invalid blueprint path");
         source = source.replace('\\', '/');

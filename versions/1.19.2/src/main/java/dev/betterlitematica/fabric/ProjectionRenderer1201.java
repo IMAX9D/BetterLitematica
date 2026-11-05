@@ -179,6 +179,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     StateResolver1201 resolver(int region){var t=layout.part(region).transform();var linear=new PlacementTransform(Vec3i.ZERO,t.quarterTurns(),t.mirrorX(),t.mirrorZ());return resolvers.computeIfAbsent(linear,k->new StateResolver1201(metadata().palette(),k));}
     BlockState resolve(int region,int id){return resolver(region).resolve(id);}
     BlueprintMetadata metadata(){return edits==null?stream.source().metadata():edits.snapshot().metadata();}
+    LoadCoordinator.Loaded printerSourceLease(){return sourceLease.retain();}
+    SchematicEdits.Snapshot printerEdits(){return edits==null?null:edits.snapshot();}
     /** Source-owned, read-only auxiliary data; deliberately does not use render entity fallbacks. */
     Map<String,Object> informationBlockData(PlacementLayout.Part region,Vec3i local){
         var patch=edits==null?null:edits.snapshot().patch(region.section(local),region.cell(local));
@@ -942,7 +944,35 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private record Special(Vec3i base,Part part,QuadVisibility.Mask mask,QuadVisibility.Mask wrong){}
     private final ArrayList<Special> specials=new ArrayList<>();
     private Vec3i worldBase(SectionKey key){return layout.part(key.region()).transform().apply(localBase(key));}
+    private int visibilityCheckSection,visibilityCheckCell;
+    private long visibilityChecks,visibilityRepairs;
+    private SectionKey visibilityCheckKey;
+    /** Repair missed/bulk world notifications without rebuilding geometry or traversing the whole projection. */
+    private void recheckVisibleMasks(Vec3d camera,List<SectionKey> keys){
+        if(keys.isEmpty()||client.world==null)return;
+        long deadline=System.nanoTime()+200_000L;boolean redraw=false,rebuild=false;
+        var pos=new BlockPos.Mutable();
+        for(int inspected=0,sections=0;inspected<512&&sections<64&&System.nanoTime()<deadline;){
+            if(visibilityCheckSection>=keys.size())visibilityCheckSection=0;
+            var key=keys.get(visibilityCheckSection);if(!key.equals(visibilityCheckKey)){visibilityCheckKey=key;visibilityCheckCell=0;}
+            var mesh=meshes.get(key);
+            if(mesh==null||camera.x<mesh.bounds.minX-32||camera.x>mesh.bounds.maxX+32||camera.y<mesh.bounds.minY-32||camera.y>mesh.bounds.maxY+32||camera.z<mesh.bounds.minZ-32||camera.z>mesh.bounds.maxZ+32){visibilityCheckSection++;visibilityCheckKey=null;sections++;continue;}
+            int cell=visibilityCheckCell++;inspected++;int raw=mesh.cells.state(cell);
+            if(raw>=0){
+                visibilityChecks++;
+                var base=localBase(key);var world=layout.part(key.region()).transform().apply(base.add(new Vec3i(cell&15,cell>>>8,(cell>>>4)&15)));
+                pos.set(world.x(),world.y(),world.z());boolean loaded=WorldChunks.loaded(client.world,pos);var actual=loaded?client.world.getBlockState(pos):null;var expected=Block.getStateFromRawId(raw);
+                boolean complete=completedBlock(loaded,actual,expected);
+                boolean changed=mesh.mask.set(cell,complete)|mesh.wrong.set(cell,wrongBlock(loaded,actual,expected));
+                if(changed){redraw=true;visibilityRepairs++;}
+                if(mesh.omitted.get(cell)&&!complete&&!worldRefresh.stale(key,mesh.worldRevision())){worldRefresh.changed(key);rebuild=true;}
+            }
+            if(visibilityCheckCell==4096){visibilityCheckSection++;visibilityCheckKey=null;sections++;}
+        }
+        if(redraw)drawRevision++;if(rebuild)wakeWorldRefresh();
+    }
     private void renderMeshes(WorldRenderContext context,Vec3d camera,List<SectionKey> visibleKeys){
+        recheckVisibleMasks(camera,visibleKeys);
         Shader shader=ProjectionShaders.surface();
         // Values live on the shared program; entity meshes drawn after this bind the same state, even when no section draws.
         shader.getUniformOrDefault("CameraPos").set((float)camera.x,(float)camera.y,(float)camera.z);
