@@ -5,7 +5,7 @@
 1.20.1 的早期实验版本曾通过 `SectionVisibilityGraph` 参考并改写 Sodium 0.5.13 的 `OcclusionCuller` 中向外遍历和角度裁剪的规则，作者为 JellySquid 及 Sodium 贡献者。review.23 保留遍历优化入口，但改为独立实现的原版等价采样与同轮成功路径复用，不再使用此前的方向和主轴角度裁剪；这里保留历史来源与许可证记录。
 
 - [对应版本源文件](https://github.com/CaffeineMC/sodium/blob/mc1.20.1-0.5.13/src/main/java/me/jellysquid/mods/sodium/client/render/chunk/occlusion/OcclusionCuller.java)
-- 许可：PolyForm Shield 1.0.0；完整文本保留于 [sodium-LICENSE.md](versions/review-1.20.1/src/main/resources/assets/betterlitematica/third-party/sodium-LICENSE.md)，并随相应 JAR 打包。
+- 许可：PolyForm Shield 1.0.0；完整文本保留于 [sodium-LICENSE.md](fabric-1.20.1/src/main/resources/assets/betterlitematica/third-party/sodium-LICENSE.md)，并随相应 JAR 打包。
 
 review.24 的 `TerrainRegions`、`TerrainBuffer`、`TerrainUploadQueue`、`TerrainWorkers` 及相应注入入口为独立实现：采用后台构建、区域共享缓冲与批量提交的架构思路，具体缓冲分配实现延续本项目的 `ProjectionPages` 和 `RangeAllocator`，未复制或改名打包 Sodium 的对应实现。Minecraft 的模型、流体、排序与着色器接口继续作为适配边界。
 
