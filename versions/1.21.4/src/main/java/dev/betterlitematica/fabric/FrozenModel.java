@@ -10,11 +10,10 @@ import java.nio.ByteOrder;
 import java.util.*;
 import java.util.function.IntUnaryOperator;
 
-/** Render-thread snapshot of vanilla geometry. Workers never call a game's model, predicates or tint callbacks. */
 final class FrozenModel {
     static final int MAX_QUADS=512;
     static final class Quad {
-        // Four vertices, each XYZ/UV as raw floats followed by a pre-tinted RGBA word.
+
         final int[] data=new int[24];
         Quad(BakedQuad quad,IntUnaryOperator colors){
             int[] raw=quad.getVertexData();int stride=raw.length/4;
@@ -38,7 +37,7 @@ final class FrozenModel {
     }
     record Choice(Node[] models,int[] weights,int total) implements Node {
         public void append(int side,Random random,List<Quad> out){
-            // DataPool selects with nextInt(total) on this model API.
+
             int pick=random.nextInt(total);
             for(int i=0;i<models.length;i++){pick-=weights[i];if(pick<0){models[i].append(side,random,out);return;}}
         }
@@ -53,7 +52,7 @@ final class FrozenModel {
     boolean randomized(){return root.randomized();}
     void append(int side,Random random,List<Quad> out){root.append(side,random,out);}
     static void appendAll(List<Quad> out,Quad[] quads){if(quads.length>MAX_QUADS-out.size())throw new IllegalArgumentException("Model exceeds quad budget");Collections.addAll(out,quads);}
-    /** Unknown/custom model implementations retain the render-thread path rather than guessing their thread safety. */
+
     static FrozenModel capture(BakedModel model,BlockState state,IntUnaryOperator colors){
         try{return new FrozenModel(new Capture(state,colors).node(model,0));}catch(UnsupportedOperationException unsupported){return null;}
     }

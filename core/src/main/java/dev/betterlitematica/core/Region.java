@@ -1,6 +1,6 @@
 package dev.betterlitematica.core;
 import java.util.Objects;
-/** Bounds include expected air. Empty sections do not erase the region's domain. */
+
 public record Region(String name, Vec3i min, Vec3i size,Vec3i anchor) {
     public Region(String name,Vec3i min,Vec3i size){this(name,min,size,min);}
     public Region {

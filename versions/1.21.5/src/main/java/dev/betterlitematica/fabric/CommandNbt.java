@@ -3,7 +3,6 @@ import java.util.*;
 import dev.betterlitematica.core.*;
 import net.minecraft.nbt.*;
 
-/** Vanilla command decomposition; never truncates NBT or edits a pre-existing block after a failed keep. */
 final class CommandNbt {
     private static final class Lines extends ArrayList<String>{int characters;}
     private CommandNbt(){}

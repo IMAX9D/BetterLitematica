@@ -6,7 +6,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
-/** A title-screen entry using the mod's own font, theme and physical-pixel scale. */
 final class TitleFeedbackButton extends UiButton {
     private final UiMotion motion=new UiMotion();
     TitleFeedbackButton(int x,int y,int width,int height,Runnable action){super(x,y,width,height,Component.literal("问题反馈"),button->action.run(),DEFAULT_NARRATION);}

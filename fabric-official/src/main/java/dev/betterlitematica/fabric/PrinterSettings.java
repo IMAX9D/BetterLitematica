@@ -2,7 +2,7 @@ package dev.betterlitematica.fabric;
 import com.google.gson.*;
 import dev.betterlitematica.core.PrinterRange;
 import java.util.*;
-/** Preferences only. The live work switch and target never survive a connection. */
+
 final class PrinterSettings {
     enum Scope { PROJECTION,SELECTION,BELOW,ABOVE }
     enum HighlightStyle { OUTLINE,FILLED,BOTH }
@@ -10,7 +10,7 @@ final class PrinterSettings {
     boolean stripLogs,noteTuning=true,bonemeal,composter,breakWrong,breakExtra,breakState,flowing=true;
     boolean forceSneak,materialBatch;
     PrinterSupply.Source supply=PrinterSupply.Source.NONE;
-    boolean iceWater,coralSubstitute,safeObserver=true,containerFill=true,highlights=true,highlightOnTop=true;
+    boolean waterToIce,autoBreakIce,coralSubstitute,safeObserver=true,containerFill=true,highlights=true,highlightOnTop=true;
     HighlightStyle highlightStyle=HighlightStyle.OUTLINE;
     int highlightMillis=1500,highlightRange=8,highlightLimit=0,placeColor=0xaa57c8d6,adjustColor=0xaae6cf70,breakColor=0xaad780ce,failedColor=0xaaf06464;
     boolean hud=true,missingHud=false,reverseX,reverseY,reverseZ;
@@ -36,8 +36,8 @@ final class PrinterSettings {
         for(var list:List.of(skip,replaceable,fluids,compostItems)){if(list.size()>128)throw new IllegalArgumentException("过滤列表过长");for(String item:list)if(item==null||item.isBlank()||item.length()>128)throw new IllegalArgumentException("过滤条件无效");}
     }
     private static void bounded(String label,int value,int min,int max){if(value<min||value>max)throw new IllegalArgumentException(label+"："+min+"–"+max);}
-    static PrinterSettings read(JsonElement value){if(value==null)return new PrinterSettings();var settings=new Gson().fromJson(value,PrinterSettings.class);var root=value.getAsJsonObject();if(!root.has("highlightOnTop")&&(root.has("highlightThrough")||root.has("errorHighlightOnTop")))settings.highlightOnTop=(root.has("highlightThrough")&&root.get("highlightThrough").getAsBoolean())||(root.has("errorHighlightOnTop")&&root.get("errorHighlightOnTop").getAsBoolean());settings.preserved=root.deepCopy();settings.validate();return settings;}
+    static PrinterSettings read(JsonElement value){if(value==null)return new PrinterSettings();var settings=new Gson().fromJson(value,PrinterSettings.class);var root=value.getAsJsonObject();if(root.has("iceWater")){boolean legacy=root.get("iceWater").getAsBoolean();if(!root.has("waterToIce"))settings.waterToIce=legacy;if(!root.has("autoBreakIce"))settings.autoBreakIce=legacy;}if(!root.has("highlightOnTop")&&(root.has("highlightThrough")||root.has("errorHighlightOnTop")))settings.highlightOnTop=(root.has("highlightThrough")&&root.get("highlightThrough").getAsBoolean())||(root.has("errorHighlightOnTop")&&root.get("errorHighlightOnTop").getAsBoolean());settings.preserved=root.deepCopy();settings.validate();return settings;}
     JsonObject snapshot(){validate();return draftSnapshot();}
-    /** Editing may contain intermediate out-of-range values; only persistence validates them. */
-    JsonObject draftSnapshot(){var root=preserved.deepCopy();root.remove("highlightThrough");root.remove("errorHighlightOnTop");new GsonBuilder().serializeSpecialFloatingPointValues().create().toJsonTree(this).getAsJsonObject().entrySet().forEach(e->root.add(e.getKey(),e.getValue()));return root;}
+
+    JsonObject draftSnapshot(){var root=preserved.deepCopy();root.remove("iceWater");root.remove("highlightThrough");root.remove("errorHighlightOnTop");new GsonBuilder().serializeSpecialFloatingPointValues().create().toJsonTree(this).getAsJsonObject().entrySet().forEach(e->root.add(e.getKey(),e.getValue()));return root;}
 }

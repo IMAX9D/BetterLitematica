@@ -1,12 +1,12 @@
 package dev.betterlitematica.core;
 import java.io.*;
 import java.util.*;
-/** Immutable 16^3 section with a LOCAL palette referencing the asset palette. */
+
 public final class PackedSection {
     public static final int VOLUME=4096;
     private final int[] palette;
     private final PackedBits indices;
-    // Derived on construction/decode, never serialized. Asset palette zero is canonical air.
+
     private final long[] occupied;
     private PackedSection(int[] palette,PackedBits indices,long[] occupied){this.palette=palette;this.indices=indices;this.occupied=occupied;}
     public static int index(int x,int y,int z) {
@@ -24,9 +24,41 @@ public final class PackedSection {
         int bits=Math.max(1,32-Integer.numberOfLeadingZeros(palette.length-1));
         return new PackedSection(palette,PackedBits.pack(bits,ids),occupied);
     }
+
+    public static final class Encoder {
+        private final int[] localCodes;
+        private final int[] palette=new int[VOLUME];
+        private final int[] indices=new int[VOLUME];
+
+        public Encoder(int assetPaletteSize){
+            if(assetPaletteSize<1||assetPaletteSize>65536)throw new IllegalArgumentException("Asset palette size");
+            localCodes=new int[assetPaletteSize];
+        }
+        public PackedSection encode(int[] blocks){
+            if(blocks.length!=VOLUME)throw new IllegalArgumentException("Expected 4096 cells");
+            int size=0;
+            long[] occupied=new long[VOLUME/64];
+            try{
+                for(int i=0;i<VOLUME;i++){
+                    int global=blocks[i];
+                    int code=localCodes[global];
+                    if(code==0){
+                        palette[size++]=global;
+                        localCodes[global]=code=size;
+                    }
+                    indices[i]=code-1;
+                    if(global!=0)occupied[i>>>6]|=1L<<(i&63);
+                }
+                int bits=Math.max(1,32-Integer.numberOfLeadingZeros(size-1));
+                return new PackedSection(Arrays.copyOf(palette,size),PackedBits.pack(bits,indices),occupied);
+            }finally{
+                for(int i=0;i<size;i++)localCodes[palette[i]]=0;
+            }
+        }
+    }
     public int globalId(int index){return palette[indices.get(index)];}
     public int globalId(int x,int y,int z){return globalId(index(x,y,z));}
-    /** First nonzero asset ID at/after from, or VOLUME. Other air variants still need a palette check. */
+
     public int nextNonZero(int from){
         if(from<0||from>VOLUME)throw new IndexOutOfBoundsException();
         if(from==VOLUME)return VOLUME;
@@ -35,7 +67,7 @@ public final class PackedSection {
         return (word<<6)+Long.numberOfTrailingZeros(bits);
     }
     public boolean isCanonicalAir(){return palette.length==1&&palette[0]==0;}
-    /** Distinct asset ids used by this section, in local palette order. */
+
     public int paletteSize(){return palette.length;}
     public int paletteId(int index){return palette[index];}
     public long estimatedBytes(){return 104L+4L*palette.length+indices.estimatedBytes()+16L+8L*occupied.length;}
@@ -50,11 +82,24 @@ public final class PackedSection {
         int bits=in.readUnsignedByte();if(bits!=Math.max(1,32-Integer.numberOfLeadingZeros(n-1)))throw new IOException("Invalid section bit width");
         int count=in.readInt();if(count!=PackedBits.wordCount(bits,VOLUME))throw new IOException("Invalid section words");
         long[] words=new long[count];for(int i=0;i<count;i++)words[i]=in.readLong();
-        PackedBits packed=new PackedBits(bits,VOLUME,words);
+        PackedBits packed=PackedBits.takeOwnership(bits,VOLUME,words);
         long[] occupied=new long[VOLUME/64];
-        for(int i=0;i<VOLUME;i++){
-            int local=packed.get(i);if(local>=n)throw new IOException("Section index outside palette");
-            if(palette[local]!=0)occupied[i>>>6]|=1L<<(i&63);
+        if(n==1){
+            if(packed.nextNonZero(0,VOLUME)!=VOLUME)throw new IOException("Section index outside palette");
+            if(palette[0]!=0)Arrays.fill(occupied,-1L);
+        }else if(n==2){
+            for(int w=0;w<occupied.length;w++)occupied[w]=palette[0]==0?words[w]:palette[1]==0?~words[w]:-1L;
+        }else{
+            for(int i=0;i<VOLUME;){
+                int local=packed.get(i);
+                if(local>=n)throw new IOException("Section index outside palette");
+                if(local==0&&palette[0]==0){
+                    i=packed.nextNonZero(i+1,VOLUME);
+                    continue;
+                }
+                if(palette[local]!=0)occupied[i>>>6]|=1L<<(i&63);
+                i++;
+            }
         }
         return new PackedSection(palette,packed,occupied);
     }

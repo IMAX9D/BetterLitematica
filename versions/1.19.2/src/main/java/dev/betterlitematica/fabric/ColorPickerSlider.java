@@ -6,7 +6,6 @@ import net.minecraft.text.Text;
 import java.util.function.*;
 import org.lwjgl.glfw.GLFW;
 
-/** Vanilla interaction/focus, independent overlay pixels and system-font labels. */
 final class ColorPickerSlider extends SliderWidget {
     public int getX(){return x;} public int getY(){return y;} public void setX(int value){x=value;} public void setY(int value){y=value;}
 

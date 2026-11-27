@@ -10,14 +10,12 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 
-/** World-space preview only; interaction and placement ownership belong to the controller. */
 public final class GizmoOverlay {
     private static final int[] COLORS={0xffef6262,0xff61c779,0xff669cff};
     private static final double[] COS={1,.5,-.5,-1,-.5,.5};
     private static final double[] SIN={0,.8660254037844386,.8660254037844386,0,-.8660254037844386,-.8660254037844386};
     static final double HEAD_START=.76,HEAD_RADIUS=.09,SHAFT_RADIUS=.025;
 
-    /** Axis indices are X=0, Y=1, Z=2; -1 means none. Bounds are world coordinates. */
     public record View(Vec3 origin,int hoveredAxis,int activeAxis,int lockedAxes,double length,
                        List<AABB> bounds,boolean dragging,int amount) {
         public View {
@@ -36,10 +34,10 @@ public final class GizmoOverlay {
         if(view==null||client.level==null||client.player==null||context.matrixStack()==null)return;
         var matrices=context.matrixStack();var camera=context.camera().getPosition();var origin=view.origin();
         var buffers=OverlayBuffers.of(context);
-        // A handle inside its target block must remain usable; the overlay mask still hides it behind entities.
+
         var faces=OverlayLayers.faces(true);var lines=OverlayLayers.lines(false);
         matrices.pushPose();
-        // Keep vertex coordinates close to zero even at distant world positions.
+
         matrices.translate(origin.x-camera.x,origin.y-camera.y,origin.z-camera.z);
         try {
             var vertices=buffers.getBuffer(faces);var matrix=matrices.last().pose();
@@ -81,7 +79,6 @@ public final class GizmoOverlay {
         }
     }
 
-    /** QUADS layer: repeating the last vertex gives one triangle and one degenerate triangle. */
     private static void triangle(VertexConsumer out,Matrix4f matrix,int axis,
             double t,double u,double v,double t2,double u2,double v2,double t3,double u3,double v3,
             float r,float g,float b,float a){
@@ -91,7 +88,7 @@ public final class GizmoOverlay {
 
     private static void vertex(VertexConsumer out,Matrix4f matrix,int axis,double t,double u,double v,float r,float g,float b,float a){
         double x=axis==0?t:u,y=axis==1?t:axis==0?u:v,z=axis==2?t:v;
-        // X uses Y/Z radial coordinates; Y uses X/Z; Z uses X/Y.
+
         out.addVertex(matrix,(float)x,(float)y,(float)z).setColor(r,g,b,a);
     }
 }

@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import dev.betterlitematica.core.*;
 import java.util.*;
 
-/** Read-only tool context. No world sampling, file reads or selection changes. */
 record ToolHudData(ToolMode mode, boolean area, String badge, List<Row> rows) {
     enum Kind { TEXT, NAME, ORIGIN, FIRST, SECOND, SIZE, BLOCK }
     record Row(Kind kind, String label, String text, String state, boolean selected) {}
@@ -12,7 +11,7 @@ record ToolHudData(ToolMode mode, boolean area, String badge, List<Row> rows) {
                  boolean expand, boolean deletePlacement, ReplaceRule pasteRule,
                  boolean pasteNbt, boolean pasteEntities, String primary, String secondary,
                  boolean showPrimary, boolean grabbing, String status) {
-        // Model objects are immutable. Identity checks keep an idle HUD independent of source size.
+
         boolean same(Input other) {
             return other!=null && mode==other.mode && selection==other.selection && target==other.target
                 && placement==other.placement && regions==other.regions && regionName.equals(other.regionName)

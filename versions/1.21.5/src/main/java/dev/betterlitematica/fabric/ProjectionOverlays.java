@@ -24,17 +24,13 @@ final class ProjectionOverlays {
     private static final NearbyProjectionHighlights.Kind[] NEARBY_KINDS=NearbyProjectionHighlights.Kind.values();
     private static final dev.betterlitematica.core.Comparison[] COMPARISONS=dev.betterlitematica.core.Comparison.values();
     private static final BoxOrder nearbyOrder=new BoxOrder(.003);
-    /**
-     * Verification highlights can hold hundreds of thousands of merged boxes. They are indexed into 16³ buckets
-     * off the render thread whenever the published list changes; a frame then touches only buckets that are in
-     * range and in view, and selects its nearest boxes without sorting the ledger.
-     */
+
     private static final java.util.concurrent.ExecutorService INDEXER=java.util.concurrent.Executors.newSingleThreadExecutor(task->{var thread=new Thread(task,"BetterLitematica highlight index");thread.setDaemon(true);thread.setPriority(Thread.MIN_PRIORITY);return thread;});
     private static final int SYNC_INDEX_LIMIT=4096;
     private static List<dev.betterlitematica.core.HighlightCuboids.Box> indexSource=List.of(),indexPendingSource;
     private static dev.betterlitematica.core.HighlightBoxIndex verificationIndex=dev.betterlitematica.core.HighlightBoxIndex.EMPTY;
     private static java.util.concurrent.CompletableFuture<dev.betterlitematica.core.HighlightBoxIndex> indexPending;
-    /** At most one build in flight. A finished build is always newer than the one on screen, so it is shown; a newer list starts the next build. */
+
     private static dev.betterlitematica.core.HighlightBoxIndex verificationIndex(List<dev.betterlitematica.core.HighlightCuboids.Box> boxes){
         if(indexPending!=null&&indexPending.isDone()){
             try{verificationIndex=indexPending.join();indexSource=indexPendingSource;}catch(RuntimeException e){BetterLitematicaClient.LOGGER.warn("Highlight index build failed",e);}
@@ -50,18 +46,18 @@ final class ProjectionOverlays {
         if(indexPending!=null)indexPending.cancel(false);indexPending=null;indexPendingSource=null;
         indexSource=List.of();verificationIndex=dev.betterlitematica.core.HighlightBoxIndex.EMPTY;
     }
-    /** Frustum classification: whole buckets inside the view skip per-box tests; boxes only ask "intersects". */
+
     private record FrustumTest(Frustum frustum) implements dev.betterlitematica.core.HighlightBoxIndex.BoundsTest {
         public int test(double x0,double y0,double z0,double x1,double y1,double z1){
             if(frustum==null)return dev.betterlitematica.core.HighlightBoxIndex.INSIDE;
             if(!frustum.isVisible(new Box(x0,y0,z0,x1,y1,z1)))return dev.betterlitematica.core.HighlightBoxIndex.OUTSIDE;
-            // A convex volume contains a box exactly when it contains all eight corners.
+
             for(int c=0;c<8;c++){double x=(c&1)!=0?x1:x0,y=(c&2)!=0?y1:y0,z=(c&4)!=0?z1:z0;if(!frustum.isVisible(new Box(x,y,z,x,y,z)))return dev.betterlitematica.core.HighlightBoxIndex.INTERSECTS;}
             return dev.betterlitematica.core.HighlightBoxIndex.INSIDE;
         }
         @Override public boolean intersects(double x0,double y0,double z0,double x1,double y1,double z1){return frustum==null||frustum.isVisible(new Box(x0,y0,z0,x1,y1,z1));}
     }
-    /** Frustum intersected with the visible layer slab; both convex, so the combination classifies exactly. */
+
     private record LayerViewTest(FrustumTest view,int axis,double from,double to) implements dev.betterlitematica.core.HighlightBoxIndex.BoundsTest {
         public int test(double x0,double y0,double z0,double x1,double y1,double z1){
             int slab=slab(x0,y0,z0,x1,y1,z1);if(slab==dev.betterlitematica.core.HighlightBoxIndex.OUTSIDE)return slab;
@@ -73,7 +69,7 @@ final class ProjectionOverlays {
             double a=axis==0?x0:axis==1?y0:z0,b=axis==0?x1:axis==1?y1:z1;
             return b<=from||a>=to?dev.betterlitematica.core.HighlightBoxIndex.OUTSIDE:a>=from&&b<=to?dev.betterlitematica.core.HighlightBoxIndex.INSIDE:dev.betterlitematica.core.HighlightBoxIndex.INTERSECTS;
         }
-        /** Cell-exclusive bound along {@code a} of a box clipped to the slab; draw extents stay within the layer. */
+
         double low(int a,double value){return a==axis?Math.max(value,from):value;}
         double high(int a,double value){return a==axis?Math.min(value,to):value;}
     }
@@ -86,7 +82,7 @@ final class ProjectionOverlays {
         dev.betterlitematica.core.HighlightCuboids.Box source(){return source;}
         Box bounds(){return bounds;}
     }
-    /** Geometry is immutable; retain unchanged cells when the live snapshot changes. */
+
     private static final class BoxOrder {
         private final double expansion;
         private List<dev.betterlitematica.core.HighlightCuboids.Box> source=List.of();
@@ -110,12 +106,7 @@ final class ProjectionOverlays {
     }
     private static final java.util.ArrayList<PreparedBox> nearbyMissing=new java.util.ArrayList<>(),nearbyErrors=new java.util.ArrayList<>();
     static void clearCaches(){nearbyOrder.clear();outlineSource=null;outlineClip=null;outline=null;outlineActive=false;if(outlinePending!=null)outlinePending.cancel(false);outlinePending=null;pendingSource=null;pendingClip=null;releaseVerificationIndex();errorSlots=new int[256];errorAlpha=new float[256];errorCount=0;nearbyMissing.clear();nearbyErrors.clear();}
-    /**
-     * Construction highlights are drawn as the silhouette of each kind's cells: only edges where the region bends,
-     * so a run of missing blocks reads as one outlined shape instead of a lattice of frames. The outline is
-     * recomputed when the highlighted cells or the visible layer change, never per frame; very large sets fall
-     * back to per-box frames.
-     */
+
     private static final int OUTLINE_CELLS=16384;
     private static List<dev.betterlitematica.core.HighlightCuboids.Box> outlineSource;private static double[] outlineClip;
     private static List<dev.betterlitematica.core.HighlightOutline.Segment> outline;
@@ -123,10 +114,7 @@ final class ProjectionOverlays {
     private static int outlineMissing,outlineErrors;private static boolean outlineActive;
     private static java.util.concurrent.CompletableFuture<List<dev.betterlitematica.core.HighlightOutline.Segment>> outlinePending;
     private static List<dev.betterlitematica.core.HighlightCuboids.Box> pendingSource;private static double[] pendingClip;
-    /**
-     * Outlines are computed on the highlight worker from the immutable box list. Only a result matching the current
-     * request is accepted; until then the previous outline stays on screen (per-box frames before the first one).
-     */
+
     private static List<dev.betterlitematica.core.HighlightOutline.Segment> outline(List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,double[] clip){
         if(outlinePending!=null&&outlinePending.isDone()){
             try{var result=outlinePending.join();if(pendingSource==boxes&&java.util.Arrays.equals(pendingClip,clip)){outline=result;outlineSource=boxes;outlineClip=pendingClip;}}
@@ -139,7 +127,7 @@ final class ProjectionOverlays {
         }
         return outlineSource==null?null:outline;
     }
-    /** Clip to whole cells of the visible layer first, so the cut itself is outlined. */
+
     private static List<dev.betterlitematica.core.HighlightCuboids.Box> clipCells(List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,double[] clip){
         int axis=(int)clip[0];if(axis<0)return boxes;
         long from=(long)Math.ceil(clip[1]),to=(long)Math.floor(clip[2])-1;var clipped=new java.util.ArrayList<dev.betterlitematica.core.HighlightCuboids.Box>(boxes.size());
@@ -161,11 +149,11 @@ final class ProjectionOverlays {
         double range=settings.highlightRange,rangeSquared=range*range;float pulse=NearbyProjectionHighlights.alpha(System.nanoTime());
         var kept=new java.util.ArrayList<Integer>();
         for(int i=0;i<segments.size();i++){var s=segments.get(i);if(segmentDistance(s,origin)>rangeSquared||context.frustum()!=null&&!context.frustum().isVisible(segmentBox(s)))continue;kept.add(i);}
-        // The limit counts boxes; an outlined box has about four visible edges.
+
         if(settings.highlightLimit>0&&kept.size()>settings.highlightLimit*4){kept.sort(java.util.Comparator.comparingDouble(i->segmentDistance(segments.get(i),origin)));kept.subList(settings.highlightLimit*4,kept.size()).clear();}
         if(outlineDraw.length<kept.size()){outlineDraw=new int[kept.size()];outlineColor=new int[kept.size()];outlineAlpha=new float[kept.size()];}
         outlineMissing=0;outlineErrors=0;int n=0;
-        // Missing first, then wrong and extra, matching the two draw passes.
+
         for(int pass=0;pass<2;pass++)for(int i:kept){var s=segments.get(i);var kind=NEARBY_KINDS[s.group()];boolean missing=kind==NearbyProjectionHighlights.Kind.MISSING;if(missing!=(pass==0))continue;
             float alpha;
             if(missing){double[] m={s.x(),s.y(),s.z()};m[s.axis()]+=s.length()*.5;double dx=m[0]-camera.x,dy=m[1]-camera.y,dz=m[2]-camera.z,length=Math.sqrt(dx*dx+dy*dy+dz*dz);
@@ -184,7 +172,7 @@ final class ProjectionOverlays {
         matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);
         try{var vertices=buffers.getBuffer(layer);var entry=matrices.peek();
             for(int k=from;k<to;k++){var s=outline.get(outlineDraw[k]);int color=outlineColor[k];float r=((color>>>16)&255)/255f,g=((color>>>8)&255)/255f,b=(color&255)/255f,a=outlineAlpha[k];
-                // Nudge the line off the block faces toward the empty side so it never z-fights them.
+
                 float[] p={s.x(),s.y(),s.z()};p[(s.axis()+1)%3]+=s.du()*.003f;p[(s.axis()+2)%3]+=s.dv()*.003f;
                 float[] q=p.clone();q[s.axis()]+=s.length();float nx=s.axis()==0?1:0,ny=s.axis()==1?1:0,nz=s.axis()==2?1:0;
                 vertices.vertex(entry.getPositionMatrix(),p[0],p[1],p[2]).color(r,g,b,a).normal(entry,nx,ny,nz);
@@ -192,7 +180,7 @@ final class ProjectionOverlays {
             }
         }finally{matrices.pop();buffers.draw(layer);}
     }
-    /** One selection for both passes preserves the shared limit and their draw order. */
+
     static void prepareNearby(MinecraftClient client,WorldRenderContext context,List<dev.betterlitematica.core.HighlightCuboids.Box> boxes,PrinterSettings settings,int extraColor,double[] clip){
         nearbyMissing.clear();nearbyErrors.clear();outlineActive=false;
         if(client.player==null||context.matrixStack()==null)return;
@@ -204,7 +192,7 @@ final class ProjectionOverlays {
         float pulse=NearbyProjectionHighlights.alpha(System.nanoTime());
         for(var prepared:nearbyOrder.get(boxes,origin,settings.highlightLimit)){
             var box=prepared.source();var bounds=prepared.bounds();
-            // Scanned regardless of layer; the visible slab clips them here so they glide with it instead of rescanning.
+
             int axis=(int)clip[0];if(axis>=0){double a=axis==0?bounds.minX:axis==1?bounds.minY:bounds.minZ,b=axis==0?bounds.maxX:axis==1?bounds.maxY:bounds.maxZ;if(b<=clip[1]||a>=clip[2])continue;
                 if(a<clip[1]||b>clip[2]){double lo=Math.max(a,clip[1]),hi=Math.min(b,clip[2]);bounds=axis==0?new Box(lo,bounds.minY,bounds.minZ,hi,bounds.maxY,bounds.maxZ):axis==1?new Box(bounds.minX,lo,bounds.minZ,bounds.maxX,hi,bounds.maxZ):new Box(bounds.minX,bounds.minY,lo,bounds.maxX,bounds.maxY,hi);}}
             if(distance(box,origin)>rangeSquared||context.frustum()!=null&&!context.frustum().isVisible(bounds))continue;
@@ -243,9 +231,9 @@ final class ProjectionOverlays {
         if(client.player==null||boxes.isEmpty()||context.matrixStack()==null)return;
         var index=verificationIndex(boxes);if(index.size()==0)return;
         var camera=context.camera().getPos();var origin=client.player.getCameraPosVec(context.tickCounter().getTickProgress(false));var look=net.minecraft.util.math.Vec3d.fromPolar(context.camera().getPitch(),context.camera().getYaw());
-        // Verification spans the whole placement; only the visible layers are drawn, clipped at the layer planes.
+
         var test=new LayerViewTest(new FrustumTest(context.frustum()),(int)clip[0],clip[1],clip[2]);float pulse=NearbyProjectionHighlights.alpha(System.nanoTime());
-        // Select first, then emit lines and faces as two batches: alternating layers per box flushes a draw call each time.
+
         errorCount=0;
         if(limit>0){
             if(errorSlots.length<limit){errorSlots=new int[limit];errorAlpha=new float[limit];}
@@ -267,7 +255,7 @@ final class ProjectionOverlays {
                 buffers.draw(faces);}
         }finally{matrices.pop();buffers.draw(lines);buffers.draw(faces);}
     }
-    /** Same order and limit semantics as before: a box selected for the limit counts even if its fade is zero. */
+
     private static void keepError(dev.betterlitematica.core.HighlightBoxIndex index,int slot,LayerViewTest test,net.minecraft.util.math.Vec3d origin,net.minecraft.util.math.Vec3d camera,net.minecraft.util.math.Vec3d look,float pulse){
         float a=COMPARISONS[index.box(slot).group()]==dev.betterlitematica.core.Comparison.MISSING?missingAlpha(test.low(0,index.minX(slot))-.002,test.low(1,index.minY(slot))-.002,test.low(2,index.minZ(slot))-.002,test.high(0,index.maxX(slot)+1.0)+.002,test.high(1,index.maxY(slot)+1.0)+.002,test.high(2,index.maxZ(slot)+1.0)+.002,origin,camera,look,128):pulse;
         if(a<=0)return;
@@ -280,7 +268,7 @@ final class ProjectionOverlays {
     static void actions(MinecraftClient client,WorldRenderContext context,java.util.Collection<dev.betterlitematica.core.ActionHighlights.Mark> marks,PrinterSettings settings){
         if(client.player==null||marks.isEmpty()||context.matrixStack()==null)return;var matrices=context.matrixStack();var camera=context.camera().getPos();var origin=client.player.getEyePos();var buffers=client.getBufferBuilders().getEntityVertexConsumers();var lines=OverlayLayers.lines(settings.highlightOnTop);var faces=OverlayLayers.faces(settings.highlightOnTop);long now=System.nanoTime();
         matrices.push();matrices.translate(-camera.x,-camera.y,-camera.z);try{java.util.Collection<dev.betterlitematica.core.ActionHighlights.Mark> ordered=marks;if(settings.highlightLimit>0){var sorted=new java.util.ArrayList<>(marks);sorted.sort(java.util.Comparator.comparingDouble(m->PrinterReach.distanceSquared(origin,net.minecraft.util.math.BlockPos.fromLong(m.position()))));ordered=sorted;}
-            // Lines then faces: switching layers per mark would flush a draw call each time.
+
             for(int pass=0;pass<2;pass++){if(pass==0?settings.highlightStyle==PrinterSettings.HighlightStyle.FILLED:settings.highlightStyle==PrinterSettings.HighlightStyle.OUTLINE)continue;var vertices=buffers.getBuffer(pass==0?lines:faces);int drawn=0;for(var mark:ordered){var pos=net.minecraft.util.math.BlockPos.fromLong(mark.position());if(PrinterReach.distanceSquared(origin,pos)>settings.highlightRange*(double)settings.highlightRange)continue;if(settings.highlightLimit>0&&drawn++>=settings.highlightLimit)break;int color=switch(mark.kind()){case PLACE->settings.placeColor;case ADJUST->settings.adjustColor;case BREAK->settings.breakColor;case FAILED->settings.failedColor;};float r=((color>>>16)&255)/255f,g=((color>>>8)&255)/255f,b=(color&255)/255f,alpha=(color>>>24)/255f*HighlightFades.action(mark,now);if(alpha<=0)continue;
                 if(pass==0)net.minecraft.client.render.VertexRendering.drawBox(matrices,vertices,pos.getX()-.003,pos.getY()-.003,pos.getZ()-.003,pos.getX()+1.003,pos.getY()+1.003,pos.getZ()+1.003,r,g,b,alpha);
                 else{var matrix=matrices.peek().getPositionMatrix();for(var face:FACE_CORNERS)for(int corner:face)vertices.vertex(matrix,pos.getX()+((corner&1)!=0?1.003f:-0.003f),pos.getY()+((corner&2)!=0?1.003f:-0.003f),pos.getZ()+((corner&4)!=0?1.003f:-0.003f)).color(r,g,b,alpha*0.25f);}

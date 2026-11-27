@@ -5,7 +5,6 @@ import dev.betterlitematica.io.*;
 import java.io.*;
 import java.util.*;
 
-/** Frozen edit exports may stream packed words. Materialize them once for preview and file output. */
 final class PreviewSourceArrays {
     private PreviewSourceArrays(){}
     static void materialize(Map<String,Object> root,Cancellation cancel)throws IOException{

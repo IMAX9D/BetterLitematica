@@ -18,7 +18,6 @@ import net.minecraft.sound.*;
 import net.minecraft.world.event.GameEvent;
 import java.util.*;
 
-/** Detached read-only rendering world. It never exposes the real world's chunks or entities. */
 final class ProjectionWorld extends World {
     private final net.minecraft.world.border.WorldBorder border=new net.minecraft.world.border.WorldBorder();
     @Override public net.minecraft.world.border.WorldBorder getWorldBorder(){return border;}

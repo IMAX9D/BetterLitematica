@@ -5,7 +5,7 @@ import com.mojang.renderpearl.api.pipeline.UniformType;
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
 import net.minecraft.resources.Identifier;
-/** Explicit immutable pipelines: no global OpenGL state and no backend assumptions. */
+
 final class ProjectionShaders {
  static Identifier id(String path){return Identifier.fromNamespaceAndPath("betterlitematica",path);}
  static final RenderPipeline SURFACE=base("surface","projection","projection_surface",DefaultVertexFormat.POSITION_TEX_COLOR,com.mojang.renderpearl.api.pipeline.PrimitiveTopology.QUADS).withBindGroupLayout(BindGroupLayout.builder().withUniform("Sampler0",UniformType.COMBINED_IMAGE_SAMPLER).build()).withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL,true,1,1)).withColorTargetState(ColorTargetState.DEFAULT).build();

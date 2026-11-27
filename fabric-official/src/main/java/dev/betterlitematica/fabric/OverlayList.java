@@ -6,7 +6,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
-/** Virtual scrolling list with one identity per row and keyboard selection. */
 final class OverlayList extends UiButton {
     record Row(String id,String name,boolean enabled,dev.betterlitematica.core.ProjectionCompatibility compatibility){
         Row(String id,String name,boolean enabled){this(id,name,enabled,dev.betterlitematica.core.ProjectionCompatibility.NONE);}

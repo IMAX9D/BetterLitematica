@@ -3,7 +3,7 @@ import com.mojang.blaze3d.systems.*;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.textures.*;
 import net.minecraft.client.Minecraft;
-/** GPU depth snapshots exclude foreground entity pixels from through-terrain overlays. */
+
 final class EntityOverlayMask {
  private static GpuTexture dummy;private static GpuTextureView dummyView;
  private static GpuTexture before,after;private static GpuTextureView beforeView,afterView;private static int width,height;private static boolean captured,ready;

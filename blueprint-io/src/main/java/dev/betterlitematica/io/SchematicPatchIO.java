@@ -5,7 +5,6 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
-/** Merge a frozen region-qualified draft into the complete source tree, only to a new file. */
 public final class SchematicPatchIO {
     private SchematicPatchIO(){}
     public record Source(Path path,boolean temporary) implements AutoCloseable {
@@ -19,7 +18,7 @@ public final class SchematicPatchIO {
     public static void write(Path source,Path output,SchematicEdits.Snapshot patch,Cancellation cancel)throws IOException{
         NbtWriter.writeNew(output,prepare(source,patch,cancel),cancel);
     }
-    /** Prepare a private draft tree; optional metadata can be attached before the new file commits. */
+
     public static Map<String,Object> prepare(Path source,SchematicEdits.Snapshot patch,Cancellation cancel)throws IOException{
         if(!SchematicImporter.sha256(source,cancel).equals(patch.metadata().sourceSha256()))throw new IOException("投影文件已被外部修改，请保留草稿后重新载入");
         var root=SourceVersions.litematic(SchematicFormats.canonical(NbtReader.read(source,SchematicImporter.SOURCE_LIMITS,cancel),cancel),cancel);

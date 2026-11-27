@@ -8,7 +8,6 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import org.joml.Matrix3x2f;
 
-/** Keep a rounded shape atomic during GUI overlap sorting, including its antialiased edges. */
 record UiSpanState(int[] spans,Matrix3x2f pose,ScreenRectangle scissorArea,ScreenRectangle bounds) implements GuiElementRenderState {
     @Override public RenderPipeline pipeline(){return RenderPipelines.GUI;}
     @Override public TextureSetup textureSetup(){return TextureSetup.noTexture();}

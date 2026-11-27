@@ -6,7 +6,6 @@ import net.minecraft.state.property.Properties;
 import net.minecraft.block.enums.*;
 import java.util.*;
 
-/** Item requirements are placement costs, not drops or a recipe expansion. */
 final class BuildMaterials {
     record Requirement(Item item, int count) {}
     private BuildMaterials() {}

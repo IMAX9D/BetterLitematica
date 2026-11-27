@@ -6,7 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-/** Live bounded observation, independent of full verification and printer work queues. */
+
 final class NearbyProjectionHighlights {
     static final int MISSING_COLOR=0xffff8f29,WRONG_COLOR=0xffff3338;
     enum Kind { MISSING,WRONG,EXTRA }
@@ -24,7 +24,7 @@ final class NearbyProjectionHighlights {
     void tick(Minecraft client,ProjectionController controller){
         if(client.level==null||client.player==null||client.gameMode==null||!controller.projectionRenderingEnabled()||!controller.options().printer.highlights){clear();return;}
         var sources=controller.printerSources();if(sources.isEmpty()){clear();return;}
-        // Layer-independent: the overlay clips to the visible slab, so moving the layer never clears and rescans.
+
         advance(client.level,sources,LayerRange.ALL,client.player.getEyePosition(),controller.options().printer.highlightRange,controller::printerSampler,p->WorldChunks.loaded(client.level,p)?client.level.getBlockState(p):null,System::nanoTime);
     }
     void advance(Object nextWorld,List<?> nextSources,LayerRange nextLayer,Vec3 nextEye,double nextReach,Supplier<Function<Vec3i,ProjectionController.PrinterSample>> source,Function<BlockPos,BlockState> actual,LongSupplier clock){
@@ -39,7 +39,7 @@ final class NearbyProjectionHighlights {
         if(nextWorld==null||nextSources.isEmpty()||reach<=0)return;
         if(scan==null)scan=new NearbyScan(eye,reach);scan.begin(eye);
         var sample=source.get();
-        // Sampling allowance starts after snapshot preparation; it is not a whole-tick hard limit.
+
         long deadline=clock.getAsLong()+750_000L;int visited=0,retries=0;int[] rows={512};
         while(visited<CELLS_PER_TICK){
             long now=clock.getAsLong();if(visited>0&&now>=deadline)break;
@@ -105,7 +105,7 @@ final class NearbyProjectionHighlights {
         marks.put(mark.position(),mark);
         if(old==null||old.kind()!=mark.kind()){var at=vector(BlockPos.of(mark.position()));cellBoxes.put(mark.position(),new HighlightCuboids.Box(at,at,mark.kind().ordinal()));boxesDirty=true;}
     }
-    /** Stable unit geometry. Unchanged cells keep their box even when neighboring cells enter or leave. */
+
     List<HighlightCuboids.Box> boxes(){
         if(boxesDirty){boxes=List.copyOf(cellBoxes.values());boxesDirty=false;}return boxes;
     }

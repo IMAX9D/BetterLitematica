@@ -5,14 +5,13 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
-/** Full-fidelity small NBT branches; packed voxel arrays are streamed past without allocating them. */
 public record AuxiliaryData(List<Part> parts) {
     public record Part(Map<Vec3i,Map<String,Object>> blocks,List<Map<String,Object>> entities){}
     public AuxiliaryData {parts=List.copyOf(parts);}
     public static AuxiliaryData read(Path path,BlueprintCache cache,Cancellation cancel)throws IOException{
         var data=read(path,cache.metadata(),cancel);
         if(cache.metadata().compatibility().skippedBlockTypes()==0)return data;
-        // Only sparse block-entity positions are queried; no full-volume second scan.
+
         var sections=new LinkedHashMap<SectionKey,PackedSection>(32,.75f,true){protected boolean removeEldestEntry(Map.Entry<SectionKey,PackedSection> e){return size()>32;}};
         var retained=new ArrayList<Part>();
         for(int i=0;i<data.parts().size();i++){

@@ -9,7 +9,6 @@ import net.minecraft.util.math.BlockPos;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-/** Incremental live verifier. Section contributions are replaced atomically, never double-counted. */
 final class PlacementAnalysis {
     record Material(Item item,long total,long missing,long unknown,long available){}
     private final ProjectionRenderer1201 source;private final ClientWorld world;private final PlacementLayout layout;private final PlacementLayout.Source cells;private final LayerRange layer;
@@ -64,7 +63,7 @@ final class PlacementAnalysis {
         }catch(RuntimeException e){error=e.toString();highlights.close();ledger.close();}
     }
     private SectionKey takeDirty(){int attempts=Math.min(64,dirty.size());while(attempts-->0){var iterator=dirty.iterator();var key=iterator.next();iterator.remove();if(!pending.containsKey(key))return key;dirty.add(key);}return null;}
-    /** Lazily expands a changed world chunk; even a tall or multi-region source cannot block a network callback. */
+
     private final class Expansion {
         final int cx,cz;int region=-1,x,y,z,x0,x1,z0,z1,ny;
         Expansion(int x,int z){cx=x;cz=z;}

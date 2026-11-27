@@ -15,7 +15,6 @@ import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Keep vanilla layer setup, fog, shader binding, fluid sort scheduling and layer teardown intact. */
 @Mixin(WorldRenderer.class)
 public abstract class TerrainRegionDrawMixin {
     @Unique private ObjectArrayList<?> betterlitematica$pass;

@@ -3,7 +3,7 @@ import com.google.gson.*;
 import dev.betterlitematica.core.SelectionBox;
 import dev.betterlitematica.core.Vec3i;
 import java.util.*;
-/** Preferences and explicit persistent regions only; live enablement and temporary work are separate. */
+
 final class BedrockSettings {
     static final int MAX_REGIONS=32,MAX_WHITELIST=64,MAX_EXCLUDED_Y=256;
     enum Face {
@@ -56,7 +56,7 @@ final class BedrockSettings {
     JsonObject snapshot(){
         validate();return draftSnapshot();
     }
-    /** Draft comparisons must not validate partially edited fields. */
+
     JsonObject draftSnapshot(){
         var root=preserved.deepCopy();root.addProperty("version",1);
         new Gson().toJsonTree(this).getAsJsonObject().entrySet().forEach(entry->root.add(entry.getKey(),entry.getValue()));return root;

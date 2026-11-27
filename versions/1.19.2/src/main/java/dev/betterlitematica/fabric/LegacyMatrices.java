@@ -2,7 +2,6 @@ package dev.betterlitematica.fabric;
 
 import org.lwjgl.system.MemoryStack;
 
-/** Copy column-major matrices at the pre-JOML rendering boundary. */
 final class LegacyMatrices {
     static org.joml.Matrix4f joml(net.minecraft.util.math.Matrix4f matrix){
         try(var stack=MemoryStack.stackPush()){var values=stack.mallocFloat(16);matrix.writeColumnMajor(values);values.rewind();return new org.joml.Matrix4f(values);}

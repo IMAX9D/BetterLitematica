@@ -1,6 +1,5 @@
 package dev.betterlitematica.fabric;
 
-/** Compact, deliberately non-rounding labels; exact counts remain in the material screen. */
 final class HudNumbers {
     private HudNumbers() {}
     static String compact(long count){

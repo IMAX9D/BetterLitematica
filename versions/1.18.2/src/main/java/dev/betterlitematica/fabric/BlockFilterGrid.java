@@ -8,7 +8,6 @@ import net.minecraft.text.Text;
 import java.util.*;
 import java.util.function.Consumer;
 
-/** Virtual block viewport; item rendering is limited to visible cells. */
 final class BlockFilterGrid extends ButtonWidget {
     public int getX(){return x;} public int getY(){return y;} public void setX(int value){x=value;} public void setY(int value){y=value;}
 
@@ -47,7 +46,7 @@ final class BlockFilterGrid extends ButtonWidget {
         try{if(rows.isEmpty())ui.text("无匹配方块",getX()+4,getY()+6,width-8,UiTheme.MUTED);
             int first=(int)(scroll/ROW),last=Math.min((rows.size()+COLUMNS-1)/COLUMNS,(int)Math.ceil((scroll+height)/ROW));
             for(int row=first;row<last;row++)for(int col=0;col<COLUMNS;col++){int index=row*COLUMNS+col;if(index>=rows.size())break;var entry=rows.get(index);int x=getX()+col*(w+GAP);double y=getY()+row*ROW-scroll;boolean chosen=selected.contains(entry.id());double hot=motion(entry.id()).hover(index==hover);
-                // Inactive (filter off): every card reads as disabled so nothing invites a click.
+
                 ui.roundRect(x,y,x+w,y+ROW-GAP,UiTheme.BUTTON_RADIUS,!active?UiTheme.DISABLED:UiMotion.mix(chosen?UiTheme.SELECTED:UiTheme.SURFACE,UiTheme.HOVER,hot*.45));
                 ui.roundFrame(x,y,x+w,y+ROW-GAP,UiTheme.BUTTON_RADIUS,!active?UiTheme.DIVIDER:isFocused()&&cursor==index?UiTheme.ACCENT:chosen?UiTheme.FOCUS:UiTheme.BORDER);
                 if(entry.icon().isEmpty())ui.glyph(UiGlyphArt.Kind.BRAND,x+7,y+9,17,UiTheme.MUTED);else ui.item(entry.icon(),x+6,y+7,21);

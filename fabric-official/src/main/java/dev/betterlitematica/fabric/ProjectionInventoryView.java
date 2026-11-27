@@ -11,7 +11,6 @@ import net.minecraft.world.level.block.DispenserBlock;
 import net.minecraft.world.level.block.HopperBlock;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
 
-/** Presentation only: never mutates a source snapshot, inventory, or item NBT. */
 final class ProjectionInventoryView {
     private static final int MAX_SLOTS=256;
     private ProjectionInventoryView() {}
@@ -29,7 +28,7 @@ final class ProjectionInventoryView {
                 else {
                     long count=(long)match.getCount()+original.getCount();
                     if(count>Integer.MAX_VALUE){
-                        // Preserve exact original counts if the display's integer count cannot represent the sum.
+
                         String message=source.availability().isEmpty()?"合计数量超过显示范围":source.availability()+" · 合计数量超过显示范围";
                         return new ProjectionInfoData.Side(source.state(),message,source.nbt(),copies(source.items()),source.columns());
                     }

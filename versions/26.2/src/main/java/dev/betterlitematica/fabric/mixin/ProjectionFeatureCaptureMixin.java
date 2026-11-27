@@ -6,7 +6,7 @@ import net.minecraft.client.renderer.rendertype.RenderType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-/** Redirect only our detached capture scope; all normal entity/BER drawing remains untouched. */
+
 @Mixin(RenderTypeFeatureRenderer.class)
 abstract class ProjectionFeatureCaptureMixin {
  @Inject(method="getVertexBuilder",at=@At("HEAD"),cancellable=true)

@@ -5,7 +5,7 @@ import net.minecraft.block.*;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.registry.Registry;
 import net.minecraft.util.math.BlockPos;
-/** Manual and region work share the same exclusive transaction used by the printer. */
+
 final class BedrockController {
     private static final int MAX_QUEUE=4096;
     private final MinecraftClient client;

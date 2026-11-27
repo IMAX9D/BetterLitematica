@@ -11,7 +11,6 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.block.BlockState;
 
-/** Immutable model data captured during extraction; workers never invoke a model or tint callback. */
 final class FrozenModel {
     static final int MAX_QUADS=512;
     static final class Quad {
@@ -78,7 +77,7 @@ final class FrozenModel {
                 for(int i=0;i<list.size();i++){choices[i]=node(list.get(i).value(),depth+1);weights[i]=list.get(i).weight();total=Math.addExact(total,weights[i]);}
                 if(total<=0)throw new UnsupportedOperationException();result=new Choice(choices,weights,total);
             }else if(model.getClass()==MultipartBlockStateModel.class){
-                // Resolve its state predicates and lazy model list on this thread before publishing.
+
                 model.addParts(Random.create(0),new ArrayList<>());
                 var list=((MultipartModelAccessor)model).betterlitematica$components();var children=new ArrayList<Node>();for(var child:list)children.add(node(child,depth+1));
                 if(children.stream().noneMatch(Node::randomized)){

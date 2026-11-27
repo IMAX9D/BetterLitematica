@@ -7,7 +7,6 @@ import java.nio.file.attribute.*;
 import java.util.*;
 import java.util.zip.*;
 
-/** Discardable, CRC-checked render models. Separate from lossless schematic data. */
 public final class OrbitPreviewCache {
     public static final long MAX_BYTES=64L<<20;
     public static final int MAX_FILES=16;
@@ -24,7 +23,7 @@ public final class OrbitPreviewCache {
             var in=new DataInputStream(new BufferedInputStream(new LimitedInput(zip,cancel,payloadLimit()),65536))){
             if(in.readInt()!=MAGIC||in.readInt()!=SchematicPreview.VERSION||!in.readUTF().equalsIgnoreCase(sha))return null;
             var model=SchematicPreview.readOrbitModel(in,cancel,detailed);
-            if(in.read()!=-1)return null; // Also validates the gzip CRC/trailer.
+            if(in.read()!=-1)return null;
             cancel.check();try{Files.setLastModifiedTime(path,FileTime.fromMillis(System.currentTimeMillis()));}catch(IOException ignored){}
             return model;
         }catch(InterruptedIOException cancelled){throw cancelled;}catch(IOException|IllegalArgumentException malformed){return null;}

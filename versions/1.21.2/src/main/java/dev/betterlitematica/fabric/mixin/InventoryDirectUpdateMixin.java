@@ -8,7 +8,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** New direct inventory messages acknowledge owned operations only after vanilla has applied them. */
 @Mixin(ClientPlayNetworkHandler.class)
 abstract class InventoryDirectUpdateMixin {
     @Inject(method="onSetPlayerInventory",at=@At("TAIL"))

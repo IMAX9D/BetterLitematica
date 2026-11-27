@@ -29,7 +29,7 @@ final class SubregionScreen extends MenuScreen {
     @Override public boolean keyPressed(int key,int scan,int modifiers){if(submitField(key,px,py,pz)){controller.action(()->change(p->p.moved(drafts.position(selected)),true));return true;}return super.keyPressed(key,scan,modifiers);}
     @Override protected void updateMenu(){if(awaiting&&!controller.regions(id).isEmpty())refresh();}
     private EditBox coordinate(String label,int axis,Vec3i value,int x,int y,int width){caption(label,x,y+2,18);var field=new OverlayTextField(x+28,0,width-34,label);field.setMaxLength(12);String region=selected;field.setValue(drafts.value(region,axis,value));field.setResponder(text->{drafts.set(region,axis,text);draftEdited();resetting="";});addBody(field,y);return field;}
-    /** Raw text survives widget rebuilds; only successful coordinate actions replace that region's draft. */
+
     static final class CoordinateDrafts {
         private final Map<String,String[]> values=new HashMap<>();
         String value(String region,int axis,Vec3i committed){return values.computeIfAbsent(region,key->new String[]{Integer.toString(committed.x()),Integer.toString(committed.y()),Integer.toString(committed.z())})[axis];}

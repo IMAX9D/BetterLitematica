@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.*;
 
-/** Sparse, region-qualified draft over an immutable complete-source palette. */
 public final class SchematicEdits {
     public static final int MAX_CELLS=65_536,MAX_SECTIONS=4096,MAX_TRANSACTION=16_384,MAX_HISTORY_CELLS=262_144;
     public record Patch(int original,int state,boolean blockData,boolean blockTicks,boolean fluidTicks){}
@@ -14,7 +13,7 @@ public final class SchematicEdits {
     public record Address(SectionKey section,int cell){public Address{Objects.requireNonNull(section);}}
     public record Delta(Address address,Patch before,Patch after){public Delta{Objects.requireNonNull(address);}}
     public record Action(List<Delta> values){public Action{values=List.copyOf(values);}}
-    /** Immutable recovery image. Live checkpoints reuse already immutable section maps and actions. */
+
     public static final class Checkpoint {
         private final BlueprintMetadata metadata;private final int originalPaletteSize;private final Map<SectionKey,Map<Integer,Patch>> sections;
         private final long revision;private final List<Action> undo,redo;private volatile long estimate=-1;
@@ -44,13 +43,13 @@ public final class SchematicEdits {
         metadataBytes=metadataBytes(metadata);
     }
     private SchematicEdits(SchematicEdits source){original=source.original;counts=source.counts.clone();ids.putAll(source.ids);undo.addAll(source.undo);redo.addAll(source.redo);snapshot=source.snapshot;cells=source.cells;historyCells=source.historyCells;metadataBytes=source.metadataBytes;cachedCheckpoint=source.cachedCheckpoint;}
-    /** Candidate transactions share immutable frames until admitted by the checkpoint writer. */
+
     public SchematicEdits fork(){return new SchematicEdits(this);}
     public Snapshot snapshot(){return snapshot;}
     public Checkpoint checkpoint(){if(cachedCheckpoint==null){cachedCheckpoint=new Checkpoint(snapshot.metadata(),original.palette().size(),snapshot.sections(),snapshot.revision(),List.copyOf(undo),List.copyOf(redo),true);cachedCheckpoint.estimate=256L+snapshot.sections().size()*128L+cells*112L+(undo.size()+redo.size())*64L+historyCells*160L+metadataBytes;}return cachedCheckpoint;}
     private static long stateBytes(BlockStateSpec state){long n=96L+state.name().length()*2L;for(var p:state.properties().entrySet())n+=96L+2L*(p.getKey().length()+p.getValue().length());return n;}
     private static long metadataBytes(BlueprintMetadata metadata){long n=128L+2L*(metadata.name().length()+metadata.sourceSha256().length());for(var state:metadata.palette())n+=stateBytes(state);for(var r:metadata.regions())n+=128L+2L*r.name().length();for(var w:metadata.warnings())n+=48L+2L*w.length();return n;}
-    /** Structural validation also checks the undo/redo chain before any recovered state is published. */
+
     public static void validateCheckpoint(Checkpoint image){
         var meta=image.metadata();int originalSize=image.originalPaletteSize();
         if(originalSize<1||originalSize>meta.palette().size()||image.revision()<0||image.undo().size()+image.redo().size()>128||image.estimatedBytes()>(96L<<20))throw new IllegalArgumentException("Invalid draft checkpoint limits");

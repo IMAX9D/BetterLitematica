@@ -4,7 +4,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
-/** Independent, versioned user settings. Unknown keys are retained on save. */
+
 final class InteractionOptions {
     boolean tool=true,easyPlace,hold=true,restriction,pick=true,boxes=true;
     String mode="PLACEMENT";

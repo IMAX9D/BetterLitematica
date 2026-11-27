@@ -6,12 +6,10 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.gl.*;
 import net.minecraft.client.render.VertexFormats;
 
-/** Explicit pipelines keep depth, blending and uniforms local to each draw pass. */
 final class ProjectionShaders {
     private ProjectionShaders(){}
     private static RenderPipeline.Builder common(String name,String vertex,String fragment){
-        // 1.21.5 overwrites the vanilla uniform names from global state on every draw.
-        // Projection sections and the full-screen composite need their explicit matrices instead.
+
         boolean projection=name.startsWith("projection");
         return RenderPipeline.builder().withLocation(net.minecraft.util.Identifier.of("betterlitematica",name))
             .withVertexShader(net.minecraft.util.Identifier.of(vertex)).withFragmentShader(net.minecraft.util.Identifier.of(fragment))

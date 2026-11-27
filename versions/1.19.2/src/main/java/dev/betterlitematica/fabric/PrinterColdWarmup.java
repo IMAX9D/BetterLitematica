@@ -10,13 +10,11 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 
-/** One-time, read-only preparation before the player starts printing. */
 final class PrinterColdWarmup {
     private static boolean dataReady,failed;
     private static int predictions;
     private PrinterColdWarmup(){}
 
-    /** Called during mod initialization, outside a game tick and without a world. */
     static void initialize(){
         if(dataReady)return;
         var scan=new PrinterScan(Vec3i.ZERO,4,PrinterRange.Shape.SPHERE,"XZY",false,false,false);
@@ -46,7 +44,6 @@ final class PrinterColdWarmup {
         dataReady=true;
     }
 
-    /** At most four vanilla read-only predictions per client tick. */
     static void step(MinecraftClient client){
         if(!dataReady||failed||predictions>=16||client.world==null||client.player==null||client.interactionManager==null)return;
         try{stepInternal(client);}catch(RuntimeException e){failed=true;BetterLitematicaClient.LOGGER.warn("Printer read-only placement preparation unavailable",e);}

@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.*;
 
-/** An independent instance of a source blueprint; its identity survives renames and reloads. */
 public record Placement(UUID id, String name, String source, PlacementTransform transform,
                         boolean enabled, boolean locked, float opacity,Map<String,RegionPlacement> regions,boolean renderBlocks,int lockedAxes,ReplaceRule overlapRule,BlockDisplayFilter displayFilter) {
     public Placement(UUID id,String name,String source,PlacementTransform transform,boolean enabled,boolean locked,float opacity,Map<String,RegionPlacement> regions,boolean renderBlocks,int lockedAxes,ReplaceRule overlapRule){this(id,name,source,transform,enabled,locked,opacity,regions,renderBlocks,lockedAxes,overlapRule,BlockDisplayFilter.OFF);}

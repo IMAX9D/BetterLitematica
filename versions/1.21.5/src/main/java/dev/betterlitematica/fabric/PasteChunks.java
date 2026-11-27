@@ -1,6 +1,5 @@
 package dev.betterlitematica.fabric;
 
-
 import dev.betterlitematica.core.PlacementBounds;
 import net.minecraft.server.world.*;
 import net.minecraft.util.math.ChunkPos;
@@ -8,10 +7,9 @@ import net.minecraft.world.chunk.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-/** Server-thread-only temporary chunk ownership. Never blocks on generation or joins an unfinished future. */
 final class PasteChunks implements AutoCloseable {
     static final int LIMIT=64,REQUESTS_PER_TICK=4;
-    // Ticket matching uses type identity: one nonpersistent type per operation preserves ownership.
+
     private final ChunkTicketType TICKET=new ChunkTicketType(0,false,ChunkTicketType.Use.LOADING);
     private static final class Entry {
         final ChunkPos pos;final CompletableFuture<OptionalChunk<Chunk>> future;

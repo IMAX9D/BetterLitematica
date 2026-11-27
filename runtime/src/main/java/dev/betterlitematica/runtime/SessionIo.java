@@ -7,7 +7,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** Serial disk operations preserve save-before-restore ordering across world changes. */
 public final class SessionIo implements AutoCloseable {
     public static final int MAX_LISTING_RESULTS=1000;
     public record FileEntry(String path, String name, boolean directory) {}
@@ -22,7 +21,7 @@ public final class SessionIo implements AutoCloseable {
     private final Set<DirectoryQuery> queries=new HashSet<>();
     private boolean browserClosed;
     public <T> CompletableFuture<T> submit(Callable<T> action) { return submit(action,true); }
-    /** Accepted settings writes finish even when the player cancels construction work. */
+
     public <T> CompletableFuture<T> persist(Callable<T> action) { return submit(action,false); }
     private <T> CompletableFuture<T> submit(Callable<T> action,boolean cancellable) {
         var future = new CompletableFuture<T>() {
@@ -42,9 +41,7 @@ public final class SessionIo implements AutoCloseable {
     public CompletableFuture<Listing> list(Path root, String relative) {
         return list(root,relative,"");
     }
-    /** Match before collecting: unrelated entries never consume the result limit or search domain.
-     * Each query retains at most one directory cursor and 1000 results. Disk traversal is sliced,
-     * independent of ordered session writes, and continues until EOF or a proven extra match. */
+
     public CompletableFuture<Listing> list(Path root,String relative,String query){
         if(query==null||query.length()>120)return CompletableFuture.failedFuture(new IOException("Search text is too long"));
         var task=new DirectoryQuery(root,relative,query.toLowerCase(Locale.ROOT));
@@ -81,7 +78,7 @@ public final class SessionIo implements AutoCloseable {
                         if(!folder&&!lower.endsWith(".litematic")&&!lower.endsWith(".schem")&&!lower.endsWith(".schematic")&&!lower.endsWith(".nbt"))continue;
                         if(entries.size()==MAX_LISTING_RESULTS){complete(true);return;}
                         entries.add(new FileEntry(canonicalRoot.relativize(real).toString().replace('\\','/'),name,folder));
-                    }catch(NoSuchFileException ignored){/* Directory changed while its cursor was open. */}
+                    }catch(NoSuchFileException ignored){ }
                 }
                 browser.execute(this);
             }catch(Exception failure){finish(null,failure);}

@@ -16,8 +16,6 @@ import net.minecraft.text.Text;
 
 import org.lwjgl.glfw.GLFW;
 
-/** Held overlay with independent work modes and a separate render-layer wheel. */
-
 final class ModeWheelScreen extends MenuScreen {
 
     static final double CX=300,CY=200,INNER=54,OUTER=132;
@@ -194,8 +192,6 @@ final class ModeWheelScreen extends MenuScreen {
 
             double cx=centerX();
 
-
-
             double centerHover=centerMotion.hover(page!=Page.MAIN&&Math.hypot(x-cx,y-CY)<INNER-5);
 
             ui.sector(cx,CY,0,INNER-5,0,Math.PI*2,UiMotion.mix(UiTheme.OVERLAY_PANEL,UiTheme.OVERLAY_SELECTED,centerHover));ui.sector(cx,CY,INNER-5.6,INNER-5,0,Math.PI*2,UiMotion.mix(UiTheme.BORDER,UiTheme.ACCENT,centerHover));
@@ -221,8 +217,6 @@ final class ModeWheelScreen extends MenuScreen {
                 int labelColor=!enabled?UiTheme.DISABLED_TEXT:hover==i||on?UiTheme.TEXT:UiTheme.SECONDARY;
 
                 if(page==Page.MAIN){
-
-                    // Each wheel glyph is unique to its action; none is borrowed from a main-menu destination.
 
                     var glyph=i==0?dev.betterlitematica.runtime.UiGlyphArt.Kind.MODES:i==1?(on?dev.betterlitematica.runtime.UiGlyphArt.Kind.EYE:dev.betterlitematica.runtime.UiGlyphArt.Kind.EYE_OFF):i==2?dev.betterlitematica.runtime.UiGlyphArt.Kind.LAYERS:dev.betterlitematica.runtime.UiGlyphArt.Kind.PLAY;
 

@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.*;
 
-/** Coalesces live-world notifications. Overflow requests a lazy full refresh instead of losing changes. */
 public final class WorldSectionChanges {
     private final int capacity;
     private final LinkedHashSet<Vec3i> sections=new LinkedHashSet<>();

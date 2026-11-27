@@ -11,7 +11,7 @@ import java.util.function.Consumer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-/** Keep native shaders, fog, ordering and drawMultipleIndexed; replace only buffer ranges. */
+
 @Mixin(WorldRenderer.class)
 public abstract class TerrainRegionDrawMixin {
     @Inject(method="render",at=@At("HEAD"))private void betterlitematica$begin(CallbackInfo ci){TerrainRegions.INSTANCE.beginFrame();}

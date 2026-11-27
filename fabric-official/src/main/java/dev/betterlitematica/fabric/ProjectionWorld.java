@@ -33,7 +33,6 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import java.util.*;
 
-/** Detached read-only rendering world. It never exposes the real world's chunks or entities. */
 final class ProjectionWorld extends Level implements BlockAndTintGetter {
     private final net.minecraft.world.level.border.WorldBorder border=new net.minecraft.world.level.border.WorldBorder();
     @Override public net.minecraft.world.level.border.WorldBorder getWorldBorder(){return border;}
@@ -81,7 +80,6 @@ final class ProjectionWorld extends Level implements BlockAndTintGetter {
     @Override public String gatherChunkSourceStats(){return "BetterLitematica projection";}
     @Override public Entity getEntity(int id){return null;}
     @Override public net.minecraft.world.level.saveddata.maps.MapItemSavedData getMapData(net.minecraft.world.level.saveddata.maps.MapId id){return base.getMapData(id);}
-
 
     @Override public void destroyBlockProgress(int id,BlockPos pos,int progress){}
     @Override public net.minecraft.world.scores.Scoreboard getScoreboard(){return scoreboard;}

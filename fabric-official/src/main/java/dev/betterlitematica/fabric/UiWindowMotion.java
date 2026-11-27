@@ -1,6 +1,5 @@
 package dev.betterlitematica.fabric;
 
-/** One entrance per navigation, never per refresh, tick or window resize. */
 final class UiWindowMotion {
     static final long DURATION_NANOS=220_000_000L;
     record Frame(double x,double y,double alpha){}

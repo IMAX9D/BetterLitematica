@@ -2,7 +2,7 @@ package dev.betterlitematica.core;
 import java.util.*;
 public record BlueprintMetadata(String name, int dataVersion, String sourceSha256,
         List<BlockStateSpec> palette, List<Region> regions, List<String> warnings, ProjectionCompatibility compatibility) {
-    /** Chunk-exported schematics can contain tens of thousands of small independent regions. */
+
     public static final int MAX_REGIONS=65_536;
     public BlueprintMetadata(String name,int dataVersion,String sourceSha256,List<BlockStateSpec> palette,List<Region> regions,List<String> warnings){
         this(name,dataVersion,sourceSha256,palette,regions,warnings,ProjectionCompatibility.NONE);

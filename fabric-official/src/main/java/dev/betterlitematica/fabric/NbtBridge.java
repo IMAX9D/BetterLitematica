@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import net.minecraft.nbt.*;
 import java.util.*;
 
-/** Type-preserving bridge at the version adapter boundary. */
 final class NbtBridge {
     private NbtBridge() {}
     static final class Budget {
@@ -28,7 +27,7 @@ final class NbtBridge {
             case 9 -> {
                 var source=(ListTag)value;byte type=0;for(Tag entry:source){if(type==0)type=entry.getId();else if(type!=entry.getId()){type=10;break;}}
                 List<Object> list=new ArrayList<>();for(Tag entry:source){Object element=plain(entry,budget,depth+1);
-                    // Match vanilla's standard NBT wire wrapper, including escaping literal {"": ...} compounds.
+
                     if(type==10&&(!(entry instanceof CompoundTag compound)||compound.size()==1&&compound.contains(""))){budget.claim(64,depth+1);element=Map.of("",element);}list.add(element);}
                 yield list;
             }

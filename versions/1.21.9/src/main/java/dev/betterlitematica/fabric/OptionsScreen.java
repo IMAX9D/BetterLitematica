@@ -27,7 +27,7 @@ final class OptionsScreen extends MenuScreen {
             setting(SettingId.OPTIONS_TOOL,button("选区工具："+on(s.tool),0,2,2,()->{s.tool=!s.tool;save();}));setting(SettingId.OPTIONS_TOOL_SETTINGS,button("工具设置",1,2,2,()->client.setScreen(new ToolScreen(this,controller))));
             setting(SettingId.OPTIONS_EASY_PLACE,button("简单放置："+on(s.easyPlace),0,2,3,()->{s.easyPlace=!s.easyPlace;save();}));setting(SettingId.OPTIONS_HOLD,button("按住连续："+on(s.hold),1,2,3,()->{s.hold=!s.hold;save();}));
             setting(SettingId.OPTIONS_RESTRICTION,button("放置限制："+on(s.restriction),0,2,4,()->{s.restriction=!s.restriction;save();}));setting(SettingId.OPTIONS_PICK,button("投影拾取："+on(s.pick),1,2,4,()->{s.pick=!s.pick;save();}));
-            // Selection boxes live only under 显示; one switch per setting.
+
             setting(SettingId.OPTIONS_ACCURATE,button("精确放置："+s.accurate.label(),0,2,5,()->{s.accurate=AccuratePlacement.Mode.values()[(s.accurate.ordinal()+1)%AccuratePlacement.Mode.values().length];controller.printer().pause("设置已更改");save();}));
             setting(SettingId.OPTIONS_INVENTORY,button("取料与工具",1,2,5,()->client.setScreen(new InventoryScreen(this,controller))));
             setting(SettingId.OPTIONS_COMPATIBILITY,button("模组共存",0,2,7,()->client.setScreen(new CompatibilityScreen(this,controller))));

@@ -7,7 +7,7 @@ import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.client.gui.screen.narration.NarrationPart;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
-/** Held overlay with independent work modes and a separate render-layer wheel. */
+
 final class ModeWheelScreen extends MenuScreen {
     static final double CX=300,CY=200,INNER=54,OUTER=132;
     private static final int CARD_X=452,CARD_RIGHT=590,CARD_TOP=130;
@@ -109,7 +109,7 @@ final class ModeWheelScreen extends MenuScreen {
                 double lx=cx+Math.cos(center)*94,ly=CY+Math.sin(center)*94;String label=page==Page.MODES?MODES[i].label():page==Page.RENDER?(i<RENDER_MODES.length?RENDER_MODES[i].label():i==RENDER_MODES.length?"下一层":"上一层"):i==0?"施工模式":i==1?"总渲染":i==2?"分层":"执行操作";
                 int labelColor=!enabled?UiTheme.DISABLED_TEXT:hover==i||on?UiTheme.TEXT:UiTheme.SECONDARY;
                 if(page==Page.MAIN){
-                    // Each wheel glyph is unique to its action; none is borrowed from a main-menu destination.
+
                     var glyph=i==0?dev.betterlitematica.runtime.UiGlyphArt.Kind.MODES:i==1?(on?dev.betterlitematica.runtime.UiGlyphArt.Kind.EYE:dev.betterlitematica.runtime.UiGlyphArt.Kind.EYE_OFF):i==2?dev.betterlitematica.runtime.UiGlyphArt.Kind.LAYERS:dev.betterlitematica.runtime.UiGlyphArt.Kind.PLAY;
                     ui.glyph(glyph,lx-8,ly-(i==1?24:20),16,hover==i||on?UiTheme.ACCENT:UiTheme.MUTED);
                     ui.centered(label,lx-42,ly-(i==1?7:3),84,22,labelColor);

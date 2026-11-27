@@ -10,8 +10,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 
-/** Wrap the existing callback chain, including Carpet's fillUpdates Redirect.
- * Outside this exact paste position the original operation is always delegated unchanged. */
 @Mixin(WorldChunk.class)
 abstract class PasteBlockMixin {
     @WrapOperation(method="setBlockState",at=@At(value="INVOKE",target="Lnet/minecraft/block/BlockState;onBlockAdded(Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;Z)V"))
@@ -22,7 +20,7 @@ abstract class PasteBlockMixin {
     @WrapOperation(method="setBlockState",at=@At(value="INVOKE",target="Lnet/minecraft/block/BlockState;onStateReplaced(Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;Z)V"))
     private void betterlitematica$pasteReplaced(BlockState previous,World world,BlockPos pos,BlockState state,boolean moved,Operation<Void> original){
         if(!PasteBlockUpdates.quiet(world,pos)){original.call(previous,world,pos,state,moved);return;}
-        // Preserve block-entity lifetime without starting neighbor physics or scattering inventories.
+
         if(previous.hasBlockEntity()&&previous.getBlock()!=state.getBlock())world.removeBlockEntity(pos);
     }
 }

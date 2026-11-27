@@ -1,13 +1,13 @@
 package dev.betterlitematica.fabric;
 import java.util.List;
-/** Tool modes are independent from the printer's composable operation switches. */
+
 enum ToolMode {
     SELECTION("选区",false,true,false,false), PLACEMENT("摆放",false,false,false,false),
     FILL("填充",true,true,true,false), REPLACE("替换",true,true,true,true),
     PASTE("粘贴",true,false,false,false), GRID_PASTE("网格粘贴",true,false,false,false),
     MOVE("移动",true,true,false,false), DELETE("删除",true,true,false,false),
     REBUILD("编辑",false,false,true,false);
-    // Keep GRID_PASTE readable in older settings, but never offer the unfinished mode.
+
     private static final List<ToolMode> CREATIVE_MODES=List.of(SELECTION,PLACEMENT,FILL,REPLACE,PASTE,MOVE,DELETE,REBUILD);
     private static final List<ToolMode> SURVIVAL_MODES=List.of(SELECTION,PLACEMENT,REBUILD);
     private final String label;private final boolean creative,selection,primary,secondary;

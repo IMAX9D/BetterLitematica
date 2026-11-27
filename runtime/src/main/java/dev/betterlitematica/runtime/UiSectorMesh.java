@@ -1,6 +1,5 @@
 package dev.betterlitematica.runtime;
 
-/** Immutable, tintable annular-sector quads with coverage at their physical-pixel edges. */
 public final class UiSectorMesh {
     private static final double TAU = Math.PI * 2;
     private static final double HALF_PIXEL = .5;
@@ -25,7 +24,6 @@ public final class UiSectorMesh {
         return (tint & 0xffffff) | (Math.round((tint >>> 24) * coverage(vertex)) << 24);
     }
 
-    /** Render-thread-owned cache: position, theme and hover alpha do not rebuild geometry. */
     public static final class Cache implements AutoCloseable {
         private record Key(double inner, double outer, double start, double sweep) {}
         private final WeightedLru<Key, UiSectorMesh> meshes =
@@ -62,7 +60,7 @@ public final class UiSectorMesh {
             radialCoverage = new double[]{1, 1, 0};
         } else {
             double peak = Math.min(1, outer - inner);
-            // A subpixel stroke has a lower, wider plateau, not two overlapping fringes.
+
             radii = new double[]{Math.max(0, inner - HALF_PIXEL),
                     Math.min(inner + HALF_PIXEL, outer - HALF_PIXEL),
                     Math.max(inner + HALF_PIXEL, outer - HALF_PIXEL), outer + HALF_PIXEL};
@@ -78,13 +76,13 @@ public final class UiSectorMesh {
             double radius = radii[row];
             if (full) {
                 for (int col = 0; col <= steps; col++) {
-                    // Reuse the exact first direction at 100%; no faint seam at the join.
+
                     double angle = col == steps ? 0 : TAU * col / steps;
                     point(rows[row], col, radius, angle, radialCoverage[row]);
                 }
             } else {
                 double fringe = Math.asin(Math.min(1, HALF_PIXEL / Math.max(HALF_PIXEL, radius)));
-                // Nearly complete rings must not double-blend opposite cap fringes in the gap.
+
                 if (sweep > Math.PI) fringe = Math.min(fringe, (TAU - sweep) / 2);
                 double first = start + Math.min(fringe, sweep - fringe);
                 double last = start + Math.max(fringe, sweep - fringe);

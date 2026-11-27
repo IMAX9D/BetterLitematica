@@ -19,7 +19,6 @@ import net.minecraft.world.level.block.LecternBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
 
-/** Client-owned immutable snapshots. No world writes, requests, loot generation or render-entity data. */
 final class ProjectionInfoData {
     record Snapshot(Vec3i position,String placement,String region,Side projection,Side actual) {}
     record Side(BlockState state,String availability,List<String> nbt,List<ItemStack> items,int columns) {
@@ -59,7 +58,7 @@ final class ProjectionInfoData {
                     if(tag!=null)check(tag,new Limit(),0);
                     var summary=summary(tag);
                     boolean inventory=slotCount(state,bp)>0;
-                    // Vanilla chunk and block-entity packets do not synchronize container inventories.
+
                     actual=new Side(state,inventory?"库存未同步":state.hasBlockEntity()?"部分 NBT（客户端）":"",summary,List.of(),9);
                 }catch(RuntimeException e){actual=unavailable(state,"数据读取失败");}
             }
@@ -131,7 +130,7 @@ final class ProjectionInfoData {
                     if(other.tag()!=null&&other.tag().contains("LootTable"))return new Side(state,"另一半箱子战利品未生成",lines,List.of(),9);
                     var otherItems=items(other.state(),other.tag(),neighborPos,registries);
                     var merged=new ArrayList<ItemStack>(54);
-                    // Vanilla DoubleBlockProperties marks RIGHT as FIRST.
+
                     if(state.getValue(ChestBlock.TYPE)==ChestType.RIGHT){merged.addAll(slots);merged.addAll(otherItems);}
                     else {merged.addAll(otherItems);merged.addAll(slots);}
                     slots=List.copyOf(merged);

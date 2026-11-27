@@ -5,7 +5,7 @@ import java.util.function.Consumer;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
-/** Virtual verifier rows with explicit ignore/restore actions. */
+
 final class VerificationList extends UiButton {
     record Row(VerificationReport.Key key,long count,boolean ignored){}
     private static final int ROW=44;private List<Row> rows=List.of();private double scroll;private boolean dragging;private String emptyMessage="尚未校验";

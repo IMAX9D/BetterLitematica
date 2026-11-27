@@ -8,7 +8,6 @@ import net.minecraft.client.render.*;
 import net.minecraft.client.util.BufferAllocator;
 import org.joml.Matrix4f;
 
-/** All placements share one nearest-surface image; opacity is applied exactly once per pixel. */
 final class ProjectionComposite implements AutoCloseable {
     private Framebuffer target;private MinecraftClient client;private boolean started;private static ProjectionComposite open;
     private ProjectionGpu quad;

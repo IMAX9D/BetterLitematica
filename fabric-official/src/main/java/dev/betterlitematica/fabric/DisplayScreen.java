@@ -14,8 +14,6 @@ final class DisplayScreen extends MenuScreen {
 
     static void buildControls(MenuScreen page,ProjectionController controller,int row,Runnable layers,Runnable save){var s=controller.options().display;
 
-        // Interface first, then what is drawn in the world, then block information; no spacer rows.
-
         page.setting(SettingId.DISPLAY_THEME,page.button("界面主题："+UiTheme.Palette.parse(s.uiTheme).label,0,2,row,()->{var next=UiTheme.Palette.parse(s.uiTheme).next();s.uiTheme=next.name();UiTheme.apply(next);save.run();},true,false));
 
         page.setting(SettingId.DISPLAY_ERROR_STYLE,page.button("错误样式："+switch(s.errorStyle){case OUTLINE->"轮廓";case FILLED->"填充";case BOTH->"轮廓与填充";},1,2,row,()->{s.errorStyle=PrinterSettings.HighlightStyle.values()[(s.errorStyle.ordinal()+1)%3];save.run();}));

@@ -6,7 +6,6 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 
-/** A title-screen entry using the mod's own font, theme and physical-pixel scale. */
 final class TitleFeedbackButton extends ButtonWidget {
     private final UiMotion motion=new UiMotion();
     TitleFeedbackButton(int x,int y,int width,int height,Runnable action){super(x,y,width,height,Text.literal("问题反馈"),button->action.run(),DEFAULT_NARRATION_SUPPLIER);}

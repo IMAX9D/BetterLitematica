@@ -4,7 +4,6 @@ import dev.betterlitematica.core.*;
 import java.io.*;
 import java.util.*;
 
-/** Version adapters supply data fixes; the file modules have no game dependency. */
 public final class SourceVersions {
     public enum Kind {STATE,BLOCK_ENTITY,ENTITY}
     public interface Adapter {
@@ -30,7 +29,7 @@ public final class SourceVersions {
         if(version==5||version==6||compatibleLoading()&&version>=5)return;
         throw new IOException("无法读取此投影格式版本："+version);
     }
-    /** Structure void is a no-op cell, never expected air which could trigger excavation. */
+
     public static final BlockStateSpec SKIPPED=BlockStateSpec.parse("minecraft:structure_void");
     public record ReadState(BlockStateSpec state,boolean skipped){}
     public static boolean skipUnknown(Kind kind,String name,int source){
@@ -38,7 +37,7 @@ public final class SourceVersions {
     }
     public static ReadState readState(Map<String,Object> tag,int source)throws IOException{
         String name=NbtReader.string(tag,"Name","");
-        // Do not attempt to interpret a future block's properties in an older game.
+
         if(skipUnknown(Kind.STATE,name,source))return new ReadState(SKIPPED,true);
         var properties=new TreeMap<String,String>();
         if(tag.containsKey("Properties"))for(var entry:NbtReader.compound(tag.get("Properties"),"Properties").entrySet()){
@@ -54,7 +53,7 @@ public final class SourceVersions {
     public static boolean acceptsAuxiliary(Kind kind,Map<String,Object> tag,int source){
         Object id=tag.get("id");return !(id instanceof String name)||!skipUnknown(kind,name,source);
     }
-    /** Palette-only check prevents an embedded preview from reintroducing discarded blocks. */
+
     public static boolean requiresFiltering(Map<String,Object> root,Cancellation cancel)throws IOException{
         if(!compatibleLoading())return false;
         root=SchematicFormats.canonical(root,cancel);int source=NbtReader.integer(root,"MinecraftDataVersion");

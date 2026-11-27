@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.*;
 
-/** Chunk packets invalidate columns, not a separate queue entry for every vertical section. */
 public final class WorldColumnChanges {
     private final int capacity;
     private final LinkedHashMap<Long,PlacementBounds> columns=new LinkedHashMap<>();

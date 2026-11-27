@@ -1,7 +1,7 @@
 package dev.betterlitematica.fabric;
 import java.util.*;
 import net.minecraft.util.registry.Registry;
-/** Compact state and NBT text shared by the in-world overlay. */
+
 final class ProjectionInfoPanel {
     private ProjectionInfoPanel(){}
     static List<String> lines(ProjectionInfoData.Side side,boolean states){var result=new ArrayList<String>();if(side==null)return result;if(side.state()!=null){result.add(Registry.BLOCK.getId(side.state().getBlock()).toString());if(states)side.state().getEntries().entrySet().stream().sorted(Comparator.comparing(e->e.getKey().getName())).forEach(e->result.add(property(e.getKey().getName())+" · "+value(e.getKey(),e.getValue())));}if(!side.availability().isBlank())result.add(side.availability());for(String line:side.nbt())if(!line.matches("(id|x|y|z|Items) = .*"))result.add(line);return result;}

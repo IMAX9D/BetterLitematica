@@ -4,7 +4,6 @@ import java.util.List;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.ItemStack;
 
-/** Compact read-only details; the inventory/source snapshots are unchanged. */
 final class ProjectionInformation {
     private record Panel(ProjectionInfoData.Side side,ItemStack icon,String name,List<String> lines,boolean more,int slots,int columns) {}
     private record Metrics(int lines,int columns,double lineHeight,double height,boolean more) {}
@@ -16,7 +15,7 @@ final class ProjectionInformation {
     private Panel prepare(ProjectionInfoData.Side source){
         var side=ProjectionInventoryView.compact(source);
         var all=ProjectionInfoPanel.lines(side,controller.options().display.informationStates);
-        // Block names and icons already identify ordinary blocks; retain properties and NBT.
+
         if(side.state()!=null&&!all.isEmpty())all=all.subList(1,all.size());
         int count=Math.min(8,all.size()),slots=Math.min(54,side.items().size()),columns=Math.max(1,Math.min(9,side.columns()));
         ItemStack icon=side.state()==null?ItemStack.EMPTY:new ItemStack(side.state().getBlock().asItem());

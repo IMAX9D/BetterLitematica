@@ -4,7 +4,6 @@ import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.Box;
 
-/** Twelve independent box edges for the projection line pipeline. */
 final class OverlayGeometry {
     private OverlayGeometry() {}
     static void box(MatrixStack.Entry pose,VertexConsumer output,Box box,float r,float g,float b,float a){box(pose,output,box.minX,box.minY,box.minZ,box.maxX,box.maxY,box.maxZ,r,g,b,a);}

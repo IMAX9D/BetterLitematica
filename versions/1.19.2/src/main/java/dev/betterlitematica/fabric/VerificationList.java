@@ -5,7 +5,7 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 import java.util.*;
 import java.util.function.Consumer;
-/** Virtual verifier rows with explicit ignore/restore actions. */
+
 final class VerificationList extends ButtonWidget {
     public int getX(){return x;} public int getY(){return y;} public void setX(int value){x=value;} public void setY(int value){y=value;}
 

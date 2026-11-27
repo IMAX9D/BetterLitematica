@@ -7,7 +7,6 @@ import org.lwjgl.glfw.GLFW;
 import java.util.HashSet;
 import java.util.Set;
 
-/** Physical state survives vanilla clearing key bindings when a menu opens. */
 public final class EditorInput {
     private static final Set<Integer> scans=new HashSet<>();
     private EditorInput(){}

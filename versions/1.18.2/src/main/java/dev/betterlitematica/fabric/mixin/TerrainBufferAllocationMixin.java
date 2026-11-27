@@ -5,7 +5,7 @@ import net.minecraft.client.gl.VertexBuffer;
 import java.util.function.Consumer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-/** Suppress only this mod's lazy terrain handles; other buffers retain vanilla allocation. */
+
 @Mixin(VertexBuffer.class)
 public abstract class TerrainBufferAllocationMixin {
     @WrapOperation(method="<init>",at=@At(value="INVOKE",target="Lcom/mojang/blaze3d/systems/RenderSystem;glGenBuffers(Ljava/util/function/Consumer;)V"),require=2)

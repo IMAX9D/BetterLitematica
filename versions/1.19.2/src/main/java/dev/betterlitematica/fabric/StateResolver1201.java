@@ -7,7 +7,6 @@ import net.minecraft.state.property.Property;
 import net.minecraft.util.*;
 import java.util.*;
 
-/** Only this adapter knows Minecraft's registry, BlockState and state-transform API. */
 final class StateResolver1201 {
     private final List<BlockStateSpec> source;
     private final BlockState[] resolved;

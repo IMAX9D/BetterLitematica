@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.*;
 
-/** Bounded result aggregation, independent of rendering and the game world. */
 public final class VerificationReport {
     public static final int MAX_GROUPS = 4096, MAX_SAMPLES = 2048;
     public record Key(Comparison type, String expected, String actual) {}
@@ -31,7 +30,7 @@ public final class VerificationReport {
     public Set<Key> ignoredKeys(){return Set.copyOf(ignored);}
     public void restore(Key key){if(ignored.remove(key))ignoredChanged.run();}
     public void resetIgnored() { if(!ignored.isEmpty()){ignored.clear();ignoredChanged.run();} }
-    /** Replace, never accumulate, the contribution of a rescanned section. Group identities remain stable. */
+
     public void replace(VerificationSection before,VerificationSection after){
         if(!before.equals(after)){change(before,-1);change(after,1);samples.removeAll(before.samples());}
         samples.removeIf(sample->ignored.contains(sample.key()));

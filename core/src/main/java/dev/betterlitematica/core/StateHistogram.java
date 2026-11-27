@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** Sparse complete-source counts for one region, independent of render residency and the world. */
 public final class StateHistogram {
     private final int[] ids;private final long[] counts;
     public StateHistogram(int[] ids,long[] counts){if(ids.length!=counts.length)throw new IllegalArgumentException();this.ids=ids.clone();this.counts=counts.clone();int previous=-1;for(int i=0;i<ids.length;i++){if(ids[i]<=previous||counts[i]<1)throw new IllegalArgumentException("Invalid histogram");previous=ids[i];}}

@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import dev.betterlitematica.core.*;
 import java.util.*;
 
-/** Immutable old/new domains; no enumeration of the schematic's block volume. */
 final class SceneChanges {
     record Source(Object owner,PlacementLayout layout) {}
     private final List<PlacementLayout> domains;

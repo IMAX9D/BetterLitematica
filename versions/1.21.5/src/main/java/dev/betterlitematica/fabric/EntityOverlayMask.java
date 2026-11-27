@@ -4,7 +4,6 @@ import com.mojang.blaze3d.systems.*;
 import com.mojang.blaze3d.textures.*;
 import net.minecraft.client.MinecraftClient;
 
-/** GPU depth snapshots isolate entity pixels without hiding terrain overlays. */
 final class EntityOverlayMask {
     private static GpuTexture before,after;
     private static int width,height;
@@ -21,7 +20,7 @@ final class EntityOverlayMask {
     static void after(MinecraftClient client){if(captured){copy(client,after);ready=true;}}
     static void bind(RenderPass pass,boolean enabled){
         pass.setUniform("EntityMaskEnabled",ready&&enabled?1:0);
-        // Always bind valid textures, including the first frame before snapshots exist.
+
         var depth=MinecraftClient.getInstance().getFramebuffer().getDepthAttachment();
         pass.bindSampler("EntityDepthBefore",ready?before:depth);pass.bindSampler("EntityDepthAfter",ready?after:depth);
     }

@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.*;
 
-/** Bounded material batches. Prefer the held material without starving another queued material. */
 public final class PrinterQueue {
     public enum Kind { PLACE, ADJUST, BREAK, FILL, FLUID, BEDROCK }
     public record Job(long generation,long position,int expected,int observed,Kind kind) {}
@@ -32,12 +31,7 @@ public final class PrinterQueue {
         else if(material==lastMaterial&&burst>=batchLimit&&turns.size()>1)for(int next:turns)if(next!=lastMaterial){material=next;break;}
         return take(material);
     }
-    /**
-     * Consume a finite material snapshot across calls/ticks. Later offers never extend the
-     * active batch. Only the first batch of an uninterrupted queue prefers the held item;
-     * subsequent batches use FIFO turns, so late materials also receive their turn.
-     * Mixing a legacy poll method ends the snapshot and starts a new scheduling boundary.
-     */
+
     public Job pollBatch(int heldMaterial){
         if(turns.isEmpty()){resetBatch();return null;}
         if(batchRemaining==0){
@@ -48,7 +42,7 @@ public final class PrinterQueue {
         if(turns.isEmpty())resetBatch();
         return job;
     }
-    /** Finish available work before requesting absent stock; an exhausted batch never holds up another material. */
+
     public Job pollBatch(int heldMaterial,java.util.function.IntPredicate available){
         Objects.requireNonNull(available);
         if(turns.isEmpty()){resetBatch();return null;}
@@ -57,7 +51,7 @@ public final class PrinterQueue {
             Integer ready=null;
             if(!batchStarted&&buckets.containsKey(heldMaterial)&&available.test(heldMaterial))ready=heldMaterial;
             else for(int material:turns)if(available.test(material)){ready=material;break;}
-            // Still visit unavailable work when nothing is ready, so shortages are recorded and supply can retry.
+
             batchMaterial=ready!=null?ready:turns.iterator().next();
             batchRemaining=buckets.get(batchMaterial).size();batchStarted=true;
         }
@@ -72,7 +66,7 @@ public final class PrinterQueue {
         burst=material==lastMaterial?burst+1:1;lastMaterial=material;return job;
     }
     public int size(){return keys.size();}
-    /** Read-only bounded candidates; active material turns and batch ownership are unchanged. */
+
     public List<Job> snapshot(int material,int limit){
         if(limit<1||limit>4096)throw new IllegalArgumentException("Snapshot limit");
         var source=buckets.get(material);if(source==null)return List.of();

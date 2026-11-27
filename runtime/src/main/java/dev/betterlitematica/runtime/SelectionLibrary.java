@@ -6,7 +6,6 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
-/** Named selection definitions; active edits never mutate a stored template. */
 public final class SelectionLibrary {
     private SelectionLibrary(){}
     private static Path file(Path directory,String name)throws IOException{

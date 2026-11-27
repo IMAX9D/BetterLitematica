@@ -14,8 +14,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 @Mixin(ServerPlayNetworkHandler.class)
 public abstract class AccurateServerMixin {
     @Shadow public ServerPlayerEntity player;
-    // Tweakeroo redirects the same subtraction. Delegate through its existing
-    // operation after correcting only our own encoded local placement position.
+
     @WrapOperation(method="onPlayerInteractBlock",at=@At(value="INVOKE",target="Lnet/minecraft/util/math/Vec3d;subtract(Lnet/minecraft/util/math/Vec3d;)Lnet/minecraft/util/math/Vec3d;"))
     private Vec3d betterlitematica$physical(Vec3d hit,Vec3d center,Operation<Vec3d> original,PlayerInteractBlockC2SPacket packet){return original.call(AccuratePlacement.physical(player,packet.getHand(),packet.getBlockHitResult(),hit),center);}
     @WrapOperation(method="onPlayerInteractBlock",at=@At(value="INVOKE",target="Lnet/minecraft/server/network/ServerPlayerInteractionManager;interactBlock(Lnet/minecraft/server/network/ServerPlayerEntity;Lnet/minecraft/world/World;Lnet/minecraft/item/ItemStack;Lnet/minecraft/util/Hand;Lnet/minecraft/util/hit/BlockHitResult;)Lnet/minecraft/util/ActionResult;"))

@@ -1,5 +1,5 @@
 package dev.betterlitematica.fabric;
-/** Stable saved key identifiers; platform polling lives behind this adapter. */
+
 public final class NativeInput {
  private NativeInput(){}
 public static final int GLFW_RELEASE = 0;

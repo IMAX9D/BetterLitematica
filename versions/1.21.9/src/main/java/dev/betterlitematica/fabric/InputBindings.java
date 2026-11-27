@@ -16,12 +16,26 @@ final class InputBindings {
     void suspend(){reset();}
     private static boolean holdAction(String action){return Set.of("easyPlaceHold","restrictionHold","hideProjection").contains(action);}
     private record Binding(String action,String chord,List<String> keys){}
+    private static final Map<String,Integer> KEY_CODES=keyCodes();
+    private static Map<String,Integer> keyCodes(){
+        var codes=new HashMap<String,Integer>();
+        for(var field:GLFW.class.getFields()){
+            String name=field.getName();
+            if(field.getType()!=int.class||!name.startsWith("GLFW_KEY_")||name.equals("GLFW_KEY_LAST")||name.equals("GLFW_KEY_UNKNOWN"))continue;
+            try{codes.put(name.substring(9),field.getInt(null));}
+            catch(IllegalAccessException e){throw new ExceptionInInitializerError(e);}
+        }
+        return Map.copyOf(codes);
+    }
     private static String key(String text){String name=text.strip().toUpperCase(Locale.ROOT).replace(' ','_');return switch(name){case "CONTROL"->"CTRL";case "LEFT_CTRL"->"LEFT_CONTROL";case "RIGHT_CTRL"->"RIGHT_CONTROL";case "ESC"->"ESCAPE";case "RETURN"->"ENTER";case "WIN","CMD"->"SUPER";default->name;};}
     static int code(String name){
-        String value=key(name);if(value.matches("MOUSE[1-8]"))return -Integer.parseInt(value.substring(5));
+        String value=key(name);
+        if(value.length()==6&&value.startsWith("MOUSE")&&value.charAt(5)>='1'&&value.charAt(5)<='8')return '0'-value.charAt(5);
         value=switch(value){case "CTRL"->"LEFT_CONTROL";case "SHIFT"->"LEFT_SHIFT";case "ALT"->"LEFT_ALT";case "SUPER"->"LEFT_SUPER";default->value;};
         if(value.equals("UNKNOWN")||value.equals("LAST"))throw new IllegalArgumentException("无效按键");
-        try{return GLFW.class.getField("GLFW_KEY_"+value).getInt(null);}catch(ReflectiveOperationException e){throw new IllegalArgumentException("无效按键："+name);}
+        Integer code=KEY_CODES.get(value);
+        if(code==null)throw new IllegalArgumentException("无效按键："+name);
+        return code;
     }
     static String name(int code){
         return switch(code){case GLFW.GLFW_KEY_LEFT_CONTROL,GLFW.GLFW_KEY_RIGHT_CONTROL->"CTRL";case GLFW.GLFW_KEY_LEFT_ALT,GLFW.GLFW_KEY_RIGHT_ALT->"ALT";case GLFW.GLFW_KEY_LEFT_SHIFT,GLFW.GLFW_KEY_RIGHT_SHIFT->"SHIFT";case GLFW.GLFW_KEY_LEFT_SUPER,GLFW.GLFW_KEY_RIGHT_SUPER->"SUPER";default->{String result="";for(var f:GLFW.class.getFields())if(f.getName().startsWith("GLFW_KEY_")&&!f.getName().endsWith("_LAST")&&!f.getName().endsWith("_UNKNOWN")){try{if(f.getInt(null)==code){result=f.getName().substring(9);break;}}catch(IllegalAccessException ignored){}}if(result.isEmpty())throw new IllegalArgumentException("无效按键");yield result;}};
@@ -43,7 +57,7 @@ final class InputBindings {
         if(!snapshot.equals(keys)){snapshot=Map.copyOf(keys);compiled=keys.entrySet().stream().filter(e->!e.getKey().equals("wheel")&&!toolDirect(e.getKey())).map(e->{String chord=normalize(e.getValue());return new Binding(e.getKey(),chord,chord.isEmpty()?List.of():List.of(chord.split("\\+")));}).toList();reset();}
     }
     private Map<String,Boolean> sample(Predicate<String> down){var held=new LinkedHashMap<String,Boolean>();for(var binding:compiled)held.put(binding.action,!binding.keys.isEmpty()&&binding.keys.stream().allMatch(down));return held;}
-    // Capture transitions while GLFW still exposes the other keys in this chord.
+
     void event(MinecraftClient client,InteractionOptions options,long window,int changed,int event){
         if(window!=client.getWindow().getHandle()||event==GLFW.GLFW_REPEAT)return;
         capture(options.keys,client.world,client.world!=null&&client.player!=null&&client.currentScreen==null&&client.isWindowFocused(),key->{

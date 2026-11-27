@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.*;
 
-/** Immutable replaceable contribution from one source section, including a bounded position sample. */
 public record VerificationSection(Map<VerificationReport.Key,Long> groups,long matched,List<VerificationReport.Sample> samples,List<VerificationReport.Sample> positions) {
     public VerificationSection(Map<VerificationReport.Key,Long> groups,long matched,List<VerificationReport.Sample> samples){this(groups,matched,samples,samples.stream().filter(s->s.key().type()!=Comparison.UNKNOWN).toList());}
     public static final VerificationSection EMPTY=new VerificationSection(Map.of(),0,List.of());

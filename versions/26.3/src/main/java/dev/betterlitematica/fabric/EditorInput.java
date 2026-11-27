@@ -1,13 +1,11 @@
 package dev.betterlitematica.fabric;
 
-
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.HashSet;
 import java.util.Set;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 
-/** Physical state survives vanilla clearing key bindings when a menu opens. */
 public final class EditorInput {
     private static final Set<Integer> scans=new HashSet<>();
     private EditorInput(){}

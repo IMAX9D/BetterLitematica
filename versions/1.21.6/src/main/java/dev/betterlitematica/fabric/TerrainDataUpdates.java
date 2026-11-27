@@ -6,7 +6,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.client.render.chunk.ChunkBuilder;
 
-/** Geometry/entity membership and connectivity have separate revisions; draws still read current data. */
 public final class TerrainDataUpdates {
     private static final AtomicLong REVISION=new AtomicLong();
     private static final AtomicLong TOPOLOGY=new AtomicLong();
@@ -18,6 +17,9 @@ public final class TerrainDataUpdates {
         long stamp=TOPOLOGY.get();return CHANGING.get()==0?stamp:Long.MIN_VALUE;
     }
     public static Object exchange(AtomicReference<?> reference,Object next,Operation<Object> original){
+        return exchange(null,reference,next,original);
+    }
+    public static Object exchange(ChunkBuilder.BuiltChunk section,AtomicReference<?> reference,Object next,Operation<Object> original){
         Object previous=reference.get();
         boolean membership=kind(previous)!=kind(next);
         boolean topology=false;
@@ -27,6 +29,10 @@ public final class TerrainDataUpdates {
         }
         if(topology){CHANGING.incrementAndGet();TOPOLOGY.incrementAndGet();}
         try{return original.call(reference,next);}finally{
+            if(previous!=next){
+                if(section instanceof TerrainSectionChanges.Owner owner)owner.betterlitematica$sectionChanged();
+                else TerrainSectionChanges.unlocatedChange();
+            }
             if(membership)REVISION.incrementAndGet();
             if(topology){TOPOLOGY.incrementAndGet();CHANGING.decrementAndGet();}
         }

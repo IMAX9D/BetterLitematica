@@ -35,6 +35,7 @@
     "TerrainChunkInfoAccessor",
     "TerrainLayerIndexMixin",
     "TerrainVisibilityGraphMixin",
+    "TerrainColumnUpdateMixin",
     "TerrainFrustumAccessor",
     "TerrainDataClearMixin",
     "TerrainDataPublishMixin",

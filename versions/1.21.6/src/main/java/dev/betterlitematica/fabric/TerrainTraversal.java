@@ -1,6 +1,5 @@
 package dev.betterlitematica.fabric;
 
-
 import dev.betterlitematica.fabric.TerrainChunkHandle;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.render.*;
@@ -10,10 +9,8 @@ import net.minecraft.util.math.*;
 import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 import java.util.Arrays;
+import java.util.BitSet;
 
-/** Render-thread breadth-first visibility. Incoming faces merge before the next distance layer;
- * branches only travel outwards and stop outside the view. Reuses flat arrays, published Minecraft
- * occlusion data and section handles; no ray stepping or per-frame linked graph snapshots. */
 public final class TerrainTraversal {
     private static final Direction[] DIRECTIONS=Direction.values();
     private static final int ALL=63;
@@ -35,21 +32,34 @@ public final class TerrainTraversal {
     private final Matrix4f cachedMatrix=new Matrix4f();
     private final ObjectArrayList<ChunkBuilder.BuiltChunk> active=new ObjectArrayList<>();
     private int[] candidates;
+    private int[] rankBySection;
+    private final BitSet drawableRanks=new BitSet();
+    private BitSet changedSections=new BitSet();
+    private TerrainSectionChanges sectionChanges;
+    private long unlocatedRevision;
     private int candidateCount,cachedX,cachedY,cachedZ;
     private double cachedCameraX,cachedCameraY,cachedCameraZ,cachedViewX,cachedViewY,cachedViewZ;
     private long cachedTopology;
     private long activeMembership,activeDirty,activeAuditAt,pruneAt;
+    private long columnRevision=-1, columnAuditAt;
+    private boolean storageMoved=true;
+    public void storageMoved(){storageMoved=true;}
     private boolean cached,cachedCulling;
     public long visits,drawables,walkNanos,walks,reuses,cacheDataChanges,walkDataChanges,totalVisits,candidateReads;
     public long missColumns,missTopology,missView,missSection,missMovement;
-    public void clear(){source=null;infos=null;data=null;connections=visitsByFrame=null;queue=horizontalSteps=columns=originY=columnX=columnZ=columnMask=candidates=null;verticalMask=null;loaded=relevantColumns=frontierColumns=null;view=null;intersection=null;frame=0;cached=false;candidateCount=0;active.clear();activeAuditAt=pruneAt=0;}
+    public void clear(){source=null;infos=null;data=null;connections=visitsByFrame=null;queue=horizontalSteps=columns=originY=columnX=columnZ=columnMask=candidates=rankBySection=null;verticalMask=null;loaded=relevantColumns=frontierColumns=null;view=null;intersection=null;frame=0;cached=false;candidateCount=0;active.clear();drawableRanks.clear();sectionChanges=null;changedSections=new BitSet();activeAuditAt=pruneAt=0;}
     private void attach(BuiltChunkStorage storage,int distance,int verticalSections){
         if(source==storage.chunks)return;
-        clear();source=storage.chunks;side=distance*2+1;height=verticalSections;plane=side*height;
+        clear();source=storage.chunks;storageMoved=true;side=distance*2+1;height=verticalSections;plane=side*height;
         if(source.length!=plane*side)throw new IllegalStateException("地形区段尺寸不一致");
         int n=source.length;infos=new ChunkBuilder.BuiltChunk[n];data=new net.minecraft.client.render.chunk.AbstractChunkRenderData[n];connections=new long[n];
         visitsByFrame=new long[n];queue=new int[n];candidates=new int[n];loaded=new boolean[side*side];relevantColumns=new boolean[side*side];frontierColumns=new boolean[side*side];horizontalSteps=new int[side*side*4];
         columns=new int[n];originY=new int[n];verticalMask=new byte[n];columnX=new int[side*side];columnZ=new int[side*side];columnMask=new int[side*side];
+        rankBySection=new int[n];sectionChanges=new TerrainSectionChanges(n);
+        for(var chunk:source){
+            if(chunk instanceof TerrainSectionChanges.Owner owner)owner.betterlitematica$watch(sectionChanges);
+            else{sectionChanges=null;break;}
+        }
         for(int z=0;z<side;z++)for(int y=0;y<height;y++)for(int x=0;x<side;x++){
             int i=(z*height+y)*side+x;
             columns[i]=z*side+x;originY[i]=source[i].getOrigin().getY();verticalMask[i]=(byte)(60|(y>0?1:0)|(y+1<height?2:0));
@@ -68,26 +78,43 @@ public final class TerrainTraversal {
         sectionX=(int)Math.floor(camera.x/16);sectionY=(int)Math.floor(camera.y/16);sectionZ=(int)Math.floor(camera.z/16);
         range=distance*16f+(float)(MARGIN*Math.sqrt(2));view=frustum;intersection=null;
         if(frustum.getClass()==Frustum.class&&frustum instanceof TerrainView f){intersection=f.betterlitematica$intersection();viewX=f.betterlitematica$x();viewY=f.betterlitematica$y();viewZ=f.betterlitematica$z();}
-        // Query each column once; never ask the provider to generate or load a chunk.
         boolean columnsChanged=false;
-        for(int z=0;z<side;z++)for(int x=0;x<side;x++){
-            int column=z*side+x;var origin=source[z*plane+x].getOrigin();
-            columnsChanged|=columnX[column]!=origin.getX()||columnZ[column]!=origin.getZ();columnX[column]=origin.getX();columnZ[column]=origin.getZ();
-            boolean available=world.getChunkManager().isChunkLoaded(origin.getX()>>4,origin.getZ()>>4);
-            columnsChanged|=loaded[column]!=available&&relevantColumns[column];loaded[column]=available;
+        var manager=world.getChunkManager();
+        long revision=manager instanceof TerrainColumnRevision tracked?tracked.betterlitematica$columnRevision():-1;
+
+        if(storageMoved||revision<0||columnRevision!=revision||started-columnAuditAt>=50_000_000L){
+            storageMoved=false;columnRevision=revision;columnAuditAt=started;
+            for(int z=0;z<side;z++)for(int x=0;x<side;x++){
+                int column=z*side+x;var origin=source[z*plane+x].getOrigin();
+                columnsChanged|=columnX[column]!=origin.getX()||columnZ[column]!=origin.getZ();columnX[column]=origin.getX();columnZ[column]=origin.getZ();
+                boolean available=manager.isChunkLoaded(origin.getX()>>4,origin.getZ()>>4);
+                columnsChanged|=loaded[column]!=available&&relevantColumns[column];loaded[column]=available;
+            }
         }
         long topology=TerrainDataUpdates.topologyStamp();
+        long unlocated=TerrainSectionChanges.unlocatedRevision();
+        if(sectionChanges!=null){changedSections.clear();changedSections=sectionChanges.drain(changedSections);}
         if(!columnsChanged&&(pruneAt==0||started<pruneAt)&&canReuse(frustum,occlusion,topology)){
-            // Normal publications and new rebuild requests invalidate immediately. A bounded audit
-            // also observes code which writes private/internal chunk data without these hooks.
-            boolean shortPath=candidateCount>4096&&topology==cachedTopology&&membership==activeMembership&&dirty==activeDirty&&started-activeAuditAt<50_000_000L;
+
+            boolean beforeAudit=candidateCount>4096&&started-activeAuditAt<50_000_000L;
+            boolean tracked=sectionChanges!=null&&unlocated==unlocatedRevision&&beforeAudit;
+            boolean shortPath=beforeAudit&&unlocated==unlocatedRevision&&topology==cachedTopology&&membership==activeMembership&&dirty==activeDirty;
             boolean valid;
-            if(shortPath){appendActive(output);valid=true;}else valid=appendCached(output,occlusion,started);
+            if(tracked)valid=appendChanges(output,occlusion,started);
+            else if(shortPath){appendActive(output);valid=true;}
+            else valid=appendCached(output,occlusion,started);
+            if(valid&&tracked&&sectionChanges.hasPending()){
+
+                output.clear();drawables=0;tracked=shortPath=false;
+                valid=appendCached(output,occlusion,started);
+            }
             if(valid&&topology==TerrainDataUpdates.topologyStamp()){
-                // A mesh outside this graph may have changed its portals. Its global revision is
-                // only a reason to inspect our candidates, not to discard an unchanged traversal.
+
                 cachedTopology=topology;
-                if(!shortPath)rememberActive(output,membership,dirty,started);
+                if(!tracked&&!shortPath){
+                    rememberActive(output,membership,dirty,started);
+                    unlocatedRevision=unlocated;
+                }
                 reuses++;view=null;intersection=null;return;
             }
         }
@@ -99,8 +126,9 @@ public final class TerrainTraversal {
             if(Math.abs(cameraX-cachedCameraX)>MARGIN||Math.abs(cameraY-cachedCameraY)>MARGIN||Math.abs(cameraZ-cachedCameraZ)>MARGIN
                     ||Math.abs(viewX-cachedViewX)>MARGIN||Math.abs(viewY-cachedViewY)>MARGIN||Math.abs(viewZ-cachedViewZ)>MARGIN)missMovement++;
         }
-        output.clear();drawables=0;candidateCount=0;cached=false;pruneAt=0;Arrays.fill(relevantColumns,false);Arrays.fill(frontierColumns,false);
-        // Resolve ring boundaries and neighbor availability once per column, not six times per node.
+        for(int rank=0;rank<candidateCount;rank++)rankBySection[candidates[rank]]=0;
+        drawableRanks.clear();output.clear();drawables=0;candidateCount=0;cached=false;pruneAt=0;Arrays.fill(relevantColumns,false);Arrays.fill(frontierColumns,false);
+
         for(int z=0;z<side;z++)for(int x=0;x<side;x++){
             int c=z*side+x,n=c+(z==0?(side-1)*side:-side),s=c+(z+1==side?-(side-1)*side:side),w=c+(x==0?side-1:-1),e=c+(x+1==side?1-side:1);
             columnMask[c]=3|(loaded[n]&&columnZ[n]==columnZ[c]-16?4:0)|(loaded[s]&&columnZ[s]==columnZ[c]+16?8:0)
@@ -113,26 +141,25 @@ public final class TerrainTraversal {
                 relevantColumns[columns[start.index]]=true;if(loaded[columns[start.index]])enqueue(start.index,0);
             }
         }else{
-            // Outside build height, seed all visible boundary sections in near-to-far diamond order.
+
             int y=sectionY<bottom?bottom:top-1,face=sectionY<bottom?0:1;var pos=new BlockPos.Mutable();
             for(int radius=0;radius<=distance*2;radius++)for(int dz=-Math.min(distance,radius);dz<=Math.min(distance,radius);dz++){
                 int dx=radius-Math.abs(dz);if(dx>distance)continue;
                 seed(storage,pos,sectionX-dx,y,sectionZ+dz,1<<face);if(dx!=0)seed(storage,pos,sectionX+dx,y,sectionZ+dz,1<<face);
             }
         }
-        // Queue cursors stay local and visitation+incoming faces share one word. Horizontal ring
-        // strides are column data (tens of KiB), not six random indices per vertical section (MiB).
+
         int read=0,write=tail;long stamp=(long)frame<<6;var states=visitsByFrame;var work=queue;
         while(read<write){
             int id=work[read++],column=columns[id],x=columnX[column],y=originY[id],z=columnZ[column];var chunk=source[id];visits++;
             relevantColumns[column]=true;
-            if(!visible(x,y,z,chunk))continue;var current=chunk.getCurrentRenderData();candidates[candidateCount++]=id;
-            append(id,chunk,current,output);
+            if(!visible(x,y,z,chunk))continue;var current=chunk.getCurrentRenderData();
+            int rank=candidateCount++;candidates[rank]=id;rankBySection[id]=rank+1;
+            if(append(id,chunk,current,output))drawableRanks.set(rank);
             int exits=ALL;
             if(occlusion){if(data[id]!=current){walkDataChanges++;data[id]=current;connections[id]=encode(current);}exits=exits(connections[id],(int)states[id]&ALL);}
             exits&=outward(x>>4,y>>4,z>>4,sectionX,sectionY,sectionZ)&verticalMask[id];
-            // Unloaded frontier columns are dependencies too: loading one can open a new path.
-            // Tracking only columns already in the output would leave holes at chunk boundaries.
+
             if(!frontierColumns[column]){
                 frontierColumns[column]=true;
                 for(int d=0;d<4;d++)relevantColumns[columns[id+horizontalSteps[column*4+d]]]=true;
@@ -151,6 +178,7 @@ public final class TerrainTraversal {
             cachedCameraX=cameraX;cachedCameraY=cameraY;cachedCameraZ=cameraZ;cachedViewX=viewX;cachedViewY=viewY;cachedViewZ=viewZ;cached=true;
         }
         rememberActive(output,membership,dirty,started);
+        unlocatedRevision=unlocated;
         view=null;intersection=null;walkNanos+=System.nanoTime()-started;walks++;totalVisits+=visits;
     }
     private void rememberActive(ObjectArrayList<ChunkBuilder.BuiltChunk> output,long membership,long dirty,long time){
@@ -161,6 +189,7 @@ public final class TerrainTraversal {
         for(int i=0,size=active.size();i<size;i++){
             var info=active.get(i);var chunk=((TerrainChunkHandle)info).betterlitematica$chunk();var current=chunk.getCurrentRenderData();
             if(chunk.needsRebuild()||current.hasData()||!current.getBlockEntities().isEmpty()){output.add(info);active.set(count++,info);drawables++;}
+            else drawableRanks.clear(rankBySection[chunk.index]-1);
         }
         active.size(count);
     }
@@ -175,23 +204,44 @@ public final class TerrainTraversal {
         for(int i=0;i<candidateCount;i++){
             candidateReads++;
             int id=candidates[i];var chunk=source[id];var current=chunk.getCurrentRenderData();
-            // Also observe direct third-party atomic publications, not just our normal worker hook.
-            if(occlusion&&data[id]!=current){
-                cacheDataChanges++;long next=encode(current),previous=connections[id];
-                // Opening a portal can expose previously omitted terrain: traverse immediately.
-                // Closing one only makes the old result a conservative superset. Keep those extra
-                // candidates briefly (depth testing still hides them), then prune within 200 ms.
-                if((next&~previous)!=0)return false;
-                if(next!=previous&&pruneAt==0)pruneAt=time+200_000_000L;
-                data[id]=current;connections[id]=next;
-            }
-            append(id,chunk,current,output);
+            if(occlusion&&!sameReachability(id,current,time))return false;
+            drawableRanks.set(i,append(id,chunk,current,output));
         }return true;
     }
-    private void append(int id,ChunkBuilder.BuiltChunk chunk,net.minecraft.client.render.chunk.AbstractChunkRenderData current,ObjectArrayList<ChunkBuilder.BuiltChunk> output){
-        if(chunk.needsRebuild()||current.hasData()||!current.getBlockEntities().isEmpty()){
-            var info=infos[id];if(info==null)infos[id]=info=chunk;output.add(info);drawables++;
+    private boolean sameReachability(int id,net.minecraft.client.render.chunk.AbstractChunkRenderData current,long time){
+        if(data[id]==current)return true;
+        cacheDataChanges++;long next=encode(current),previous=connections[id];
+
+        if((next&~previous)!=0)return false;
+        if(next!=previous&&pruneAt==0)pruneAt=time+200_000_000L;
+        data[id]=current;connections[id]=next;
+        return true;
+    }
+    private boolean appendChanges(ObjectArrayList<ChunkBuilder.BuiltChunk> output,boolean occlusion,long time){
+        boolean membershipChanged=false;
+        for(int id=changedSections.nextSetBit(0);id>=0;id=changedSections.nextSetBit(id+1)){
+            int rank=rankBySection[id]-1;
+            if(rank<0)continue;
+            var chunk=source[id];var current=chunk.getCurrentRenderData();candidateReads++;
+            if(occlusion&&!sameReachability(id,current,time))return false;
+            boolean draw=drawable(chunk,current);
+            if(draw!=drawableRanks.get(rank)){drawableRanks.set(rank,draw);membershipChanged=true;}
         }
+        if(!membershipChanged){appendActive(output);return true;}
+
+        for(int rank=drawableRanks.nextSetBit(0);rank>=0;rank=drawableRanks.nextSetBit(rank+1)){
+            int id=candidates[rank];var chunk=source[id];
+            if(!append(id,chunk,chunk.getCurrentRenderData(),output))drawableRanks.clear(rank);
+        }
+        active.clear();active.addAll(output);
+        return true;
+    }
+    private static boolean drawable(ChunkBuilder.BuiltChunk chunk,net.minecraft.client.render.chunk.AbstractChunkRenderData current){
+        return chunk.needsRebuild()||current.hasData()||!current.getBlockEntities().isEmpty();
+    }
+    private boolean append(int id,ChunkBuilder.BuiltChunk chunk,net.minecraft.client.render.chunk.AbstractChunkRenderData current,ObjectArrayList<ChunkBuilder.BuiltChunk> output){
+        if(!drawable(chunk,current))return false;
+        var info=infos[id];if(info==null)infos[id]=info=chunk;output.add(info);drawables++;return true;
     }
     private void seed(BuiltChunkStorage storage,BlockPos.Mutable pos,int x,int y,int z,int incoming){
         var chunk=storage.getRenderedChunk(pos.set(x*16,y*16,z*16));if(chunk!=null&&chunk.getOrigin().equals(pos)){
@@ -209,7 +259,7 @@ public final class TerrainTraversal {
         return view.isVisible(((TerrainExpandedBounds)chunk).betterlitematica$expandedBounds(chunk.getBoundingBox()));
     }
     static long encode(net.minecraft.client.render.chunk.AbstractChunkRenderData data){
-        // Unbuilt terrain is traversable until the completed occlusion data is published.
+
         if(data==net.minecraft.client.render.chunk.ChunkRenderData.HIDDEN||data==net.minecraft.client.render.chunk.ChunkRenderData.READY)return (1L<<36)-1;
         if(data instanceof net.minecraft.client.render.chunk.ChunkRenderData compiled){
             var visible=compiled.chunkOcclusionData.visibility;

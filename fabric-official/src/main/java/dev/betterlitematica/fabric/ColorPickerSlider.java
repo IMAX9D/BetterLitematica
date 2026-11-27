@@ -5,8 +5,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.network.chat.Component;
 
-
-/** Vanilla interaction/focus, independent overlay pixels and system-font labels. */
 final class ColorPickerSlider extends UiSlider {
     private final String label;private final int steps;private final DoubleConsumer changed;private final DoubleToIntFunction color;
     private final UiMotion motion=new UiMotion();

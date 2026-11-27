@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.*;
 
-/** Grid DDA, shared by picking and placement. Work is bounded by maxCells. */
 public final class VoxelRay {
     public record Hit(Vec3i position, double distance, Vec3i face) {}
     private VoxelRay() {}

@@ -6,7 +6,6 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.gl.*;
 import net.minecraft.client.render.VertexFormats;
 
-/** Explicit pipelines share Minecraft's frame uniform buffers, with a bounded mode block. */
 final class ProjectionShaders {
     private ProjectionShaders(){}
     private static RenderPipeline.Builder common(String name,String vertex,String fragment){

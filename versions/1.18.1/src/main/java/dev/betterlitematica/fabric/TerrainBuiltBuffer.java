@@ -2,7 +2,7 @@ package dev.betterlitematica.fabric;
 import java.nio.ByteBuffer;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.VertexFormat;
-/** Adapts 1.18's single packed view without an extra mesh allocation. */
+
 public final class TerrainBuiltBuffer {
     public record Parameters(VertexFormat format,VertexFormat.DrawMode mode,int vertexCount,int indexCount,VertexFormat.IntType indexType,boolean indexOnly,boolean sequentialIndex,int getBufferSize){}
     private final Parameters parameters;

@@ -1,6 +1,6 @@
 package dev.betterlitematica.fabric;
 import dev.betterlitematica.runtime.UiGlyphArt.Kind;
-/** Hub: loaded projections on the left, a launcher of tools on the right. Only the list scrolls. */
+
 final class ProjectionScreen extends MenuScreen {
     private static final int LIST=300,GUTTER=24,ROW=26,TILE=34,TILE_STEP=40;
     private int ticks;
@@ -8,7 +8,7 @@ final class ProjectionScreen extends MenuScreen {
     private java.util.UUID removing;private long removingSince;
     ProjectionScreen(ProjectionController c){super("BetterLitematica","",null,c,true);}
     @Override protected int preferredHeight(){return Math.max(306,130+ROW*Math.max(Math.min(controller.placements().size(),8),6));}
-    // The hub has a single title and one footer button row, so both bands stay 32 units tall.
+
     @Override protected int footerHeight(){return 32;}
     @Override protected int scrollRight(){return left+LIST;}
     @Override protected int scrollTop(){return bodyTop+ROW;}
@@ -29,7 +29,7 @@ final class ProjectionScreen extends MenuScreen {
             if(compatibility.incompatible())hint(row,compatibility.description()+"\n点击选中投影");
             iconAt(Kind.TUNE,"配置",ax,y,icon,()->{controller.select(entry.id());ClientUi.setScreen(minecraft,new PlacementConfigScreen(this,controller));},true,Look.GHOST,0);
             iconAt(live?Kind.EYE:Kind.EYE_OFF,!entry.enabled()?"启用并显示":live?"隐藏方块":"显示方块",ax+icon+2,y,icon,()->{controller.toggleDisplay(entry.id());refresh();},true,Look.GHOST,live?0:UiTheme.MUTED);
-            // Removing loses position, rotation and filters, so it takes a second click on the same, now red, control.
+
             boolean confirming=entry.id().equals(removing);
             iconAt(Kind.TRASH,confirming?"再次点击移除":"移除投影",ax+2*(icon+2),y,icon,()->{
                 if(confirming){removing=null;controller.unload(entry.id());}else{removing=entry.id();removingSince=System.nanoTime();}

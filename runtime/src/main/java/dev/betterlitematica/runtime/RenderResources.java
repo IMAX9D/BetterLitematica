@@ -2,7 +2,6 @@ package dev.betterlitematica.runtime;
 
 import java.util.*;
 
-/** Render-thread ownership of resident, in-flight and retired GPU allocations. */
 public final class RenderResources {
     public static final int COLD=0,NEARBY=1,VISIBLE=2;
     private long capacity;
@@ -10,11 +9,7 @@ public final class RenderResources {
     private long normalCapacity;
     private int normalObjects;private final int normalGroups;
     private final long reservedBytes;private final int reservedObjects;
-    /**
-     * Opt-in residency by distance: under pressure the farthest resident mesh goes first, and only for a request
-     * nearer than it. The resident set becomes a stable shell around the viewer, so turning the camera never
-     * trades the meshes behind it for farther ones in front.
-     */
+
     private boolean distanceOrdered,concurrentBuilds;private long sequence;
     private final TreeSet<Group> byDistance=new TreeSet<>((a,b)->a.distance!=b.distance?Double.compare(b.distance,a.distance):Long.compare(a.order,b.order));
     private long used,pendingBytes,revision,frame,wakeFrame=Long.MAX_VALUE;
@@ -25,7 +20,7 @@ public final class RenderResources {
     public RenderResources(long capacity,int maxObjects,int maxGroups){
         this(capacity,maxObjects,maxGroups,0,0,0);
     }
-    /** Replacement headroom is part of the hard budget, never additional capacity. */
+
     public RenderResources(long capacity,int maxObjects,int maxGroups,long reservedBytes,int reservedObjects,int reservedGroups){
         if(capacity<1||maxObjects<1||maxGroups<1)throw new IllegalArgumentException();
         if(reservedBytes<0||reservedBytes>=capacity||reservedObjects<0||reservedObjects>=maxObjects||reservedGroups<0||reservedGroups>=maxGroups)throw new IllegalArgumentException("Invalid replacement reserve");
@@ -39,7 +34,7 @@ public final class RenderResources {
         public void attach(Runnable release){if(this.release!=null||released)throw new IllegalStateException("Allocation already assigned");this.release=Objects.requireNonNull(release);}
         private void dispose(){if(released)return;if(release!=null)release.run();released=true;release=null;used-=bytes;pendingBytes-=bytes;objects-=objectCount;pendingObjects-=objectCount;revision++;}
     }
-    /** Physical storage shared by several mesh groups. Its entire capacity stays charged until deletion. */
+
     public final class SharedAllocation implements AutoCloseable {
         private final int bytes,count;private boolean closed;
         private SharedAllocation(int bytes,int count){this.bytes=bytes;this.count=count;}
@@ -59,13 +54,13 @@ public final class RenderResources {
         private boolean building=true,closed;private Runnable evicted;
         private final boolean replacement;private final long order=sequence++;private double distance=Double.POSITIVE_INFINITY;
         private Group(boolean replacement,double distance){this.replacement=replacement;this.distance=distance;}
-        /** Squared distance used for distance-ordered residency; unknown or out-of-query meshes are infinitely far. */
+
         public void distance(double value){
             double next=Double.isNaN(value)?Double.POSITIVE_INFINITY:value;if(next==distance)return;
             boolean resident=!building&&!closed&&byDistance.remove(this);distance=next;if(resident)byDistance.add(this);
         }
         public double distance(){return distance;}
-        /** All-or-nothing reservation, before creating any native resource. */
+
         public List<Lease> reserve(int[] sizes,int demand){
             if(closed||!building)throw new IllegalStateException("Group is no longer building");
             if(demand<COLD||demand>VISIBLE)throw new IllegalArgumentException();
@@ -81,7 +76,7 @@ public final class RenderResources {
         }
         public boolean replacement(){return replacement;}
         public void checkReference(int logicalBytes){if(closed||!building||logicalBytes<1||bytes+logicalBytes>(8L<<20))throw new IllegalArgumentException("Mesh resource limit exceeded");}
-        /** A slice owns its release callback, while the shared page owns the physical byte/object charge. */
+
         public void reference(int logicalBytes,Runnable release){checkReference(logicalBytes);var lease=new Lease(0,0);lease.attach(release);allocations.add(lease);bytes+=logicalBytes;}
         public void finish(int priority,Runnable evicted){if(closed||!building)throw new IllegalStateException();this.evicted=Objects.requireNonNull(evicted);building=false;if(builder==this)builder=null;revision++;this.priority=priority;lanes.get(priority).add(this);byDistance.add(this);if(priority==VISIBLE)lastVisible=frame;}
         public void priority(int value){
@@ -95,14 +90,14 @@ public final class RenderResources {
             if(building){if(builder==this)builder=null;revision++;}
             if(allocations.isEmpty()){groups--;revision++;}
             else {pendingBytes+=ownedBytes;pendingObjects+=ownedObjects;pendingGroups++;retired.add(this);}
-            // Detach the cache entry now; native deletion remains incremental and charged.
+
             var callback=evicted;evicted=null;if(callback!=null)callback.run();
         }
     }
     public Group begin(int demand){
         return begin(demand,false,Double.POSITIVE_INFINITY);
     }
-    /** Build a new mesh while its old resident mesh is still visible and charged. */
+
     public Group beginReplacement(int demand){
         return begin(demand,true,Double.POSITIVE_INFINITY);
     }
@@ -114,20 +109,17 @@ public final class RenderResources {
         int groupLimit=replacement?maxGroups:normalGroups;
         if(groups>=groupLimit){request(0,0,1,demand,replacement,distance);if(groups>=groupLimit)return null;}groups++;builder=new Group(replacement,distance);return builder;
     }
-    /** Opt-in: several groups may build at once, e.g. a background mesh finishing beside a foreground build. */
+
     public void concurrentBuilds(boolean value){concurrentBuilds=value;}
-    /** Switch to distance-ordered residency; call before any mesh is resident. */
+
     public void distanceOrdered(boolean value){distanceOrdered=value;}
     public boolean distanceOrdered(){return distanceOrdered;}
-    /**
-     * In distance order, whether a mesh at this squared distance could become resident: there is room, or a
-     * resident mesh is farther. Lets callers skip work that would only be rejected.
-     */
+
     public boolean admits(double distance){
         if(!distanceOrdered||used<normalCapacity*3/4&&objects<normalObjects*3/4)return true;
         return !byDistance.isEmpty()&&byDistance.first().distance>distance;
     }
-    /** Change the byte and object budget in place; a smaller budget is reclaimed by later requests. */
+
     public void resize(long capacity,int maxObjects){
         if(capacity<=reservedBytes||maxObjects<=reservedObjects)throw new IllegalArgumentException("Invalid render budget");
         if(capacity==this.capacity&&maxObjects==this.maxObjects)return;
@@ -145,7 +137,7 @@ public final class RenderResources {
             }
             return;
         }
-        // Pending deletions already promise space: don't retire the whole cache repeatedly.
+
         for(int lane=0;lane<demand&&checked<128&&removed<8;lane++){
             var values=lanes.get(lane);int available=values.size();
             while(available-->0&&!values.isEmpty()&&checked++<128&&removed<8&&
@@ -156,7 +148,7 @@ public final class RenderResources {
             }
         }
     }
-    /** Actual releases, including zero-byte mesh records, have a work and time budget. */
+
     public int drain(int limit,long deadline){
         if(limit<1)throw new IllegalArgumentException();int work=0;
         while(!retired.isEmpty()&&work<limit&&System.nanoTime()<deadline){

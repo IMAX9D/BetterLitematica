@@ -2,7 +2,6 @@ package dev.betterlitematica.fabric;
 import java.util.*;
 import net.minecraft.nbt.*;
 
-/** Capture identity follows UUID, so moving entities and detached passengers cannot be copied twice. */
 final class CapturedEntities {
     private final Set<UUID> seen=new HashSet<>();
     boolean accept(CompoundTag root){var added=new HashSet<UUID>();if(!visit(root,added,0))return false;seen.addAll(added);return true;}

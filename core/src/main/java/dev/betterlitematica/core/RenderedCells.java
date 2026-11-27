@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.Arrays;
 
-/** Immutable expected raw states for source cells represented or omitted as already complete. */
 public final class RenderedCells {
     private final short[] cells;
     private final int[] states;

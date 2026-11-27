@@ -10,7 +10,7 @@ import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 import java.util.*;
-/** Extraction produces bounded immutable draw commands; draw never queries the game world. */
+
 final class ProjectionDraw {
  private static final int MAX_COMMANDS=65536,MAX_RANGE_INTS=4*1024*1024,UNIFORM_BYTES=288;
  private static final List<Object> commands=new ArrayList<>();private static int ranges;
@@ -38,17 +38,15 @@ final class ProjectionDraw {
   int stride=(UNIFORM_BYTES+alignment-1)/alignment*alignment;
   int draws=(int)commands.stream().filter(Draw.class::isInstance).count();
   if(draws==0){try{for(var value:commands)if(value instanceof Runnable action)action.run();}finally{clear();}return;}
-  // Extraction's base projection excludes walking/hurt/nausea transforms. At this world-pass
-  // boundary the vanilla buffer contains the final matrix used by terrain, on both backends.
+
   var worldProjection=RenderSystem.getProjectionMatrixBuffer();
   var data=MemoryUtil.memCalloc(Math.multiplyExact(draws,stride));GpuBuffer uniforms=null;Batch batch=null;
   try{
    int index=0;var textures=new HashMap<Identifier,TextureBinding>();
    for(var value:commands)if(value instanceof Draw draw){
-    // A cold entity/block-entity texture may upload GPU data. Resolve it before any pass,
-    // then bind only prepared handles below. Keep the cache frame-local for resource reloads.
+
     if(draw.texture!=null)textures.computeIfAbsent(draw.texture,id->{var texture=client.getTextureManager().getTexture(id);return new TextureBinding(texture.getTextureView(),texture.getSampler());});
-    // Grow shared indices before opening a render pass; later draws only bind them.
+
     RenderSystem.getSequentialBuffer(draw.mesh.mode).getBuffer(draw.mesh.indexCount);
     int at=index++*stride;draw.view.get(at,data);draw.projection.get(at+64,data);
     data.putFloat(at+128,1).putFloat(at+132,1).putFloat(at+136,1).putFloat(at+140,draw.opacity);

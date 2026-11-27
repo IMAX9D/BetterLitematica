@@ -16,7 +16,7 @@ public abstract class TerrainDataPublishMixin {
     }
     @WrapOperation(method="doTask",at=@At(value="INVOKE",target="Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher$RenderSection;setSectionMesh(Lnet/minecraft/client/renderer/chunk/SectionMesh;)Lnet/minecraft/client/renderer/chunk/SectionMesh;"))
     private SectionMesh betterlitematica$publish(SectionRenderDispatcher.RenderSection section,SectionMesh mesh,Operation<SectionMesh> original){
-        // The caller releases the returned old mesh; return the stale new mesh for disposal instead.
+
         if(!betterlitematica$stamp.current())return mesh;
         TerrainNativeBudget.changing();try{return original.call(section,mesh);}finally{TerrainNativeBudget.changed();}
     }

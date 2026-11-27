@@ -11,7 +11,6 @@ import com.sun.jna.win32.W32APIOptions;
 import java.io.IOException;
 import java.lang.ref.Reference;
 
-/** Explorer's common item dialog. Call on a dedicated STA worker, never the render thread. */
 public final class WindowsSchematicDialog {
     private static final GUID CLASS_ID=new GUID("{DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7}");
     private static final GUID DIALOG_ID=new GUID("{D57C7288-D4AD-4768-BE02-9D969532D960}");
@@ -36,7 +35,7 @@ public final class WindowsSchematicDialog {
         Item dialog=null,initialItem=null,selected=null;Pointer name=null;
         try{
             var pointer=new PointerByReference();check(Ole32.INSTANCE.CoCreateInstance(CLASS_ID,null,1,DIALOG_ID,pointer).intValue());dialog=new Item(pointer.getValue());
-            // IFileDialog slots follow IUnknown(0..2), IModalWindow.Show(3), then the SDK vtable.
+
             var options=new IntByReference();check(dialog.call(10,options));
             check(dialog.call(9,options.getValue()|0x8|0x40|0x800|0x1000|(folder?0x20:0)));
             check(dialog.call(17,new WString(folder?"加载投影文件夹":"加载投影文件")));
@@ -48,7 +47,7 @@ public final class WindowsSchematicDialog {
                 initialItem=new Item(start.getValue());check(dialog.call(12,initialItem.getPointer()));
             }
             int result=dialog.call(3,owner==0?null:new Pointer(owner));Reference.reachabilityFence(filter);
-            if(result==0x800704c7)return null; // HRESULT_FROM_WIN32(ERROR_CANCELLED)
+            if(result==0x800704c7)return null;
             check(result);var item=new PointerByReference();check(dialog.call(20,item));selected=new Item(item.getValue());
             var display=new PointerByReference();check(selected.call(5,0x80058000,display));name=display.getValue();return name.getWideString(0);
         }finally{

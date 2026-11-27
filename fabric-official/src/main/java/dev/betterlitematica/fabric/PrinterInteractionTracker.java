@@ -2,7 +2,6 @@ package dev.betterlitematica.fabric;
 
 import java.util.*;
 
-/** No normal-path gate: only an observed replacement menu can nominate diagnostic materials. */
 final class PrinterInteractionTracker<K> {
     private static final int MAX_MATERIALS=128;
     private static final long LIFETIME=5_000_000_000L;

@@ -3,7 +3,6 @@ package dev.betterlitematica.core;
 import java.util.*;
 import java.util.regex.Pattern;
 
-/** Registry-independent identity. Unknown names and properties are never silently discarded. */
 public record BlockStateSpec(String name, Map<String, String> properties) {
     private static final Pattern NAME = Pattern.compile("[a-z0-9_.-]+:[a-z0-9_./-]+");
     private static final Pattern TOKEN = Pattern.compile("[a-z0-9_.-]+");

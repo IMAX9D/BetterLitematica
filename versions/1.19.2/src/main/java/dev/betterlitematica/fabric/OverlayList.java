@@ -6,7 +6,6 @@ import net.minecraft.text.Text;
 import java.util.*;
 import java.util.function.Consumer;
 
-/** Virtual scrolling list with one identity per row and keyboard selection. */
 final class OverlayList extends ButtonWidget {
     public int getX(){return x;} public int getY(){return y;} public void setX(int value){x=value;} public void setY(int value){y=value;}
 

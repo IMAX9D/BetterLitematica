@@ -7,20 +7,13 @@ import java.security.*;
 import java.util.*;
 import java.util.function.Consumer;
 
-/** Read-only importer. Source files are never modified and are NOT replaced by the preview cache. */
 public final class SchematicImporter {
     public static final long MAX_CELLS=536_870_912L, MAX_SOURCE_BYTES=512L<<20;
-    // Full schematic sources share this envelope; generic/capture NBT keeps its smaller default.
+
     public static final NbtReader.Limits SOURCE_LIMITS=SchematicReadLimits.fullSource();
     public record Progress(String phase,long completed,long total) {}
     public record Result(Path path,boolean cacheHit,long elapsedNanos) {}
-    private record RegionData(Region region,PackedBits blocks,int[] remap) {
-        int global(int x,int y,int z)throws IOException {
-            int index=x+z*region.size().x()+y*region.size().x()*region.size().z();
-            int id=blocks.get(index);
-            if(id>=remap.length)throw new IOException("Block index outside source palette");return remap[id];
-        }
-    }
+    private record RegionData(Region region,PackedBits blocks,int[] remap) {}
     private record Parsed(BlueprintMetadata metadata,List<RegionData> regions) {}
     private SchematicImporter() {}
     public static Result importFile(Path source,Path directory,Cancellation cancel,Consumer<Progress> progress)throws IOException{
@@ -34,7 +27,7 @@ public final class SchematicImporter {
                 if(existing.metadata().sourceSha256().equals(digest)){
                     progress.accept(new Progress("cached",1,1));return new Result(target,true,System.nanoTime()-started);
                 }
-            }catch(IOException e){cancel.check(); /* Malformed derived cache is rebuilt, original remains untouched. */}
+            }catch(IOException e){cancel.check();  }
         }
         progress.accept(new Progress("parse NBT",0,1));
         Map<String,Object> root=NbtReader.read(source,SOURCE_LIMITS,cancel);
@@ -45,22 +38,76 @@ public final class SchematicImporter {
         long total=0;for(RegionData r:parsed.regions)total+=sectionCount(r.region);
         long done=0;
         try(BlueprintCache.Writer writer=new BlueprintCache.Writer(target,parsed.metadata)){
+            SectionStrip strip=new SectionStrip(parsed.metadata.palette().size());
             for(int regionId=0;regionId<parsed.regions.size();regionId++){
-                RegionData data=parsed.regions.get(regionId);Vec3i size=data.region.size();
-                for(int sy=0;sy<(size.y()+15)/16;sy++)for(int sz=0;sz<(size.z()+15)/16;sz++)for(int sx=0;sx<(size.x()+15)/16;sx++){
-                    cancel.check();int[] blockIds=new int[PackedSection.VOLUME];
-                    for(int y=0;y<16&&sy*16+y<size.y();y++)for(int z=0;z<16&&sz*16+z<size.z();z++)for(int x=0;x<16&&sx*16+x<size.x();x++){
-                        int global=data.global(sx*16+x,sy*16+y,sz*16+z);blockIds[PackedSection.index(x,y,z)]=global;writer.count(regionId,global);
-                    }
-                    writer.add(new SectionKey(regionId,sx,sy,sz),PackedSection.fromGlobalIds(blockIds));
-                    progress.accept(new Progress("index sections",++done,total));
-                }
+                RegionData data=parsed.regions.get(regionId);
+                done=strip.writeRegion(writer,regionId,data,cancel,progress,done,total);
             }
-            // Detect ordinary concurrent source edits. Deliberately changing bytes AND restoring size/time is out of scope.
+
             if(Files.size(source)!=initialSize||!Files.getLastModifiedTime(source).equals(initialTime))throw new IOException("Source changed during import; retry");
             writer.commit(cancel);
         }
         progress.accept(new Progress("ready",1,1));return new Result(target,false,System.nanoTime()-started);
+    }
+
+    private static final class SectionStrip {
+        private static final int WIDTH=32;
+        private final int[][] cells=new int[WIDTH][];
+        private final boolean[] touched=new boolean[WIDTH];
+        private final PackedSection.Encoder encoder;
+        SectionStrip(int paletteSize){encoder=new PackedSection.Encoder(paletteSize);}
+
+        long writeRegion(BlueprintCache.Writer writer,int regionId,RegionData source,Cancellation cancel,
+                         Consumer<Progress> progress,long done,long total)throws IOException {
+            Vec3i size=source.region().size();
+            int sectionsX=(size.x()+15)>>>4;
+            int nonAir=0;
+            boolean zeroIsAir=source.remap()[0]==0;
+            for(int y0=0;y0<size.y();y0+=16){
+                for(int z0=0;z0<size.z();z0+=16){
+                    for(int first=0;first<sectionsX;first+=WIDTH){
+                        int sections=Math.min(WIDTH,sectionsX-first);
+                        int x0=first<<4, width=Math.min(sections<<4,size.x()-x0);
+                        for(int y=0;y<16 && y0+y<size.y();y++){
+                            cancel.check();
+                            for(int z=0;z<16 && z0+z<size.z();z++){
+                                int row=((y0+y)*size.z()+z0+z)*size.x()+x0;
+                                int end=row+width;
+                                for(int i=row;i<end;){
+                                    int local=source.blocks().get(i);
+                                    if(local==0 && zeroIsAir){
+                                        i=source.blocks().nextNonZero(i+1,end);
+                                        continue;
+                                    }
+                                    if(local>=source.remap().length)throw new IOException("Block index outside source palette");
+                                    int global=source.remap()[local];
+                                    int x=i++-row;
+                                    if(global==0)continue;
+                                    int slot=x>>>4;
+                                    if(cells[slot]==null)cells[slot]=new int[PackedSection.VOLUME];
+                                    cells[slot][(y<<8)|(z<<4)|(x&15)]=global;
+                                    touched[slot]=true;
+                                    writer.count(regionId,global);
+                                    nonAir++;
+                                }
+                            }
+                        }
+                        for(int slot=0;slot<sections;slot++){
+                            if(!touched[slot])continue;
+                            cancel.check();
+                            writer.add(new SectionKey(regionId,first+slot,y0>>>4,z0>>>4),encoder.encode(cells[slot]));
+                            Arrays.fill(cells[slot],0);
+                            touched[slot]=false;
+                        }
+                        done+=sections;
+                        progress.accept(new Progress("index sections",done,total));
+                    }
+                }
+            }
+
+            writer.count(regionId,0,source.region().volume()-nonAir);
+            return done;
+        }
     }
     private static long sectionCount(Region r){return ((r.size().x()+15L)/16)*((r.size().y()+15L)/16)*((r.size().z()+15L)/16);}
     public static String sha256(Path file,Cancellation cancel)throws IOException{

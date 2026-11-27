@@ -9,7 +9,7 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.state.property.Properties;
 import net.minecraft.block.enums.SlabType;
-/** Vanilla inventory and interaction packets only. Never edits the client/server world to fake a placement. */
+
 final class BuildingInteractions {
     void editingEntered(){pendingPick=null;dragSelection=null;dragTarget=null;transfers.reset();wasUse=false;stroke.clear();}
     boolean preservePrinterBreaking(){return controller.printer().ownsBreaking()||NativeMiner.ownsBreaking();}
@@ -39,7 +39,7 @@ final class BuildingInteractions {
         if(controller.options().hold||!wasUse)attempt();
         return true;
     }
-    /** Poll after mouse look, not only at 20 Hz; new targets never share a cooldown. */
+
     void frame(){if(enabled()&&controller.options().hold&&client.options.useKey.isPressed())attempt();}
     private void attempt(){
         var target=controller.target(client.player.getBlockInteractionRange());if(target==null)return;
@@ -101,7 +101,7 @@ final class BuildingInteractions {
         var existing=client.world.getBlockState(pos);if(PrinterRules.constructionMatches(existing,target.state()))return;
         boolean doubleSlab=target.state().contains(Properties.SLAB_TYPE)&&target.state().get(Properties.SLAB_TYPE)==SlabType.DOUBLE;
         if(!existing.isReplaceable()&&!(doubleSlab&&existing.getBlock()==target.state().getBlock()))return;
-        // Do not target projection blocks behind a real wall.
+
         var obstruction=client.world.raycast(new net.minecraft.world.RaycastContext(client.player.getEyePos(),Vec3d.ofCenter(pos),net.minecraft.world.RaycastContext.ShapeType.COLLIDER,net.minecraft.world.RaycastContext.FluidHandling.NONE,client.player));
         if(obstruction.getType()!=HitResult.Type.MISS&&!obstruction.getBlockPos().equals(pos))return;
         var needs=BuildMaterials.forState(target.state());
@@ -110,7 +110,7 @@ final class BuildingInteractions {
         var selected=transfers.equip(item,ticks);if(selected!=InventoryTransfers.Result.READY){if(selected==InventoryTransfers.Result.MISSING)hint("缺少："+item.getName().getString());return;}
         ItemStack stack=client.player.getMainHandStack();BlockItem blockItem=(BlockItem)stack.getItem();
         for(Direction side:Direction.values())for(double height:new double[]{0.25,0.75}){
-            // Vanilla accepts a replaceable target directly, including unsupported floating cubes.
+
             Vec3d point=EasyPlacementRules.hitPoint(pos,side,height);
             if(client.player.getEyePos().squaredDistanceTo(point)>reach*reach)continue;
             BlockHitResult hit=new BlockHitResult(point,side,pos,false);

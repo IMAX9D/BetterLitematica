@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import net.minecraft.client.render.VertexConsumer;
 import java.util.Arrays;
 
-/** Bounded model capture for the vertex-start API; attributes update the current vertex in place. */
 final class ProjectionVertices implements VertexConsumer {
     private static final int STRIDE=9,MAX=16384;
     private float[] data=new float[STRIDE*256];private int size;
@@ -18,7 +17,7 @@ final class ProjectionVertices implements VertexConsumer {
     private int current(){if(size==0)throw new IllegalStateException("模型顶点尚未开始");return (size-1)*STRIDE;}
     @Override public VertexConsumer color(int r,int g,int b,int a){int at=current();data[at+5]=r/255f;data[at+6]=g/255f;data[at+7]=b/255f;data[at+8]=Math.max(1/255f,a/255f);return this;}
     @Override public VertexConsumer color(int argb){return color((argb>>>16)&255,(argb>>>8)&255,argb&255,(argb>>>24)&255);}
-    // Captured surfaces are textured quads; line width is not part of that vertex format.
+
     @Override public VertexConsumer lineWidth(float width){return this;}
     @Override public VertexConsumer texture(float u,float v){int at=current();data[at+3]=u;data[at+4]=v;return this;}
     @Override public VertexConsumer overlay(int u,int v){return this;}

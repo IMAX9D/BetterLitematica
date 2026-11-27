@@ -13,7 +13,6 @@ import java.util.Objects;
 import java.util.function.IntConsumer;
 import org.lwjgl.glfw.GLFW;
 
-/** One texture per open picker; only confirmation commits the draft color to its owner. */
 final class ColorPickerScreen extends MenuScreen {
     private static final int TEXTURE_SIZE=512;
     private final IntConsumer accepted;private final long epoch;
@@ -71,7 +70,7 @@ final class ColorPickerScreen extends MenuScreen {
         Preview(int x,int width){super(x,0,width,66,Text.empty());active=false;}
         @Override public boolean mouseClicked(double x,double y,int button){return false;}
         @Override public void renderButton(MatrixStack legacyMatrices,int mouseX,int mouseY,float delta){LegacyGuiContext context=new LegacyGuiContext(legacyMatrices);var ui=IndependentUi.INSTANCE;for(int y=0;y<40;y+=8)for(int x=0;x<width;x+=8)ui.rect(getX()+x,getY()+y,getX()+Math.min(width,x+8),getY()+y+8,((x+y)/8&1)==0?UiTheme.INPUT:UiTheme.TRACK);ui.rect(getX(),getY(),getX()+width,getY()+40,color());
-            // Mask only the preview's four corners; alpha and checkerboard retain their exact values.
+
             for(int row=0;row<6;row++){double cut=6-Math.sqrt(36-(5.5-row)*(5.5-row));ui.rect(getX(),getY()+row,getX()+cut,getY()+row+1,UiTheme.PANEL);ui.rect(getX()+width-cut,getY()+row,getX()+width,getY()+row+1,UiTheme.PANEL);ui.rect(getX(),getY()+39-row,getX()+cut,getY()+40-row,UiTheme.PANEL);ui.rect(getX()+width-cut,getY()+39-row,getX()+width,getY()+40-row,UiTheme.PANEL);}ui.roundFrame(getX(),getY(),getX()+width,getY()+40,6,UiTheme.BORDER);ui.text(String.format("#%08X",color()),getX(),getY()+49,width,UiTheme.TEXT);}
         @Override protected void appendClickableNarrations(NarrationMessageBuilder builder){}
     }

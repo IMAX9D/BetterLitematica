@@ -6,11 +6,10 @@ import net.minecraft.world.item.ItemStack;
 import java.util.Objects;
 import java.util.function.Predicate;
 
-/** Shared item-selection rules for pick, Easy Place and the printer. */
 final class InventoryPolicy {
     private InventoryPolicy(){}
     private static final Predicate<ItemStack> UNPROTECTED=stack->false;
-    /** Parsed once per configured identity; returned predicates remain immutable in flight. */
+
     static final class ToolProtection {
         private String text;private Predicate<ItemStack> protectedStack=UNPROTECTED;
         Predicate<ItemStack> get(boolean enabled,String configured){
@@ -33,7 +32,7 @@ final class InventoryPolicy {
         return printerDestinationWithProtection(inventory,protectedSlots,tool==null?UNPROTECTED:stack->stack.is(tool));
     }
     static int printerDestinationWithProtection(Inventory inventory,int protectedSlots,Predicate<ItemStack> protection){
-        // Retain earlier materials in the hotbar; later batches can select them without a bag swap.
+
         for(int i=0;i<9;i++)if(inventory.getItem(i).isEmpty()&&allowed(inventory,i,protectedSlots,protection))return i;
         return destinationWithProtection(inventory,protectedSlots,protection);
     }

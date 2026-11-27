@@ -5,7 +5,6 @@ import net.minecraft.nbt.*;
 import net.minecraft.util.math.Direction;
 import java.util.*;
 
-/** Type-specific directional payloads; unrelated user NBT is never guessed from field names. */
 final class BlockEntityNbtTransform {
     static final class UnknownSourceState extends IllegalArgumentException {
         private static final long serialVersionUID=1L;

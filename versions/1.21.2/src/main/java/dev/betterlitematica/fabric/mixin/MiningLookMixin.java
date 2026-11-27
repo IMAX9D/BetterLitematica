@@ -6,7 +6,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
-/** Hold only an owned, short pre-placement server rotation; the camera is untouched. */
 @Mixin(PlayerMoveC2SPacket.class)
 abstract class MiningLookMixin {
     @ModifyVariable(method="<init>(DDDFFZZZZ)V",at=@At("HEAD"),ordinal=0,argsOnly=true)

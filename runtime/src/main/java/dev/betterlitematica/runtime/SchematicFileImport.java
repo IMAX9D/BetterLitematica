@@ -6,7 +6,6 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 
-/** Exact-byte import, including embedded previews; publishing never replaces another schematic. */
 public final class SchematicFileImport {
     private SchematicFileImport(){}
     public static String copy(Path requested,Path directory)throws IOException {
@@ -32,7 +31,7 @@ public final class SchematicFileImport {
                 String targetName=suffix==0?name:name.substring(0,dot)+" ("+suffix+")"+name.substring(dot);
                 Path target=root.resolve(targetName);
                 try{Files.move(temporary,target);return targetName;}
-                catch(FileAlreadyExistsException exists){/* Try a new name, preserving every existing file. */}
+                catch(FileAlreadyExistsException exists){ }
             }
             throw new IOException("同名投影过多，请先重命名文件");
         }finally{Files.deleteIfExists(temporary);}

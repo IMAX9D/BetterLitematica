@@ -10,9 +10,8 @@ import net.minecraft.util.datafix.fixes.References;
 import java.io.*;
 import java.util.*;
 
-/** Only called by source IO workers; native DFU never runs in a frame or input callback. */
 final class SourceVersions1201 implements SourceVersions.Adapter {
-    // Immutable registry snapshot: import workers never touch the game registry or a world.
+
     private final Map<String,Map<String,Set<String>>> blocks;
     private final Set<String> blockEntities,entities;
     private final String registryKey;

@@ -1,6 +1,5 @@
 package dev.betterlitematica.runtime;
 
-/** Retains input ownership across menus and failures until a physical release in the world. */
 public final class InputReleaseGuard {
     private boolean armed,waiting;
     public void arm(){armed=true;waiting=true;}

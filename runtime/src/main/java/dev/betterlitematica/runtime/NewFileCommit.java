@@ -1,7 +1,7 @@
 package dev.betterlitematica.runtime;
 import java.io.IOException;
 import java.nio.file.*;
-/** Cancellation and publishing a newly created artifact have one linearization point. */
+
 public final class NewFileCommit {
     private enum State {OPEN,CANCELLED,COMMITTED}
     private State state=State.OPEN;

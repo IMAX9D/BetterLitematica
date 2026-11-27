@@ -12,7 +12,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import java.util.*;
 
-/** Only this adapter knows Minecraft's registry, BlockState and state-transform API. */
 final class StateResolver1201 {
     private final List<BlockStateSpec> source;
     private final BlockState[] resolved;

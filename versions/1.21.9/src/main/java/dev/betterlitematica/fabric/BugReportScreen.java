@@ -5,7 +5,6 @@ import net.minecraft.client.gui.widget.*;
 import net.minecraft.text.Text;
 import java.util.concurrent.CompletableFuture;
 
-/** One short form, explicit attachment choices, and a durable receipt in the same responsive frame. */
 final class BugReportScreen extends MenuScreen {
     private final BugReportClient service;
     private BugReportClient.Draft draft=BugReportClient.Draft.EMPTY;
@@ -71,7 +70,7 @@ final class BugReportScreen extends MenuScreen {
         if(!loaded&&service.loading().isDone()){
             var saved=service.draft();draft=saved.hasContent()?saved:defaults();
             if(saved.hasContent()&&!service.retrying(saved))draft=new BugReportClient.Draft(saved.title(),saved.description(),saved.contact(),saved.logs(),saved.crash(),previousSession());
-            // A blank legacy draft may contain the old attachment defaults; it is a new report.
+
             if(!draft.equals(saved))service.saveDraft(draft);
             loaded=true;description=null;attachmentNote=service.attachmentNote(draft);refresh();
         }

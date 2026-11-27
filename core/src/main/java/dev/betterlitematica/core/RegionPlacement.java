@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** Position is relative to the main placement origin, initialized from the source's signed-size anchor. */
 public record RegionPlacement(Vec3i position,int quarterTurns,boolean mirrorX,boolean mirrorZ,boolean enabled,boolean locked) {
     public RegionPlacement {if(position==null)throw new NullPointerException();quarterTurns=Math.floorMod(quarterTurns,4);}
     public static RegionPlacement original(Region region){return new RegionPlacement(region.anchor(),0,false,false,true,false);}

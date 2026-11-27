@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.*;
 
-/** Single-owner mesh revisions. Completion never consumes an update received during a build. */
 public final class MeshRefresh<K> {
     private final int limit;
     private final Map<K,Long> changed=new HashMap<>();
@@ -22,7 +21,7 @@ public final class MeshRefresh<K> {
     public static PlacementBounds padded(PlacementBounds bounds){return new PlacementBounds(offset(bounds.min(),-1),offset(bounds.max(),1));}
     private static Vec3i offset(Vec3i value,int delta){return new Vec3i(offset(value.x(),delta),offset(value.y(),delta),offset(value.z(),delta));}
     private static int offset(int value,int delta){return (int)Math.max(Integer.MIN_VALUE,Math.min(Integer.MAX_VALUE,(long)value+delta));}
-    /** Inclusive source section coordinates affected by an already padded world-space box. */
+
     public static PlacementBounds sourceSections(PlacementLayout.Part part,PlacementBounds world){
         var a=part.local(world.min()).subtract(part.region().min());var b=part.local(world.max()).subtract(part.region().min());var size=part.region().size();
         var min=new Vec3i(Math.max(0,Math.min(a.x(),b.x())>>4),Math.max(0,Math.min(a.y(),b.y())>>4),Math.max(0,Math.min(a.z(),b.z())>>4));

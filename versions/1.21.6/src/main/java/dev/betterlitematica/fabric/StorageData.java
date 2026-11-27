@@ -8,7 +8,6 @@ import net.minecraft.storage.NbtWriteView;
 import net.minecraft.storage.ReadView;
 import net.minecraft.util.ErrorReporter;
 
-/** Keep serialization failures visible instead of accepting partial clipboard or entity data. */
 final class StorageData {
     private StorageData() {}
     private static final ErrorReporter STRICT = new ErrorReporter() {

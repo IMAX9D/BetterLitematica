@@ -23,7 +23,7 @@ def prepareJava = tasks.register('prepareAdapterSources', Sync) {
     // lives in the GPU-API adapter, rather than compiling incompatible GL-era hooks unused.
     def gpuTerrain = remapped && (target.minecraft.tokenize('.').collect { it as int }.with { it[0] == 1 && (it[1] > 21 || (it[1] == 21 && it.size() > 2 && it[2] >= 5)) })
     def portableTerrain = ['TerrainWorkers.java', 'TerrainBuildStamp.java', 'TerrainSectionOwner.java',
-        'TerrainExpandedBounds.java', 'TerrainView.java', 'TerrainRebuildUpdates.java', 'TerrainRenderLists.java',
+        'TerrainExpandedBounds.java', 'TerrainView.java', 'TerrainRebuildUpdates.java', 'TerrainSectionChanges.java', 'TerrainColumnRevision.java', 'TerrainColumnUpdateMixin.java', 'TerrainRenderLists.java',
         'TerrainFrustumAccessor.java', 'TerrainChunkHandle.java'] as Set
     roots.each { root ->
         from(new File(root, 'java')) {

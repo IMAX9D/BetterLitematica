@@ -6,7 +6,6 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
-/** Independent, bounded Java-edition NBT reader. No Minecraft NBT classes. */
 public final class NbtReader {
     public record Limits(long maxUncompressedBytes,long maxAllocatedBytes,int maxDepth,int maxNodes) {
         public static final Limits DEFAULT=new Limits(256L<<20,384L<<20,64,1_000_000);
@@ -20,7 +19,7 @@ public final class NbtReader {
     public static Map<String,Object> read(Path path,Limits limits,Cancellation cancel)throws IOException {
         return readPartial(path,limits,cancel,p->false);
     }
-    /** Omitted branches still consume byte, depth and node budgets; their large arrays are never allocated. */
+
     public static Map<String,Object> readPartial(Path path,Limits limits,Cancellation cancel,java.util.function.Predicate<List<String>> omitted)throws IOException {return readPartial(path,limits,cancel,(p,t)->omitted.test(p));}
     public static Map<String,Object> readPartial(Path path,Limits limits,Cancellation cancel,java.util.function.BiPredicate<List<String>,Integer> omitted)throws IOException {
         try(InputStream file=new BufferedInputStream(Files.newInputStream(path),64*1024)){
@@ -59,9 +58,26 @@ public final class NbtReader {
             }
             case 10 -> compound(in,depth+1);
             case 11 -> {int[] v=new int[length(in,4)];for(int i=0;i<v.length;i++){if((i&8191)==0)cancel.check();v[i]=in.readInt();}yield v;}
-            case 12 -> {long[] v=new long[length(in,8)];for(int i=0;i<v.length;i++){if((i&8191)==0)cancel.check();v[i]=in.readLong();}yield v;}
+            case 12 -> readLongArray(in);
             default -> throw new IOException("Unsupported NBT tag type: "+type);
         };
+    }
+    private long[] readLongArray(DataInputStream in)throws IOException {
+        long[] values=new long[length(in,Long.BYTES)];
+        if(values.length<256){
+            for(int i=0;i<values.length;i++)values[i]=in.readLong();
+            return values;
+        }
+        if(skipBuffer==null)skipBuffer=new byte[65536];
+        var words=java.nio.ByteBuffer.wrap(skipBuffer).asLongBuffer();
+        for(int i=0;i<values.length;){
+            cancel.check();
+            int count=Math.min(words.capacity(),values.length-i);
+            in.readFully(skipBuffer,0,count*Long.BYTES);
+            words.position(0).get(values,i,count);
+            i+=count;
+        }
+        return values;
     }
     private Map<String,Object> compound(DataInputStream in,int depth)throws IOException {
         if(depth>limits.maxDepth)throw new IOException("NBT nesting limit exceeded");

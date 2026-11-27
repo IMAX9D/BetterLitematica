@@ -5,7 +5,6 @@ import net.minecraft.world.level.block.*;
 import net.fabricmc.loader.api.FabricLoader;
 import java.util.*;
 
-/** Optional Diagonal Blocks v2 conversion registry; never equate unrelated blocks sharing an item. */
 final class DiagonalStateCompatibility {
     private DiagonalStateCompatibility() {}
     private static final class Registry {

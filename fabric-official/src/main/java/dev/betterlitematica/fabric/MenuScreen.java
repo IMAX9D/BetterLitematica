@@ -8,7 +8,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import java.util.*;
-/** Shared responsive frame. Scrolling only moves the body; navigation and status stay in place. */
+
 abstract class MenuScreen extends UiScreen {
     protected final Screen parent;protected final ProjectionController controller;
     protected int left,bodyTop,bodyBottom,innerWidth;private int panelTop,panelBottom;
@@ -57,7 +57,7 @@ abstract class MenuScreen extends UiScreen {
     void focusSetting(SettingId id){for(var item:body)if(settingIds.get(item.widget)==id){focusControl(item.widget);return;}throw new IllegalStateException("设置位置不存在："+id);}
     protected boolean isSettingsPage(){return false;}
     protected final <T extends AbstractWidget> T setting(SettingId id,T control){SettingHelp.require(id);settingIds.put(control,Objects.requireNonNull(id));return control;}
-    /** Explicitly distinguishes operations (such as clearing a queue) from editable settings. */
+
     protected final <T extends AbstractWidget> T settingAction(T control){settingActions.add(control);return control;}
     final void validateSettings(){
         for(var id:settingIds.values())SettingHelp.require(id);
@@ -83,7 +83,7 @@ abstract class MenuScreen extends UiScreen {
     protected String displayedStatus(){return !controller.actionError().isEmpty()?controller.actionError():discardDraft&&draftDirty()?"再次返回将放弃未保存的更改":statusLine();}
     protected int statusColor(){return controller.actionError().isEmpty()?UiTheme.MUTED:UiTheme.ERROR;}
     protected void updateMenu(){}
-    /** Optional isolated control preview: no menu panel, captions or background dimming. */
+
     protected AbstractWidget previewControl(){return null;}
     @Override public void extractBackground(GuiGraphicsExtractor graphics,int mouseX,int mouseY,float delta){if(previewControl()==null)extractBlurredBackground(graphics);ClientUi.subtitles(minecraft);}
     protected final void hint(AbstractWidget control,String value){hints.put(control,value);}
@@ -95,12 +95,12 @@ abstract class MenuScreen extends UiScreen {
     protected final Button button(String text,int column,int columns,int row,Runnable action,boolean enabled,boolean primary){
         return buttonAt(text,cellX(column,columns),row*26,cellWidth(columns),action,enabled,primary);
     }
-    /** x is a canvas coordinate; y is relative to the scrollable body. */
+
     protected final Button buttonAt(String text,int x,int y,int w,Runnable action,boolean enabled,boolean primary){
         var button=new MenuButton(x,0,w,text,()->runAction(action),primary,buttonMotion("body:"+x+":"+y+":"+w));
         button.active=enabled;addBody(button,y);return button;
     }
-    /** Square icon control; the name doubles as its hover hint. */
+
     protected final GlyphButton iconAt(dev.betterlitematica.runtime.UiGlyphArt.Kind glyph,String name,int x,int y,int size,Runnable action,boolean enabled,Look look,int tint){
         var button=new GlyphButton(x,size,glyph,name,look,tint,buttonMotion("icon:"+x+":"+y+":"+glyph),()->runAction(action));
         button.active=enabled;addBody(button,y);hint(button,name);return button;
@@ -111,7 +111,7 @@ abstract class MenuScreen extends UiScreen {
     protected final RowButton rowAt(String name,int x,int y,int w,boolean selected,boolean live,Runnable action){
         var row=new RowButton(x,w,name,selected,live,buttonMotion("row:"+x+":"+y+":"+w),()->runAction(action));addBody(row,y);return row;
     }
-    /** Underlined tab; a hairline bridges the gaps so a row of tabs reads as one strip. */
+
     protected final Button tabAt(String text,int x,int y,int w,Runnable action,boolean selected){
         var button=new MenuButton(x,0,w,text,()->runAction(action),selected?Look.TAB_SELECTED:Look.TAB,buttonMotion("tab:"+x+":"+y+":"+w));addBody(button,y);return button;
     }
@@ -126,7 +126,7 @@ abstract class MenuScreen extends UiScreen {
         caption(label,x,y,w);
         var field=new OverlayTextField(x+6,0,w-12,label);field.setMaxLength(max);field.setValue(value);addBody(field,y+14);return field;
     }
-    /** A search field keeps its accessible name without a separate caption row. */
+
     protected final EditBox searchAt(String value,int x,int y,int w,int max){
         return searchAt("名称、ID 或拼音",value,x,y,w,max);
     }
@@ -141,13 +141,13 @@ abstract class MenuScreen extends UiScreen {
         if(pages<=1)return;
         var prev=fixed("上一页",0,60,previous);prev.active=page>0;navigation.add(prev);
         var forward=fixed("下一页",68,60,next);forward.active=page+1<pages;navigation.add(forward);
-        // The position is read-only text, not a greyed-out control.
+
         navigation.add(fixedControl(new OverlayLabel(0,54,(page+1)+" / "+Math.max(1,pages)),142));
         if(!building)position();
     }
     private UiMotion buttonMotion(String key){var value=buttonMotions.get(key);if(value==null){if(buttonMotions.size()>=256)buttonMotions.remove(buttonMotions.keySet().iterator().next());value=new UiMotion();buttonMotions.put(key,value);}return value;}
     protected final Button fixed(String text,int x,int w,Runnable action){return footerButton(text,x,w,action,Look.STANDARD);}
-    /** The page's one committing action (load, save); drawn solid so it is never mistaken for Back. */
+
     protected final Button fixedAction(String text,int x,int w,Runnable action){return footerButton(text,x,w,action,Look.ACCENT);}
     private int footerControlY(int height){return footerHeight()<49?panelBottom-footerHeight()+(footerHeight()-height)/2:panelBottom-41;}
     private Button footerButton(String text,int x,int w,Runnable action,Look look){var b=new MenuButton(left+x,footerControlY(20),w,text,()->runAction(action),look,buttonMotion("footer:"+x+":"+w));footer.add(b);addRenderableWidget(b);return b;}
@@ -158,7 +158,7 @@ abstract class MenuScreen extends UiScreen {
     protected boolean scrolls(int x,int y){return true;}
     private int maxScroll(){return Math.max(0,contentHeight-Math.max(20,bodyBottom-bodyTop));}
     private void position(){scroll=Math.max(0,Math.min(scroll,maxScroll()));for(var item:body){boolean moving=scrolls(item.widget.getX(),item.y);item.widget.setY(bodyTop+item.y-(moving?scroll:0));item.widget.visible=item.widget.getY()>=(moving?scrollTop():bodyTop)&&item.widget.getY()+item.widget.getHeight()<=bodyBottom;}}
-    /** Validation must reveal the field, including fields below the current scroll position. */
+
     protected final void focusControl(AbstractWidget widget){
         for(var item:body)if(item.widget==widget&&scrolls(widget.getX(),item.y)){
             int top=bodyTop+item.y-scroll,bottom=top+widget.getHeight();
@@ -188,7 +188,7 @@ abstract class MenuScreen extends UiScreen {
         return super.mouseClicked(x,y,button);
     }
     @Override public boolean mouseReleased(double x,double y,int button){
-        // Release goes to its owner even beyond the preview or menu; no hovered-child lookup.
+
         if(previewCapture!=null){previewCapture.releaseDrag(button);if(!previewCapture.capturing()){previewCapture=null;setDragging(false);}return true;}
         var v=viewport();return super.mouseReleased(inputX(v,x),inputY(v,y),button);
     }
@@ -207,9 +207,9 @@ abstract class MenuScreen extends UiScreen {
     @Override public boolean keyPressed(int key,int scan,int modifiers){if(getFocused() instanceof OverlayList list&&list.keyPressed(key,scan,modifiers))return true;if(getFocused() instanceof VerificationList results&&results.keyPressed(key,scan,modifiers))return true;if(getFocused() instanceof MaterialGrid grid&&grid.keyPressed(key,scan,modifiers))return true;if(getFocused() instanceof BrowserGrid grid&&grid.keyPressed(key,scan,modifiers))return true;if(key==dev.betterlitematica.fabric.NativeInput.GLFW_KEY_PAGE_DOWN||key==dev.betterlitematica.fabric.NativeInput.GLFW_KEY_PAGE_UP){scroll+=(key==dev.betterlitematica.fabric.NativeInput.GLFW_KEY_PAGE_DOWN?1:-1)*Math.max(26,bodyBottom-bodyTop-26);position();return true;}return super.keyPressed(key,scan,modifiers);}
     @Override public void tick(){
         if(sessionEpoch!=controller.sessionEpoch()){ClientUi.setScreen(minecraft,null);return;}checkPreviewCapture();if(getFocused()!=null&&!children().contains(getFocused()))setFocused(null);updateMenu();
-        // Screen.mouseClicked focuses the button after its callback; validation owns the next focus.
+
         if(pendingFocus!=null){var requested=pendingFocus;pendingFocus=null;if(children().contains(requested))setFocused(requested);}
-        // Back can read "放弃" once a page holds a draft; keep its wording current without rebuilding.
+
         if(back!=null){String label=backLabel();if(!back.getMessage().getString().equals(label))back.setMessage(Component.literal(label));}
     }
     @Override public final void render(GuiGraphicsExtractor ctx,int mouseX,int mouseY,float delta){
@@ -225,7 +225,7 @@ abstract class MenuScreen extends UiScreen {
         int y=(int)Math.floor(v.localPixelY(minecraft.mouseHandler.ypos()*v.pixelHeight()/Math.max(1,window.getScreenHeight()))-animatedY);
         var ui=IndependentUi.INSTANCE;
         if(!ui.beginMenu(ctx,v)){
-            // A geometric progress indicator during the one-time background font load; no native glyph fallback.
+
             int cx=window.getGuiScaledWidth()/2,cy=window.getGuiScaledHeight()/2;ctx.fill(cx-24,cy,cx+24,cy+1,UiMotion.alpha(UiTheme.ACCENT,.5));int p=(int)((System.nanoTime()/8_000_000L)%48);ctx.fill(cx-24+Math.max(0,p-12),cy,cx-24+p,cy+1,UiTheme.ACCENT);return;
         }
         try{
@@ -244,15 +244,15 @@ abstract class MenuScreen extends UiScreen {
         double l=left-14,r=left+innerWidth+14,radius=UiTheme.PANEL_RADIUS,footerTop=panelBottom-footerHeight();
 
         ui.roundRect(l,panelTop,r,panelBottom,radius,UiTheme.PANEL);
-        // Footer band: same silhouette, square top edge, one tone deeper.
+
         ui.roundRect(l,footerTop,r,panelBottom,radius,UiTheme.FOOTER);ui.rect(l,footerTop,r,footerTop+radius,UiTheme.FOOTER);
         ui.rect(l,footerTop,r,footerTop+ui.pixel(),UiTheme.DIVIDER);
         ui.roundFrame(l,panelTop,r,panelBottom,radius,UiTheme.BORDER);
         ui.sheen(l,panelTop+ui.pixel(),r,radius);
-        // Header: brand mark, breadcrumb and title on one optical baseline.
+
         double headerMid=panelTop+(bodyTop-8-panelTop)/2d,titleY=headerMid-ui.titleLineHeight()/2-.5;
         ui.glyph(dev.betterlitematica.runtime.UiGlyphArt.Kind.BRAND,left,headerMid-7,14,UiTheme.ACCENT);
-        // Reserve the author label in the panel header; HUD/preview overlays never enter this path.
+
         double authorWidth=ui.measureSmall(AUTHOR),authorX=left+innerWidth-authorWidth;
         double tx=left+21;String crumb=crumb();
         if(!crumb.isEmpty()){
@@ -275,7 +275,7 @@ abstract class MenuScreen extends UiScreen {
         for(var widget:footer)widget.extractRenderState(ctx,mouseX,mouseY,delta);
         String status=displayedStatus();
         if(!status.isEmpty()){int color=statusColor();boolean compact=footerHeight()<49;double sx=left+(compact?88:0),sy=compact?footerTop+(footerHeight()-ui.lineHeight())/2-.5:panelBottom-15;ui.roundRect(sx,sy+ui.lineHeight()/2-1.5,sx+3,sy+ui.lineHeight()/2+1.5,1.5,color==UiTheme.MUTED?UiTheme.ACCENT:color);ui.text(status,sx+8,sy,innerWidth-(compact?184:8),color);}
-        // Tooltips wait for a short rest on one control so sweeping the pointer across icons stays quiet.
+
         AbstractWidget resting=null;String dynamicHint="";
         for(var entry:hints.entrySet())if(entry.getKey().visible&&entry.getKey().isMouseOver(mouseX,mouseY)){resting=entry.getKey();break;}
         if(resting==null)for(var item:body)if(item.widget.visible&&item.widget instanceof MenuButton&&item.widget.isMouseOver(mouseX,mouseY)){resting=item.widget;break;}
@@ -332,7 +332,7 @@ abstract class MenuScreen extends UiScreen {
             boolean mixed=split>0&&text.substring(split+1).equals("部分");
             Boolean state=split<=0||width<80?null:switch(text.substring(split+1)){case "开","开启","是","部分"->Boolean.TRUE;case "关","关闭","否"->Boolean.FALSE;default->null;};
             if(state!=null&&look!=Look.GHOST){
-                // Binary settings read as a labelled switch rather than a button that names its own state.
+
                 paint(ui,getX(),getY(),width,height,Look.STANDARD,active,isFocused(),hover,press);
                 double sw=24,sh=12,sx=getX()+width-10-sw,sy=y+(height-sh)/2,on=mixed?.5:switchMotion.hover(state);
                 ui.roundRect(sx,sy,sx+sw,sy+sh,sh/2,!active?UiTheme.DIVIDER:UiMotion.mix(UiTheme.TRACK,mixed?UiTheme.WARNING:UiTheme.ACCENT,mixed?1:on));
@@ -343,7 +343,7 @@ abstract class MenuScreen extends UiScreen {
             }
             paint(ui,getX(),getY(),width,height,look,active,isFocused(),hover,press);
             if(split>0&&split<text.length()-1&&width>=110&&look==Look.STANDARD){
-                // Cycling choice: name on the left, current value and a chevron on the right.
+
                 String name=text.substring(0,split),value=text.substring(split+1);double ty=y+(height-ui.lineHeight())/2-.5;
                 double vw=Math.min(width*.55,ui.measure(value)+1),vx=getX()+width-22-vw;
                 ui.glyph(dev.betterlitematica.runtime.UiGlyphArt.Kind.NEXT,getX()+width-18,y+(height-10)/2,10,!active?UiTheme.DISABLED_TEXT:UiMotion.mix(UiTheme.MUTED,UiTheme.ACCENT,hover));
@@ -363,7 +363,7 @@ abstract class MenuScreen extends UiScreen {
             if(isFocused())ui.ring(x,y,x+width,y+height,UiTheme.BUTTON_RADIUS,1);
             ui.centered(label,x,y,width,height,!active?UiTheme.DISABLED_TEXT:on?UiTheme.TEXT:UiMotion.mix(UiTheme.MUTED,UiTheme.TEXT,hover));
         }
-        /** Shared control surface so every bespoke widget presses, hovers and focuses identically. */
+
         static void paint(IndependentUi ui,double x,double y,double width,double height,Look look,boolean active,boolean focused,double hover,double press){
             double inset=press*.6,top=y+press*.5,l=x+inset,r=x+width-inset,b=top+height,radius=UiTheme.BUTTON_RADIUS;
             if(!active){ui.roundRect(l,top,r,b,radius,UiTheme.DISABLED);ui.roundFrame(l,top,r,b,radius,UiTheme.DIVIDER);return;}

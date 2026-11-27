@@ -11,7 +11,7 @@ import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-/** Exact matrix/graph identity and section coordinates, with a four-block conservative margin. */
+
 @Mixin(SectionOcclusionGraph.class)
 public abstract class TerrainFrustumCacheMixin {
     @Shadow @Final private AtomicReference<?> currentGraph;

@@ -1,7 +1,7 @@
 package dev.betterlitematica.fabric;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
-/** Small boundary for the client GUI/camera ownership change in 26.2. */
+
 public final class ClientUi {
  private ClientUi(){}
  public static void message(Minecraft client,net.minecraft.network.chat.Component text,boolean overlay){if(overlay)client.gui.hud.setOverlayMessage(text,false);else client.player.sendSystemMessage(text);}

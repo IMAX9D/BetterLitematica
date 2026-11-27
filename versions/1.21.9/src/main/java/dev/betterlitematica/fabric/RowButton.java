@@ -4,7 +4,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 
-/** List row: left-aligned name, a state dot and an accent rail when selected. */
 final class RowButton extends ButtonWidget {
     private final boolean selected,live;private final UiMotion motion;private long hoverStart;private boolean incompatible;
     void incompatible(boolean value){incompatible=value;}

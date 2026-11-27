@@ -4,7 +4,6 @@ import dev.betterlitematica.core.Vec3i;
 import java.util.*;
 import java.util.function.Predicate;
 
-/** Fair, bounded dispatch of independent transactions; order within each transaction is preserved. */
 public final class CommandDispatchQueue {
     private static final long MAX_TRANSACTION_BYTES=3L<<20,MAX_BYTES=32L<<20;
     private static final int MAX_TRANSACTIONS=128;

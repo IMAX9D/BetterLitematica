@@ -1,6 +1,5 @@
 package dev.betterlitematica.fabric;
 
-
 import dev.betterlitematica.fabric.TerrainChunkHandle;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.util.math.Box;
@@ -9,7 +8,6 @@ import java.util.Arrays;
 import java.util.ConcurrentModificationException;
 import java.util.LinkedHashSet;
 
-/** A conservative superset: expanding boxes by M covers any camera translation of at most M on each axis. */
 public final class TerrainFrustumCache {
     public static final double MARGIN=4.0,ROUNDING_MARGIN=.125;
     private Object graph;private int count,sectionX,sectionY,sectionZ;
@@ -34,8 +32,7 @@ public final class TerrainFrustumCache {
         var f=(TerrainView)view;
         if(!matrix.equals(f.betterlitematica$matrix())||Math.abs(f.betterlitematica$x()-x)>MARGIN
                 ||Math.abs(f.betterlitematica$y()-y)>MARGIN||Math.abs(f.betterlitematica$z()-z)>MARGIN)return false;
-        // Size and identity of the set are insufficient: a section can move, or members can be
-        // replaced/reordered without changing either. Compare exact identities, never a hash.
+
         int i=0;
         try{
             for(Object info:current){
@@ -48,7 +45,7 @@ public final class TerrainFrustumCache {
     public boolean reuse(Frustum view,LinkedHashSet<?> current,int sx,int sy,int sz){
         return committed&&matches(view,current,sx,sy,sz);
     }
-    /** Snapshot BEFORE vanilla traverses the set; only commit after a successful unchanged traversal. */
+
     public boolean capture(Frustum view,LinkedHashSet<?> current,int sx,int sy,int sz){
         clear();
         if(current==null||current.size()>1_048_576||!supported(view))return false;
@@ -68,8 +65,7 @@ public final class TerrainFrustumCache {
         return true;
     }
     public void commit(Frustum view,LinkedHashSet<?> current,int sx,int sy,int sz){
-        // The margin applies only AFTER a completed traversal. Moving the view during capture
-        // would shift the expansion's center and could invalidate the conservative-superset proof.
+
         if(supported(view)&&view instanceof TerrainView f
                 &&f.betterlitematica$x()==x&&f.betterlitematica$y()==y&&f.betterlitematica$z()==z
                 &&matches(view,current,sx,sy,sz))committed=true;else clear();

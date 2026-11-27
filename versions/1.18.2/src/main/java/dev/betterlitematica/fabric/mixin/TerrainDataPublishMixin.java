@@ -28,7 +28,7 @@ public abstract class TerrainDataPublishMixin {
     @WrapOperation(method="method_23619",at=@At(value="INVOKE",target="Ljava/util/concurrent/atomic/AtomicReference;set(Ljava/lang/Object;)V"))
     private void betterlitematica$publishCategory(AtomicReference<?> reference,Object value,Operation<Void> original){
         if(betterlitematica$stamp.current()){
-            TerrainDataUpdates.publish(reference,value,original);
+            TerrainDataUpdates.publish(field_20839,reference,value,original);
             ((TerrainSectionOwner)field_20839).betterlitematica$published(betterlitematica$stamp.generation());
         }
     }

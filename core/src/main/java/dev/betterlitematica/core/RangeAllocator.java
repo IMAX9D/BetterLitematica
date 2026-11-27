@@ -2,17 +2,16 @@ package dev.betterlitematica.core;
 
 import java.util.Arrays;
 
-/** First-fit ranges inside one fixed span; freed neighbours coalesce. Single owner, no native resources. */
 public final class RangeAllocator {
     private final int capacity;
-    // Free ranges sorted by start and never adjacent: adjacent ranges are always merged.
+
     private int[] starts=new int[8],lengths=new int[8];
     private int count,free;
     public RangeAllocator(int capacity){
         if(capacity<1)throw new IllegalArgumentException("Positive capacity required");
         this.capacity=capacity;starts[0]=0;lengths[0]=capacity;count=1;free=capacity;
     }
-    /** Start of a new range of {@code size} units, or -1 when no free range is large enough. */
+
     public int allocate(int size){
         if(size<1)throw new IllegalArgumentException("Positive size required");
         for(int i=0;i<count;i++)if(lengths[i]>=size){
@@ -42,6 +41,6 @@ public final class RangeAllocator {
     public int used(){return capacity-free;}
     public boolean empty(){return free==capacity;}
     public int largestFree(){int best=0;for(int i=0;i<count;i++)best=Math.max(best,lengths[i]);return best;}
-    /** Number of separate free ranges; one means no fragmentation. */
+
     public int fragments(){return count;}
 }

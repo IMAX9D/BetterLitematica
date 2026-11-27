@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Immutable per-world/per-dimension settings. Persistence enforces a byte budget. Render layers apply to every placement. */
 public record PlacementSession(List<Placement> placements, UUID selected, LayerRange layer,
                                float opacity, boolean rendering) {
     public static final PlacementSession EMPTY = new PlacementSession(List.of(), null, LayerRange.ALL, 0.45f, true);

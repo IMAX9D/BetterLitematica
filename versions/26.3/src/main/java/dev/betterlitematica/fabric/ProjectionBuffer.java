@@ -1,7 +1,7 @@
 package dev.betterlitematica.fabric;
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
-/** Reusable CPU allocation; a completed mesh owns its slice until uploaded. */
+
 final class ProjectionBuffer implements VertexConsumer,AutoCloseable {
  private final ByteBufferBuilder storage;private BufferBuilder current;
  ProjectionBuffer(int bytes){storage=new ByteBufferBuilder(bytes);}

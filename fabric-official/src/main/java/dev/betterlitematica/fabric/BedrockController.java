@@ -7,7 +7,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CommandBlock;
 import net.minecraft.world.level.block.state.BlockState;
-/** Manual and region work share the same exclusive transaction used by the printer. */
+
 final class BedrockController {
     private static final int MAX_QUEUE=4096;
     private final Minecraft client;

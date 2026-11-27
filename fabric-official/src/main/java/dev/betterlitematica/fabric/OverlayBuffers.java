@@ -1,7 +1,7 @@
 package dev.betterlitematica.fabric;
 import com.mojang.blaze3d.vertex.*;
 import java.util.*;
-/** Captures transient overlays during extraction, with a strict per-frame vertex budget. */
+
 final class OverlayBuffers {
  private static final OverlayBuffers INSTANCE=new OverlayBuffers();
  private final Map<OverlayLayers.Layer,ProjectionBuffer> batches=new LinkedHashMap<>();private ProjectionFrame frame;private int vertices;

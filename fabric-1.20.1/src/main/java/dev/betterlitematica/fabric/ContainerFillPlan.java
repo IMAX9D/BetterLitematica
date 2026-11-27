@@ -7,7 +7,6 @@ import net.minecraft.screen.slot.*;
 import java.util.*;
 import java.util.function.Predicate;
 
-/** Read-only inventory planning. Each accepted transaction starts and finishes with an empty cursor. */
 final class ContainerFillPlan {
     record Click(int slot,int button,SlotActionType action){}
     record Plan(List<Click> clicks,List<ItemStack> after,ItemStack missing,boolean complete,String blocked){}
@@ -47,7 +46,7 @@ final class ContainerFillPlan {
                 }
                 Transaction chosen=null;int room=maxClicks-clicks.size();
                 for(int button=0;button<2;button++){
-                    // Right-clicking a bundle changes its contents rather than splitting the stack.
+
                     if(button==1&&stack.isOf(Items.BUNDLE))continue;
                     int taken=button==0?stack.getCount():(stack.getCount()+1)/2;
                     if(button==1&&!handler.slots.get(sourceSlot).canTakePartial(player))continue;
@@ -62,7 +61,7 @@ final class ContainerFillPlan {
                 if(chosen==null)continue;
                 clicks.addAll(chosen.clicks());for(var portion:chosen.portions()){var next=stack.copy();next.setCount(after.get(portion.slot()).getCount()+portion.count());after.set(portion.slot(),next);}
                 int remaining=stack.getCount()-chosen.moved();var rest=stack.copy();rest.setCount(remaining);after.set(sourceSlot,remaining==0?ItemStack.EMPTY:rest);
-                // Budget-limited distribution may leave this source useful for the same destination.
+
                 if(!satisfied(after.get(destination),wanted)&&remaining>0)source--;
             }
         }
@@ -93,13 +92,13 @@ final class ContainerFillPlan {
     }
     private static Transaction transaction(Slot source,int sourceSlot,ItemStack identity,int taken,int button,List<Portion> portions,int moved,boolean returnFirst,int budget){
         int rest=taken-moved;if(rest>0&&!source.canInsert(identity))return null;
-        // The original source slot always has enough room to receive its own remainder.
+
         if(rest>0&&capacity(source,identity)<identity.getCount()-moved)return null;
         var result=new ArrayList<Click>();result.add(new Click(sourceSlot,button,SlotActionType.PICKUP));int cursor=taken;
         if(returnFirst){for(int i=0;i<rest;i++){if(result.size()>=budget)return null;result.add(new Click(sourceSlot,1,SlotActionType.PICKUP));}cursor-=rest;}
         for(var portion:portions){
             boolean left=portion.count()==Math.min(cursor,portion.capacity());int count=left?1:portion.count();
-            // After the first right-click an empty slot is occupied; vanilla then also requires canTakeItems.
+
             if(!left&&count>1&&!portion.canTake())return null;
             if(result.size()+count>budget)return null;for(int i=0;i<count;i++)result.add(new Click(portion.slot(),left?0:1,SlotActionType.PICKUP));cursor-=portion.count();
         }

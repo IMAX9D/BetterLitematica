@@ -2,7 +2,6 @@ package dev.betterlitematica.fabric;
 
 import net.minecraft.nbt.*;
 
-/** Typed schematic reads reject a list with an incompatible element type. */
 final class NbtAccess {
     static final int NUMERIC=99;
     private NbtAccess(){}

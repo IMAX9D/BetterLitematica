@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.*;
 
-/** Exact run merging: a box never encloses a missing cell or a different group. */
 public final class HighlightCuboids {
     private HighlightCuboids() {}
     public record Cell(Vec3i position,int group) {}

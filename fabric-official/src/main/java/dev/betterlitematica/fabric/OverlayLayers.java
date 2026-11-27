@@ -1,5 +1,5 @@
 package dev.betterlitematica.fabric;
-/** Render policy is copied into each overlay batch. */
+
 final class OverlayLayers {
  record Layer(boolean face,boolean through,boolean near){Layer(boolean face,boolean through){this(face,through,false);}}
  private static final Layer[] LINES={new Layer(false,false),new Layer(false,true)},FACES={new Layer(true,false),new Layer(true,true)};

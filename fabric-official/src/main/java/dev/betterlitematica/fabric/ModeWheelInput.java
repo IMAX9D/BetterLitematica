@@ -5,8 +5,6 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 
-
-/** Physical held-key screen ownership; no queued open may survive a screen, focus or world transition. */
 final class ModeWheelInput {
     private final Minecraft client;
     private final ProjectionController controller;
@@ -77,7 +75,7 @@ final class ModeWheelInput {
         if(scan>=0)KeyMapping.set(InputConstants.Type.SCANCODE.getOrCreate(scan),false);
         if(client.options.keyPlayerList.matches(new net.minecraft.client.input.KeyEvent(boundKey,scan,0)))clear(client.options.keyPlayerList);
     }
-    /** Package-visible production state machine for deterministic lifecycle regressions. */
+
     static final class Lifecycle {
         record Decision(boolean consume,boolean open,Object close){}
         private Object world,connection,owned;

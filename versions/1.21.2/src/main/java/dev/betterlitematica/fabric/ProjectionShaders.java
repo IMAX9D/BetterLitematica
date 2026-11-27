@@ -5,7 +5,7 @@ import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.util.Identifier;
 import java.util.List;
-/** ShaderLoader owns compilation, resource reload and disposal in this game generation. */
+
 final class ProjectionShaders {
     static final ShaderProgramKey SURFACE=key("projection_surface",VertexFormats.POSITION_TEXTURE_COLOR);
     static final ShaderProgramKey COMPOSITE=key("projection_composite",VertexFormats.POSITION_TEXTURE_COLOR);
@@ -19,13 +19,13 @@ final class ProjectionShaders {
     }
     static ShaderProgram surface(){return program(SURFACE);}
     static ShaderProgram composite(){return program(COMPOSITE);}
- // Programs are shared between layers, so every supplier states its own near fade at draw time.
+
  static final float NEAR_CLEAR=1f,NEAR_FULL=3f,NEAR_MIN=.18f;
  static ShaderProgram overlayLines(){return near(EntityOverlayMask.bind(program(LINES)),false);}
     static ShaderProgram overlayFaces(){return near(EntityOverlayMask.bind(program(FACES)),false);}
  static ShaderProgram nearLines(){return near(EntityOverlayMask.bind(program(LINES)),true);}
  static ShaderProgram nearFaces(){return near(EntityOverlayMask.bind(program(FACES)),true);}
- /** Depth-tested highlights rely on depth for occlusion; the entity mask would hide lines drawn in front of mobs. */
+
  static ShaderProgram nearLinesDepthTested(){return near(unmasked(program(LINES)),true);}
  static ShaderProgram nearFacesDepthTested(){return near(unmasked(program(FACES)),true);}
  private static ShaderProgram unmasked(ShaderProgram shader){shader.getUniformOrDefault("EntityMaskEnabled").set(0);return shader;}

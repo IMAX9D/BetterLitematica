@@ -2,7 +2,7 @@ package dev.betterlitematica.fabric;
 import net.minecraft.client.render.*;
 final class OverlayLayers extends RenderPhase {
     private OverlayLayers(){super("betterlitematica_overlays",()->{},()->{});}
-    // Vanilla ALWAYS_DEPTH_TEST is a no-op: it inherits the previous pass's depth state.
+
     private static final RenderPhase.DepthTest ON_TOP=new RenderPhase.DepthTest("betterlitematica_on_top",519){
         private boolean previous;
         @Override public void startDrawing(){previous=org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();}
@@ -14,8 +14,7 @@ final class OverlayLayers extends RenderPhase {
     private static final RenderPhase.ShaderProgram MASKED_LINES=program(ProjectionShaders.LINES,true,false),MASKED_FACES=program(ProjectionShaders.FACES,true,false);
     private static final RenderLayer[] LINES={make(false,false),make(false,true)},FACES={make(true,false),make(true,true)};
     static RenderLayer lines(boolean through){return LINES[through?1:0];}static RenderLayer faces(boolean through){return FACES[through?1:0];}
-    // Construction highlights fade out at the eye so wireframes around the player never wall off the view.
-    // Gizmos and bounds keep the plain layers above and stay solid when held close.
+
     private static final RenderPhase.ShaderProgram NEAR_LINES=program(ProjectionShaders.LINES,true,true),NEAR_LINES_DEPTH=program(ProjectionShaders.LINES,false,true),NEAR_FACES=program(ProjectionShaders.FACES,true,true),NEAR_FACES_DEPTH=program(ProjectionShaders.FACES,false,true);
     private static final RenderLayer[] NEAR_LINE_LAYERS={make("near_",false,false,NEAR_LINES_DEPTH),make("near_",false,true,NEAR_LINES)},NEAR_FACE_LAYERS={make("near_",true,false,NEAR_FACES_DEPTH),make("near_",true,true,NEAR_FACES)};
     static RenderLayer nearLines(boolean through){return NEAR_LINE_LAYERS[through?1:0];}static RenderLayer nearFaces(boolean through){return NEAR_FACE_LAYERS[through?1:0];}

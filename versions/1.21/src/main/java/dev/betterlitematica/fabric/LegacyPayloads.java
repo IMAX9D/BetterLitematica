@@ -12,7 +12,6 @@ import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
-/** Bridge established wire protocols through the registered codec without replacing another mod's payload type. */
 final class LegacyPayloads {
     private static final int LIMIT=1_048_576;
     private static final Identifier CARPET=Identifier.of("carpet","hello");
@@ -22,7 +21,7 @@ final class LegacyPayloads {
         @Override public CustomPayload.Id<Raw> getId(){return type;}
     }
     static void initialize(){
-        // Carpet registers its own type when installed. Never claim its channel ahead of that initialization.
+
         if(!FabricLoader.getInstance().isModLoaded("carpet")&&PayloadTypeRegistryImpl.PLAY_S2C.get(CARPET)==null){
             var id=new CustomPayload.Id<Raw>(CARPET);
             ensure(PayloadTypeRegistryImpl.PLAY_S2C,CARPET);

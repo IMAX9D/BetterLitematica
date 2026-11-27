@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import dev.betterlitematica.core.Vec3i;
 import net.minecraft.util.math.Vec3d;
 
-/** Exact eye-to-unit-box frontier. Planning rows and sampled cells have separate caller budgets. */
 final class NearbyScan {
     private final double radius;
     private Vec3d eye;

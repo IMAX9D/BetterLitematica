@@ -20,9 +20,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Six-face outward traversal adapted to 26.3's extracted loading state and octree publication.
- * The engine retains its background scheduler, shared GPU buffers, transparency and both backends.
- * No live client-world query or graphics call occurs in this graph worker. */
 @Mixin(SectionOcclusionGraph.class)
 public abstract class TerrainVisibilityGraphMixin {
     @Unique private static final Direction[] betterlitematica$directions=Direction.values();
@@ -58,7 +55,7 @@ public abstract class TerrainVisibilityGraphMixin {
                 long portals=betterlitematica$connections(section.getSectionMesh());
                 if(portals!=betterlitematica$open){
                     exits=0;int incoming=node.sourceDirections&63;
-                    // The engine records the direction of travel; its opposite is the entry face.
+
                     if(incoming==0)incoming=63;
                     while(incoming!=0){int d=Integer.numberOfTrailingZeros(incoming);incoming&=incoming-1;
                         exits|=(int)(portals>>>((d^1)*6))&63;
@@ -78,8 +75,7 @@ public abstract class TerrainVisibilityGraphMixin {
                     storage.sectionToNodeMap.put(neighbor,next);queue.add(next);
                 }else if((existing.sourceDirections&(1<<d))==0){
                     existing.addSourceDirection(side);
-                    // Partial updates can open a new route through an already visited section.
-                    // Revisit only for new entry bits; six bits bound this work without ray stepping.
+
                     queue.add(existing);
                 }
             }

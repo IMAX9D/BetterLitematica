@@ -103,7 +103,7 @@ final class PlacementConfigScreen extends MenuScreen {
             if(key==org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE){endPreview();return true;}
             return true;
         }
-        // Enter commits the field being edited, the same as its button.
+
         if((key==org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER||key==org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER)&&getFocused()!=null){
             var focus=getFocused();
             if(focus==name){controller.action(()->act(()->controller.rename(name.getText())));return true;}
@@ -111,7 +111,7 @@ final class PlacementConfigScreen extends MenuScreen {
         }
         return super.keyPressed(key,scan,modifiers);
     }
-    /** Typed name and coordinates are kept when leaving, like the opacity slider; unparsable drafts are left untouched. */
+
     private void commitDrafts(){
         Placement p=placement();if(p==null||epochChanged())return;
         if(name!=null){String value=name.getText().strip();if(!value.isEmpty()&&!value.equals(p.name()))controller.action(()->act(()->controller.rename(value)));}
@@ -147,6 +147,6 @@ final class PlacementConfigScreen extends MenuScreen {
         long now=System.nanoTime();
         if(now-lastOpacityUpdate>=200_000_000L){lastOpacityUpdate=now;applyOpacity();}
     }
-    // Preserve the last drag value when closing before the next 200 ms update.
+
     @Override public void removed(){cancelPreview();schematicPreview=null;endPreview();applyOpacity();commitDrafts();super.removed();}
 }

@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import dev.betterlitematica.core.*;
 import java.util.function.Function;
 
-/** Incremental six-face grow/trim. The caller owns world identity and publishes only result(). */
 final class ToolSelectionResize {
     static final int MAX_ROUNDS=256;
     private static final int[] SCAN_AXES={0,2,1};
@@ -41,7 +40,7 @@ final class ToolSelectionResize {
         faceMin[axis]=faceMax[axis]=(face&1)==0?min[axis]:max[axis];System.arraycopy(faceMin,0,at,0,3);faceStarted=true;
     }
     private boolean advanceFace(){
-        // X first, then Z, then Y. Fixed face axis has a one-cell extent.
+
         for(int axis:SCAN_AXES){if(at[axis]<faceMax[axis]){at[axis]++;return true;}at[axis]=faceMin[axis];}return false;
     }
     private void finishFace(boolean isEmpty){

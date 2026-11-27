@@ -1,12 +1,12 @@
 package dev.betterlitematica.core;
 import java.util.Objects;
-/** Continuous bit stream, including values that straddle 64-bit words. */
+
 public final class PackedBits {
     private final int bits, size;
     private final long[] words;
     private final long mask;
     public PackedBits(int bits, int size, long[] words) { this(bits,size,words,true); }
-    /** Transfers an exclusively owned buffer. Caller must never mutate or publish the array afterwards. */
+
     public static PackedBits takeOwnership(int bits,int size,long[] words) { return new PackedBits(bits,size,words,false); }
     private PackedBits(int bits,int size,long[] words,boolean copy) {
         if(bits<1||bits>31||size<0) throw new IllegalArgumentException("Invalid packed size/bits");
@@ -41,6 +41,18 @@ public final class PackedBits {
         long value=words[w]>>>s;
         if(s+bits>64) value|=words[w+1]<<(64-s);
         return (int)(value&mask);
+    }
+
+    public int nextNonZero(int from,int end) {
+        Objects.checkFromToIndex(from,end,size);
+        if(from==end)return end;
+        long startBit=(long)from*bits, endBit=(long)end*bits;
+        int word=(int)(startBit>>>6), last=(int)((endBit-1)>>>6);
+        long value=words[word]&(-1L<<(int)(startBit&63));
+        while(value==0 && word<last)value=words[++word];
+        if(value==0)return end;
+        long bit=((long)word<<6)+Long.numberOfTrailingZeros(value);
+        return bit<endBit?(int)(bit/bits):end;
     }
     public int bits(){return bits;} public int size(){return size;}
     public long[] copyWords(){return words.clone();}

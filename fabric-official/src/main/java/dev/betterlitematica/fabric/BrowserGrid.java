@@ -5,7 +5,7 @@ import java.util.function.Consumer;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
-/** A clipped, virtual single-column directory viewport. */
+
 final class BrowserGrid extends UiButton {
     private static final int COLUMNS=1,ROW=30,GAP=5;
     private final Consumer<SessionIo.FileEntry> choose,open;
@@ -20,7 +20,7 @@ final class BrowserGrid extends UiButton {
     void entries(List<SessionIo.FileEntry> next,String empty){boolean unchanged=entries.equals(next);entries=List.copyOf(next);this.empty=empty;if(!unchanged){scroll=0;hovered=-1;dragging=false;}}
     void selected(String path){selected=path==null?"":path;}
     String selectedPath(){return selected;}
-    /** Hover only advertises a preview target; selection and loading remain explicit. */
+
     SessionIo.FileEntry previewHovered(){return visible&&active&&!dragging&&hovered>=0&&hovered<entries.size()&&System.nanoTime()-hoverStart>=350_000_000L&&!entries.get(hovered).directory()?entries.get(hovered):null;}
     double scrollOffset(){return scroll;}
     private int cardWidth(){return (width-10-(COLUMNS-1)*GAP)/COLUMNS;}
@@ -55,7 +55,7 @@ final class BrowserGrid extends UiButton {
         if(top<scroll)scroll=top;else if(top+ROW>scroll+height)scroll=top+ROW-height;
         clamp();selected=entries.get(next).path();choose.accept(entries.get(next));return true;
     }
-    // Pause at both ends, move at a constant speed, then repeat without jumping.
+
     static double marqueeOffset(double overflow,double seconds){
         if(overflow<=0)return 0;double travel=overflow/28.0,phase=Math.max(0,seconds)%(2*travel+1.6);
         if(phase<0.8)return 0;if(phase<0.8+travel)return (phase-0.8)*28;
@@ -78,7 +78,7 @@ final class BrowserGrid extends UiButton {
                 int fill=chosen?UiMotion.mix(UiTheme.SELECTED,UiTheme.PRESSED,over*.6):UiMotion.alpha(UiTheme.HOVER,over);
                 if((fill>>>24)!=0)ui.roundRect(x,y,x+w,y+ROW-GAP,UiTheme.BUTTON_RADIUS,fill);
                 if(chosen)ui.roundRect(x+1,y+6,x+3,y+ROW-GAP-6,1,UiTheme.ACCENT);
-                // Folder and document glyphs replace repeated type labels.
+
                 ui.glyph(file.directory()?dev.betterlitematica.runtime.UiGlyphArt.Kind.FOLDER:dev.betterlitematica.runtime.UiGlyphArt.Kind.FILE,x+8,y+(ROW-GAP-13)/2.0,13,file.directory()||chosen?UiTheme.ACCENT:UiTheme.MUTED);
                 double tx=x+28,ty=y+(ROW-GAP-ui.lineHeight())/2.0-.5,space=w-34;
                 if(index==hover&&ui.measure(file.name())>space){

@@ -9,7 +9,6 @@ import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.util.math.BlockPos;
 import java.util.*;
 
-/** Detached source inventories. Empty source slots do not authorize deleting world items. */
 record ContainerPrintTarget(BlockPos position,List<BlockPos> positions,List<BlockState> states,
                             List<ItemStack> items,boolean stored,int bytes) {
     static boolean supported(BlockState state){

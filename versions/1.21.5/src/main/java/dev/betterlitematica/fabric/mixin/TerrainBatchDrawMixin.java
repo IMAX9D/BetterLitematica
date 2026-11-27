@@ -11,7 +11,6 @@ import java.util.Collection;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-/** Restrict batching to commands tagged by the terrain adapter. All other passes stay vanilla. */
 @Mixin(GlResourceManager.class)
 public abstract class TerrainBatchDrawMixin {
     @WrapMethod(method="drawObjectsWithRenderPass")

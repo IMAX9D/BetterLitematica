@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.*;
 
-/** Counts dispatched interactions, including unfinished multi-step actions; polling costs no quota. */
 public final class PrinterPacing {
     private final LinkedHashMap<Long,Long> positions=new LinkedHashMap<>();
     private long tick,nextBatch,nextBreak,lastTick=Long.MIN_VALUE,lastExpire=Long.MIN_VALUE;
@@ -24,7 +23,7 @@ public final class PrinterPacing {
     public void defer(long position,int delay){
         if(delay<0)throw new IllegalArgumentException("Negative cooldown");
         if(delay==0){positions.remove(position);return;}
-        // More than the maximum retained work queue, so an eligible queued retry keeps its deadline.
+
         if(!positions.containsKey(position)&&positions.size()>=8192){if(lastExpire!=tick)expire();if(positions.size()>=8192)return;}
         positions.put(position,tick+delay);
     }

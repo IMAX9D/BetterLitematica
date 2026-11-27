@@ -11,14 +11,14 @@ final class OverlayPreview extends UiWidget implements AutoCloseable {
     private Identifier texture;private int side;private UiTexture nativeTexture;
     OverlayPreview(int x,int size){super(x,0,size,size,Component.empty());active=false;}
     void pixels(int[] pixels){if(pixels.length==0){close();return;}pixels(pixels,(int)Math.sqrt(pixels.length));}
-    /** Reserve the final viewport capacity once; coarse and fine frames reuse that texture. */
+
     void pixels(int[] pixels,int capacity){
         int size=(int)Math.sqrt(pixels.length);
         if(size<1||size*size!=pixels.length||capacity<size||capacity>1024)throw new IllegalArgumentException("无效预览图");
         if(nativeTexture!=null&&side>=capacity){
             var image=nativeTexture.getPixels();if(image==null)return;
             for(int y=0;y<size;y++)for(int x=0;x<size;x++)image.setPixelABGR(x,y,nativeColor(pixels[y*size+x]));
-            // Linear sampling at a coarse viewport edge must not pick up an older larger frame.
+
             int upload=Math.min(side,size+1);
             if(size<side)for(int n=0;n<upload;n++){image.setPixelABGR(size,n,0);image.setPixelABGR(n,size,0);}
             nativeTexture.uploadRegion(0,0,upload,upload);return;
@@ -28,7 +28,7 @@ final class OverlayPreview extends UiWidget implements AutoCloseable {
             for(int y=0;y<capacity;y++)for(int x=0;x<capacity;x++)image.setPixelABGR(x,y,x<size&&y<size?nativeColor(pixels[y*size+x]):0);
             next=new UiTexture(image);next.setFilter(true,false);id=UiTexture.register("betterlitematica-preview",next);
         }catch(RuntimeException|Error failure){if(next!=null)next.close();else image.close();throw failure;}
-        // A failed allocation/upload leaves the previous successful frame available.
+
         close();side=capacity;nativeTexture=next;texture=id;
     }
     boolean ready(){return texture!=null;}

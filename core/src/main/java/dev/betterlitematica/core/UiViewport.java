@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** Physical-pixel safe area, independent of a host application's logical GUI scale. */
 public record UiViewport(int pixelWidth,int pixelHeight,int inputWidth,int inputHeight,double guiScale,
                          double scale,double offsetX,double offsetY) {
     public static final int WIDTH=600,HEIGHT=400;
@@ -21,7 +20,7 @@ public record UiViewport(int pixelWidth,int pixelHeight,int inputWidth,int input
     public double drawX(){return offsetX/guiScale;}
     public double drawY(){return offsetY/guiScale;}
     public record Clip(int x,int y,int width,int height){}
-    /** OpenGL bottom-left origin; rounded outwards, clamped to the framebuffer. */
+
     public Clip clip(double left,double top,double right,double bottom){
         int x1=Math.max(0,Math.min(pixelWidth,(int)Math.floor(pixelX(left))));
         int y1=Math.max(0,Math.min(pixelHeight,(int)Math.floor(pixelY(top))));

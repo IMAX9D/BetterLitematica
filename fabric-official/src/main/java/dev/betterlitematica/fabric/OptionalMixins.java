@@ -15,7 +15,7 @@ public final class OptionalMixins implements IMixinConfigPlugin {
     public boolean shouldApplyMixin(String target,String mixin){
         var loader=FabricLoader.getInstance();
         if(mixin.substring(mixin.lastIndexOf('.')+1).startsWith("Terrain"))return terrainOptimizations;
-        // Optional targets can arrive in JVM internal or binary class-name form.
+
         target=target.replace('/','.');
         if(mixin.endsWith(".ExternalMinerMixin"))return loader.isModLoaded(target.startsWith("me.z7087.")?"blockminer":"bedrockminer");
         if(mixin.contains(".compat.")){

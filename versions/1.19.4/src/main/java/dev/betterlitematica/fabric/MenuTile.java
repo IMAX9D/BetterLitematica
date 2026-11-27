@@ -5,7 +5,6 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 
-/** Launcher tile: an icon well and a single label. Emphasised tiles carry the accent, never a second colour. */
 final class MenuTile extends ButtonWidget {
     private final UiGlyphArt.Kind glyph;private final boolean emphasis;private final UiMotion motion;
     MenuTile(int x,int width,int height,UiGlyphArt.Kind glyph,String label,boolean emphasis,UiMotion motion,Runnable action){

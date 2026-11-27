@@ -10,7 +10,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;
 
-/** Passively observes normal printing. Confirmation gates exist only after an actual unexpected menu. */
 public final class PrinterInteractionGuard {
     private static PrinterInteractionGuard active,manualOwner;
     private static long blockPackets;
@@ -25,7 +24,7 @@ public final class PrinterInteractionGuard {
     boolean waiting(){context();return tracker.waiting(System.nanoTime());}
     boolean allow(BlockPos pos,BlockState wanted){
         context();var item=wanted.getBlock().asItem();if(!tracker.allowed(item,System.nanoTime()))return false;
-        // Visible/manual inventory ownership is left to the existing printer inventory policy.
+
         preparedItem=manualWindowPending()||ClientUi.screen(client) instanceof AbstractContainerScreen<?>?null:item;
         preparedPos=pos.asLong();preparedBlock=wanted.getBlock();if(preparedItem!=null)active=this;return true;
     }
@@ -57,8 +56,7 @@ public final class PrinterInteractionGuard {
         var guard=active;if(guard==null||!guard.client.isSameThread())return false;guard.context();var client=guard.client;
         if(client.player==null||ClientUi.screen(client) instanceof AbstractContainerScreen<?>||!client.player.containerMenu.getCarried().isEmpty()){guard.cancel();return false;}
         var decision=guard.tracker.opened(System.nanoTime());if(!decision.owned())return false;
-        // An automation-owned hidden menu may have been replaced on the server. Its owner observes
-        // this closure and reconciles inventory; no old slot operation is replayed here.
+
         client.getConnection().send(new ServerboundContainerClosePacket(packet.getContainerId()));
         client.player.containerMenu=client.player.inventoryMenu;
         if(decision.blockedItem()!=null){

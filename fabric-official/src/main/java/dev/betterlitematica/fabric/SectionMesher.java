@@ -21,21 +21,14 @@ import org.lwjgl.system.MemoryUtil;
 import java.util.*;
 import java.util.concurrent.*;
 
-/**
- * Builds one section's block geometry off the render thread, the way vanilla chunk builders do: an immutable
- * snapshot goes in, arena-relative vertices in native memory come out. Models, fluids and block colors are read
- * concurrently as in vanilla; the client world is read only to omit blocks that are already built. Block entity
- * renderers stay on the render thread, so their cells are only listed here.
- */
 final class SectionMesher {
     static final int STRIDE=24,MAX_PART_VERTICES=16384,MAX_BLOCK_QUADS=512;
     static final long MAX_SECTION_BYTES=8L<<20;
-    /** Palette flags by asset id, written on the render thread before any snapshot that uses the id is published. */
+
     static final short READY=1,SKIP=2,OPAQUE=4,FLUID=8,ENTITY=16,LIGHT=32,MODEL=64,INVISIBLE=128,INVALID=256;
     static final int THREADS=Math.max(1,Math.min(4,Runtime.getRuntime().availableProcessors()/2));
     static final int MAX_IN_FLIGHT=THREADS*3;
-    // A result may wait across frames and receive block-entity cells on the render thread.
-    // Keep exclusive ownership until consumption/cancellation, then reuse its 16 KiB staging array.
+
     private static final ArrayBlockingQueue<RenderedCells.Builder> CELL_BUFFERS=new ArrayBlockingQueue<>(MAX_IN_FLIGHT);
     private static RenderedCells.Builder acquireCells(){
         var cells=CELL_BUFFERS.poll();if(cells==null)return new RenderedCells.Builder();
@@ -49,7 +42,6 @@ final class SectionMesher {
     private static final Direction[] DIRECTIONS=Direction.values();
     static final class Cancelled extends RuntimeException {private static final long serialVersionUID=1L;Cancelled(){super(null,null,false,false);}}
 
-    /** Flags for one asset id; {@code displayed} applies the placement's display filter. */
     static short flags(BlockStateSpec spec,BlockState state,boolean displayed,boolean invalid){
         short flags=READY;
         if(spec.isAir()||spec.name().equals("minecraft:structure_void")||!displayed)flags|=SKIP;
@@ -61,19 +53,19 @@ final class SectionMesher {
         var type=state.getRenderShape();if(type==net.minecraft.world.level.block.RenderShape.MODEL)flags|=MODEL;else if(type==net.minecraft.world.level.block.RenderShape.INVISIBLE)flags|=INVISIBLE;
         return flags;
     }
-    /** Resolved states and flags for one placement transform; entries are immutable once flagged READY. */
+
     static final class Palette {
         final BlockState[] states;final short[] flags;final FrozenModel[] models;FrozenModel marker;
         Palette(int size){states=new BlockState[size];flags=new short[size];models=new FrozenModel[size];}
     }
-    /** Where models, fluids and tints come from; the game supplies vanilla's, tests their own. */
+
     interface Geometry {
         BlockStateModel model(BlockState state);
         BlockStateModel marker();
         void fluid(BlockPos pos,BlockAndTintGetter view,VertexConsumer out,BlockState state);
         int tint(BlockState state,int index);
     }
-    /** Read-only world access for completion checks and fluid colors. */
+
     interface World {
         boolean loaded(int chunkX,int chunkZ);
         BlockState state(BlockPos pos);
@@ -83,11 +75,11 @@ final class SectionMesher {
         int bottom();
         LevelLightEngine lighting();
     }
-    /** Everything a build reads, captured on the render thread. Sections are indexed (dx+1)+(dz+1)*3+(dy+1)*9. */
+
     static final class Input {
         final SectionKey key;final long generation;final PackedSection[] sections;final Palette palette;final Vec3i localBase,worldBase;final int shiftX,shiftY,shiftZ;
         final LayerRange layer;final int capAxis;final long capLo,capHi;final World world;final Geometry geometry;final TextureAtlasSprite[] lightSprites;
-        // world = origin + lx*ex + ly*ey + lz*ez with orthonormal integer axes; the inverse is the transpose.
+
         final int ox,oy,oz,exx,exz,ezx,ezz;final int[][] offsets=new int[6][];
         Input(SectionKey key,long generation,PackedSection[] sections,Palette palette,PlacementTransform transform,Vec3i localBase,Vec3i worldBase,int shiftX,int shiftY,int shiftZ,
               LayerRange layer,int capAxis,long capLo,long capHi,World world,Geometry geometry,TextureAtlasSprite[] lightSprites){
@@ -98,13 +90,13 @@ final class SectionMesher {
             ox=origin.x();oy=origin.y();oz=origin.z();exx=ex.x();exz=ex.z();ezx=ez.x();ezz=ez.z();
             for(var side:DIRECTIONS){var local=transform.inverse(origin.add(new Vec3i(side.getStepX(),side.getStepY(),side.getStepZ())));offsets[side.ordinal()]=new int[]{local.x(),local.y(),local.z()};}
         }
-        /** Asset id at section-relative local coordinates in -16..31, 0 where the neighborhood holds nothing. */
+
         int id(int x,int y,int z){
             var section=sections[((x>>4)+1)+((z>>4)+1)*3+((y>>4)+1)*9];return section==null?0:section.globalId(x&15,y&15,z&15);
         }
         boolean neighborhood(int x,int y,int z){return x>=-16&&x<32&&y>=-16&&y<32&&z>=-16&&z<32;}
     }
-    /** One part's vertices in native memory, released by whoever consumes the output. */
+
     static final class Part {
         private long address;final int vertices;final short[] owners;
         Part(long address,int vertices,short[] owners){this.address=address;this.vertices=vertices;this.owners=owners;}
@@ -123,11 +115,11 @@ final class SectionMesher {
             var staging=cells;cells=null;if(staging!=null)CELL_BUFFERS.offer(staging);
         }
     }
-    /** Per-thread scratch: one part of vertices, quad ownership, model and fluid capture. */
+
     private static final class Workspace {
         final RandomSource random=RandomSource.create(0);final ArrayList<FrozenModel.Quad> quads=new ArrayList<>(48);final FluidCapture fluid=new FluidCapture();
         final QuadVisibility.Builder ownership=new QuadVisibility.Builder();final BlockPos.MutableBlockPos pos=new BlockPos.MutableBlockPos();
-        // Lives as long as its pool thread; the pool's threads never time out, so this is allocated at most THREADS times.
+
         final long address=MemoryUtil.nmemAllocChecked((long)MAX_PART_VERTICES*STRIDE);int vertices;
         void vertex(float x,float y,float z,float u,float v,int r,int g,int b,int a){
             long p=address+(long)vertices*STRIDE;MemoryUtil.memPutFloat(p,x);MemoryUtil.memPutFloat(p+4,y);MemoryUtil.memPutFloat(p+8,z);MemoryUtil.memPutFloat(p+12,u);MemoryUtil.memPutFloat(p+16,v);
@@ -136,12 +128,11 @@ final class SectionMesher {
     }
     private static final ThreadLocal<Workspace> WORKSPACE=ThreadLocal.withInitial(Workspace::new);
 
-    /** Builds the whole section; checks {@code cancelled} between cells. Never throws: failures are recorded in the output. */
     static Output build(Input in,java.util.function.LongPredicate cancelled){
         var out=new Output(in);var ws=WORKSPACE.get();ws.vertices=0;ws.ownership.clear();long started=System.nanoTime();
         try{mesh(in,out,ws,cancelled);flush(in,out,ws);}
         catch(Cancelled stop){out.free();out.parts.clear();out.cancelled=true;}
-        // Any throwable becomes a failed output: the render thread must always hear back from a started build.
+
         catch(Throwable e){out.free();out.parts.clear();out.failed=true;out.failure="区段模型生成失败："+e;}
         finally{ws.vertices=0;ws.ownership.clear();out.nanos=System.nanoTime()-started;}
         return out;
@@ -158,7 +149,7 @@ final class SectionMesher {
             int wx=in.ox+lx*in.exx+lz*in.ezx,wy=in.oy+ly,wz=in.oz+lx*in.exz+lz*in.ezz;
             if(!contains(in.layer,wx,wy,wz))continue;
             BlockState state=states[id];boolean model=(flag&MODEL)!=0;int culled=0;
-            // Faces hidden by opaque projection neighbours never draw; a fully enclosed block needs no world lookup either.
+
             if(model){for(var side:DIRECTIONS)if(culled(in,x,y,z,wx,wy,wz,state,side))culled|=1<<side.ordinal();if(culled==63)continue;}
             int chunkX=wx>>4,chunkZ=wz>>4;if(chunkX!=lastChunkX||chunkZ!=lastChunkZ){lastChunkX=chunkX;lastChunkZ=chunkZ;chunkLoaded=in.world.loaded(chunkX,chunkZ);}
             BlockState actual=chunkLoaded?in.world.state(ws.pos.set(wx,wy,wz)):null;
@@ -190,7 +181,7 @@ final class SectionMesher {
         }
     }
     private static boolean contains(LayerRange layer,int x,int y,int z){int v=switch(layer.axis()){case X->x;case Y->y;case Z->z;};return v>=layer.min()&&v<=layer.max();}
-    /** Same rule as the render-thread builder: only displayed, opaque or self-hiding neighbours inside the layer cull. */
+
     private static boolean culled(Input in,int x,int y,int z,int wx,int wy,int wz,BlockState state,Direction side){
         if(in.capAxis>=0&&side.getAxis().ordinal()==in.capAxis){int c=in.capAxis==0?wx:in.capAxis==1?wy:wz;if(c>=in.capLo&&c<=in.capHi)return false;}
         if(in.layer.mode()!=LayerRange.Mode.ALL&&!contains(in.layer,wx+side.getStepX(),wy+side.getStepY(),wz+side.getStepZ()))return false;
@@ -205,7 +196,7 @@ final class SectionMesher {
         if(ws.vertices+vertices>MAX_PART_VERTICES)flush(in,out,ws);
         if((out.vertices+ws.vertices+vertices)*(long)STRIDE>MAX_SECTION_BYTES)throw new IllegalArgumentException("区段模型超过资源预算");
     }
-    /** Copies the current part out of the scratch buffer at its exact size. */
+
     private static void flush(Input in,Output out,Workspace ws){
         if(ws.vertices==0)return;int vertices=ws.vertices;short[] owners=ws.ownership.build(vertices);
         long address=MemoryUtil.nmemAlloc((long)vertices*STRIDE);if(address==0)throw new OutOfMemoryError("Projection vertex buffer");
@@ -221,13 +212,13 @@ final class SectionMesher {
             MemoryUtil.memPutInt(p+12,data[at+3]);MemoryUtil.memPutInt(p+16,data[at+4]);MemoryUtil.memPutInt(p+20,data[at+5]);
         }
     }
-    /** Four coincident centers; alpha=0 tags a marker and RG encodes view-space corners for the vertex shader. */
+
     private static void light(Input in,Workspace ws,BlockState state,float x,float y,float z){
         var sprite=in.lightSprites[state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LEVEL)];if(sprite==null)throw new IllegalStateException("Light marker sprite not prepared");
         for(int vertex=0;vertex<4;vertex++){boolean right=vertex==1||vertex==2,top=vertex>=2;
             ws.vertex(x+.5f,y+.5f,z+.5f,right?sprite.getU1():sprite.getU0(),top?sprite.getV0():sprite.getV1(),right?255:0,top?255:0,255,0);}
     }
-    /** Modern fluid vertices complete attributes on the most recently added vertex. */
+
     private static final class FluidCapture implements VertexConsumer {
         private final ProjectionVertices vertices=new ProjectionVertices();
         void clear(){vertices.clear();}int size(){return vertices.size();}
@@ -250,7 +241,7 @@ final class SectionMesher {
         public VertexConsumer setUv3(float u,float v){return this;}public VertexConsumer setNormal(float x,float y,float z){return this;}
         public VertexConsumer setLineWidth(float width){return this;}
     }
-    /** Fluid neighbours from the snapshot, in world coordinates; full-bright like the render-thread view. */
+
     private static final class View implements BlockAndTintGetter {
         private final Input in;View(Input in){this.in=in;}
         @Override public BlockState getBlockState(BlockPos pos){
@@ -262,7 +253,7 @@ final class SectionMesher {
         @Override public FluidState getFluidState(BlockPos pos){return getBlockState(pos).getFluidState();}
         @Override public BlockEntity getBlockEntity(BlockPos pos){return null;}
         @Override public net.minecraft.world.level.CardinalLighting cardinalLighting(){return in.world.lightingByFace();}
-        // Light levels are overridden below; vanilla region views hand out the same provider to builder threads.
+
         @Override public LevelLightEngine getLightEngine(){return in.world.lighting();}
         @Override public int getBlockTint(BlockPos pos,ColorResolver resolver){return in.world.color(pos,resolver);}
         @Override public int getBrightness(LightLayer type,BlockPos pos){return 15;}

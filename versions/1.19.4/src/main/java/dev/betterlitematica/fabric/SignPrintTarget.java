@@ -9,7 +9,6 @@ import net.minecraft.text.Text;
 import net.minecraft.util.DyeColor;
 import net.minecraft.util.math.BlockPos;
 
-/** Detached sign text. Only literal content and visual sign properties enter creative items. */
 record SignPrintTarget(BlockState state,List<String> front,List<String> back,NbtCompound itemData) {
     SignPrintTarget {front=List.copyOf(front);back=List.copyOf(back);itemData=itemData.copy();}
     @Override public NbtCompound itemData(){return itemData.copy();}

@@ -10,7 +10,6 @@ import dev.betterlitematica.fabric.NativeInput;
 import java.util.*;
 import java.util.function.Consumer;
 
-/** Multiline editing in the same measured system font as the rest of the menu. Enter inserts a line. */
 final class BugTextArea extends UiWidget {
     private record Line(int start,int end) {}
     private record Edit(String text,int cursor,int anchor) {}

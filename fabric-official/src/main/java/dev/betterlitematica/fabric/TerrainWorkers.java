@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Dedicated, bounded-by-builder-count mesh execution; leaves CPU capacity for the game/projection. */
 public final class TerrainWorkers {
     private TerrainWorkers(){}
     private static final AtomicInteger THREAD_IDS=new AtomicInteger();

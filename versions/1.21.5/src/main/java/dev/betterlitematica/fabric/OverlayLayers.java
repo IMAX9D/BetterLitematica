@@ -7,7 +7,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
 import net.minecraft.client.render.*;
 
-/** Each overlay owns its draw state, including the entity mask for through-wall inspection. */
 final class OverlayLayers extends RenderLayer {
     private final boolean face,through,near;
     private final RenderPipeline pipeline;

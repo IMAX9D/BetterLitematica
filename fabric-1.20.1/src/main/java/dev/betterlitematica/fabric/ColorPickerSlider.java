@@ -6,7 +6,6 @@ import net.minecraft.text.Text;
 import java.util.function.*;
 import org.lwjgl.glfw.GLFW;
 
-/** Vanilla interaction/focus, independent overlay pixels and system-font labels. */
 final class ColorPickerSlider extends SliderWidget {
     private final String label;private final int steps;private final DoubleConsumer changed;private final DoubleToIntFunction color;
     private final UiMotion motion=new UiMotion();

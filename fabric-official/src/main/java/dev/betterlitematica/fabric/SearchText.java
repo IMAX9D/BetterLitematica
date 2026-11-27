@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.*;
 
-/** Offline polyphonic search. Finite prefix states avoid expanding exponential reading combinations. */
 final class SearchText {
     private static final Map<Integer,String[]> PINYIN=load();
     private static final Map<String,List<String[]>> CACHE=new LinkedHashMap<>(256,.75f,true);

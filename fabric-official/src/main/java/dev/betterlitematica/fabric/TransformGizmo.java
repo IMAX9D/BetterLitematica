@@ -8,7 +8,6 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
 
-/** A held, single-axis metadata transaction. Preview never mutates a placement or selection. */
 final class TransformGizmo {
     private static final int MIDDLE=-NativeInput.GLFW_MOUSE_BUTTON_MIDDLE-1;
     private final Minecraft client;
@@ -68,7 +67,7 @@ final class TransformGizmo {
         }else{
             double limit=obstruction(ray);
             if(!current(hover)||hover.id()!=null||!reachable(hover))hover=null;
-            // The revealed node owns its complete handle while aiming from the node onto an axis.
+
             double node=hover==null?Double.POSITIVE_INFINITY:nodeHit(hover,ray);
             if(hover!=null&&(axisHit(hover,ray)>=0||Double.isFinite(node)&&node<=limit)){hoverUntil=now+220_000_000L;}
             else {
@@ -87,7 +86,7 @@ final class TransformGizmo {
         scaleTarget(hover,ray);
         hoveredAxis=hover==null?-1:axisHit(hover,ray);if(hover!=null)lockedAxes=locks(hover)|parallelAxes(ray);
     }
-    // Camera/player motion changes the live ray, not ownership of the held metadata transaction.
+
     private boolean valid(){return drag!=null&&available()&&client.level==drag.world&&client.getConnection()==drag.connection&&controller.sessionEpoch()==drag.epoch&&tool.mode()==drag.mode&&current(drag.target)&&!controller.worldWriteBusy();}
     private void updateDrag(){
         if(!valid()){cancel();return;}var ray=ray();if((parallelAxes(ray)&1<<drag.axis)!=0)return;
@@ -129,7 +128,7 @@ final class TransformGizmo {
             if(completed.target.id()!=null){var p=completed.target.anchor().add(offset);controller.move(p.x(),p.y(),p.z());}
             else{var target=new SelectionTarget(completed.target.part(),completed.target.name(),0);controller.selectionApply(completed.selectionPreview);controller.selectionTarget(target);}
         })==0){cancel();return;}
-        // Rebind the committed node without resetting its displayed scale or requiring another node hit.
+
         hover=committedTarget(completed.target);hoveredAxis=-1;hoverUntil=System.nanoTime()+220_000_000L;
         if(hover==null)clearScale();
     }
@@ -153,7 +152,7 @@ final class TransformGizmo {
         var target=drag==null?hover:drag.target;
         if(target==null){clearScale();return;}
         var ray=ray();scaleTarget(target,ray);long now=System.nanoTime();
-        // Advance once per rendered frame; ticking and input only read the displayed geometry.
+
         double seconds=Math.min(.05,Math.max(0,(now-scaleTime)/1e9));scaleTime=now;
         length+=(size(target,ray)-length)*-Math.expm1(-18*seconds);
         if(drag==null)hoveredAxis=axisHit(target,ray);

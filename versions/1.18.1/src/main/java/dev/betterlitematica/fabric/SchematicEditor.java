@@ -14,7 +14,6 @@ import net.minecraft.state.property.Property;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** One fixed placement draft. Input never falls through to real-world interactions while armed. */
 final class SchematicEditor {
     private final MinecraftClient client;private final ProjectionController controller;
     private UUID target;private ProjectionRenderer1201 renderer;private SchematicEdits draft;
@@ -30,7 +29,7 @@ final class SchematicEditor {
         final int limit;final boolean composed;final BlockStateSpec stored;final List<ProjectionScene.Part> sceneParts;int visited;boolean waitUnknown;final List<SchematicEdits.Request> changes=new ArrayList<>();
         Plan(Placement placement,LayerRange layer,Hit hit,Vec3i start,Vec3i step,BlockState expected,BlockState replacement,int limit,boolean composed,List<ProjectionScene.Part> sceneParts){this.placement=placement;this.layer=layer;part=hit.part();this.start=start;this.step=step;this.expected=expected;this.replacement=replacement;this.limit=limit;this.composed=composed;this.sceneParts=sceneParts;stored=StateResolver1201.spec(StateResolver1201.unplace(replacement,part.transform()));}
     }
-    /** Source-domain traversal: absent render residency stalls a cell instead of discarding it. */
+
     static final class ToolScan {
         interface Reader {SchematicEdits.Request read(PlacementLayout.Part part,Vec3i local);}
         final List<PlacementLayout.Part> parts;final LayerRange layer;final RegionCursor cursor;final List<SchematicEdits.Request> changes=new ArrayList<>();
@@ -169,7 +168,7 @@ final class SchematicEditor {
         int limit=line?(waitUnknown?SchematicEdits.MAX_TRANSACTION+1:10001):1;var last=start.add(new Vec3i(step.x()*(limit-1),step.y()*(limit-1),step.z()*(limit-1)));var bounds=new PlacementBounds(new Vec3i(Math.min(start.x(),last.x()),Math.min(start.y(),last.y()),Math.min(start.z(),last.z())),new Vec3i(Math.max(start.x(),last.x()),Math.max(start.y(),last.y()),Math.max(start.z(),last.z())));
         plan=new Plan(controller.placement(target),controller.layerRange(),hit,start,step,expected,wanted,limit,region<0,controller.editorScene().overlapping(bounds));plan.waitUnknown=waitUnknown;status="";advance();
     }
-    /** Returns null for an unmatched/no-op cell. Properties are copied only when the destination accepts them. */
+
     static BlockState toolReplacement(BlockState before,BlockState expected,BlockState replacement,boolean byType,boolean exceptType,boolean fillAir){
         boolean match=fillAir?before.isAir():exceptType?!before.isAir()&&before.getBlock()!=expected.getBlock():byType?before.getBlock()==expected.getBlock():before.equals(expected);
         if(!match)return null;var after=replacement;

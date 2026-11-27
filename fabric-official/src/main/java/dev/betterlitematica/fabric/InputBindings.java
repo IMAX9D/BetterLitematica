@@ -31,18 +31,32 @@ final class InputBindings {
     private static boolean holdAction(String action){return Set.of("easyPlaceHold","restrictionHold","hideProjection").contains(action);}
 
     private record Binding(String action,String chord,List<String> keys){}
+    private static final Map<String,Integer> KEY_CODES=keyCodes();
+    private static Map<String,Integer> keyCodes(){
+        var codes=new HashMap<String,Integer>();
+        for(var field:NativeInput.class.getFields()){
+            String name=field.getName();
+            if(field.getType()!=int.class||!name.startsWith("GLFW_KEY_")||name.equals("GLFW_KEY_LAST")||name.equals("GLFW_KEY_UNKNOWN"))continue;
+            try{codes.put(name.substring(9),field.getInt(null));}
+            catch(IllegalAccessException e){throw new ExceptionInInitializerError(e);}
+        }
+        return Map.copyOf(codes);
+    }
 
     private static String key(String text){String name=text.strip().toUpperCase(Locale.ROOT).replace(' ','_');return switch(name){case "CONTROL"->"CTRL";case "LEFT_CTRL"->"LEFT_CONTROL";case "RIGHT_CTRL"->"RIGHT_CONTROL";case "ESC"->"ESCAPE";case "RETURN"->"ENTER";case "WIN","CMD"->"SUPER";default->name;};}
 
     static int code(String name){
 
-        String value=key(name);if(value.matches("MOUSE[1-8]"))return -Integer.parseInt(value.substring(5));
+        String value=key(name);
+        if(value.length()==6&&value.startsWith("MOUSE")&&value.charAt(5)>='1'&&value.charAt(5)<='8')return '0'-value.charAt(5);
 
         value=switch(value){case "CTRL"->"LEFT_CONTROL";case "SHIFT"->"LEFT_SHIFT";case "ALT"->"LEFT_ALT";case "SUPER"->"LEFT_SUPER";default->value;};
 
         if(value.equals("UNKNOWN")||value.equals("LAST"))throw new IllegalArgumentException("无效按键");
 
-        try{return NativeInput.class.getField("GLFW_KEY_"+value).getInt(null);}catch(ReflectiveOperationException e){throw new IllegalArgumentException("无效按键："+name);}
+        Integer code=KEY_CODES.get(value);
+        if(code==null)throw new IllegalArgumentException("无效按键："+name);
+        return code;
 
     }
 
@@ -85,8 +99,6 @@ final class InputBindings {
     }
 
     private Map<String,Boolean> sample(Predicate<String> down){var held=new LinkedHashMap<String,Boolean>();for(var binding:compiled)held.put(binding.action,!binding.keys.isEmpty()&&binding.keys.stream().allMatch(down));return held;}
-
-    // Capture transitions while GLFW still exposes the other keys in this chord.
 
     void event(Minecraft client,InteractionOptions options,long window,int changed,int event){
 

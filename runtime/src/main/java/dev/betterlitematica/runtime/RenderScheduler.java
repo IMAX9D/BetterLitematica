@@ -2,7 +2,6 @@ package dev.betterlitematica.runtime;
 
 import java.util.List;
 
-/** Fair section handoff within one global time and upload budget. */
 public final class RenderScheduler {
     private RenderScheduler(){}
     public record Work(int uploaded,boolean progressed){public static final Work NONE=new Work(0,false);}

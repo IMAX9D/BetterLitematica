@@ -9,7 +9,7 @@ import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 import java.util.*;
-/** Extraction produces bounded immutable draw commands; draw never queries the game world. */
+
 final class ProjectionDraw {
  private static final int MAX_COMMANDS=65536,MAX_RANGE_INTS=4*1024*1024,UNIFORM_BYTES=288;
  private static final List<Object> commands=new ArrayList<>();private static int ranges;
@@ -42,7 +42,7 @@ final class ProjectionDraw {
    for(var value:commands)if(value instanceof Draw draw){
     RenderSystem.getSequentialBuffer(draw.mesh.mode).getBuffer(draw.mesh.indexCount);
     if(draw.texture!=null)client.getTextureManager().getTexture(draw.texture);
-    // Grow shared indices before opening a render pass; later draws only bind them.
+
     RenderSystem.getSequentialBuffer(draw.mesh.mode).getBuffer(draw.mesh.indexCount);
     int at=index++*stride;draw.view.get(at,data);draw.projection.get(at+64,data);
     data.putFloat(at+128,1).putFloat(at+132,1).putFloat(at+136,1).putFloat(at+140,draw.opacity);

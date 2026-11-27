@@ -7,8 +7,6 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.opengl.GL14;
 import org.lwjgl.system.MemoryUtil;
 
-/** Coalesce owned terrain commands after the game established their order. The native encoder
- * still binds the pipeline, attributes, samplers and uniforms; only its final draw becomes multi-draw. */
 public final class TerrainMultiDraw {
     private TerrainMultiDraw(){}
     private record Key(Object vertices,Object indices,Object uniform){}

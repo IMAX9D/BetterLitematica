@@ -8,7 +8,6 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 import java.util.ArrayDeque;
 
-/** Owns raster textures without freeing views still referenced by extracted frames. */
 final class UiTexture extends DynamicTexture {
     private static long sequence;
     private static final ArrayDeque<Identifier> retired=new ArrayDeque<>();
@@ -16,7 +15,7 @@ final class UiTexture extends DynamicTexture {
     void setFilter(boolean linear,boolean mipmaps){sampler=RenderSystem.getSamplerCache().getClampToEdge(linear?FilterMode.LINEAR:FilterMode.NEAREST,mipmaps);}
     static Identifier register(String name,UiTexture texture){var id=Identifier.fromNamespaceAndPath("betterlitematica",name+"/"+(sequence++));Minecraft.getInstance().getTextureManager().register(id,texture);return id;}
     static void retire(Identifier id){if(id!=null)retired.addLast(id);}
-    /** Called on a tick before a new frame is extracted; earlier draws have been submitted. */
+
     static void collect(){while(!retired.isEmpty()){var id=retired.removeFirst();RenderSystem.queueFencedTask(()->Minecraft.getInstance().getTextureManager().release(id));}}
     void uploadRegion(int x,int y,int width,int height){var image=getPixels();if(image!=null)RenderSystem.getDevice().createCommandEncoder().writeToTexture(getTexture(),image,0,0,x,y,width,height,x,y);}
 }

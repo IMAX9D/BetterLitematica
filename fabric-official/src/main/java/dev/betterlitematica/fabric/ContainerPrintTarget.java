@@ -19,7 +19,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import java.util.*;
 
-/** Detached source inventories. Empty source slots do not authorize deleting world items. */
 record ContainerPrintTarget(BlockPos position,List<BlockPos> positions,List<BlockState> states,
                             List<ItemStack> items,boolean stored,int bytes) {
     static boolean supported(BlockState state){

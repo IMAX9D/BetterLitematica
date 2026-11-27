@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Independent target retries and a bounded per-tick budget for frame-rate mouse strokes. */
 final class PlacementStroke {
     static final int MAX_PER_TICK=8,RETRY_TICKS=4;
     private final Map<Long,Integer> retryAt=new HashMap<>();

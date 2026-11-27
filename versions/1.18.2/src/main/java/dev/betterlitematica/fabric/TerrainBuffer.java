@@ -7,7 +7,6 @@ import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import java.nio.ByteOrder;
 
-/** A section/layer handle, with no GL objects until its first nonempty mesh arrives. */
 public final class TerrainBuffer extends VertexBuffer {
     private volatile boolean closed;
     TerrainRegions.Slice slice;
@@ -42,7 +41,7 @@ public final class TerrainBuffer extends VertexBuffer {
     TerrainRegions.Transfer beginUpload(TerrainBuiltBuffer data,TerrainBuildStamp stamp){
         var parameters=data.getParameters();
         if(parameters.indexCount()==0||parameters.vertexCount()==0){if(!parameters.indexOnly())clearMesh();return null;}
-        // An old sorting job must not reorder a replacement mesh, even at the same coordinates.
+
         if(parameters.indexOnly()&&(slice==null||slice.retired||slice.page.closed||meshGeneration!=stamp.generation()
                 ||parameters.indexCount()!=slice.indices||parameters.vertexCount()!=slice.vertices))return null;
         return TerrainRegions.INSTANCE.begin(data,TerrainRegions.origin(stamp.x(),stamp.y(),stamp.z()),slice);
@@ -62,13 +61,12 @@ public final class TerrainBuffer extends VertexBuffer {
     }
 
     @Override public void upload(BufferBuilder builder){
-        // All native uploads must carry a creation-time stamp. Silently accepting an unstamped
-        // upload could draw old geometry at a new position after the section handle is recycled.
+
         builder.popData();throw new IllegalStateException("地形上传缺少版本标识");
     }
-    @Override public void bind(){/* Binding is batched by region, not by section. */}
+    @Override public void bind(){ }
     @Override public void drawElements(){
-        // Preserve the vanilla single-draw path for callers outside our batched world pass.
+
         if(slice==null||closed)return;
         var shader=RenderSystem.getShader();
         if(shader==null)return;

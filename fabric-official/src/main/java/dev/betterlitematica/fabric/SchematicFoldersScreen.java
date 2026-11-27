@@ -5,7 +5,6 @@ import dev.betterlitematica.runtime.UiGlyphArt.Kind;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Folder links are instance settings; removing a link never deletes its files. */
 final class SchematicFoldersScreen extends MenuScreen {
     private final BlueprintBrowserScreen browser;
     private String confirming="",status="",removingSource="";

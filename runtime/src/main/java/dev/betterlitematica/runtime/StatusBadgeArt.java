@@ -14,7 +14,6 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.util.Objects;
 
-/** Original vector badges rasterized for their final physical size; no fonts, files or GPU APIs. */
 public final class StatusBadgeArt {
     public enum Kind { EYE_OPEN, EYE_CLOSED, PRINTER_ON, PRINTER_OFF }
     public static final int MIN_PIXELS=12,MAX_PIXELS=192,SUPERSAMPLING=4;
@@ -24,21 +23,19 @@ public final class StatusBadgeArt {
     private static final Style DARK=new Style(new Color(236,232,224),new Color(130,134,143),new Color(110,214,156),
         new Color(38,40,47,238),new Color(24,25,30,238),new Color(255,255,255,30));
 
-    /** Straight-alpha ARGB. The circle occupies [padding, padding + requestedDiameter). */
     public record Raster(int width,int height,int[] argb) {
         public Raster {Objects.requireNonNull(argb);if(width<1||height<1||(long)width*height!=argb.length)throw new IllegalArgumentException("Invalid badge raster");}
         public long bytes(){return (long)width*height*4;}
     }
     private StatusBadgeArt() {}
 
-    /** Transparent padding preserves the physical-pixel blit origin and antialiased boundary. */
     public static int padding(int physicalPixels){
         if(physicalPixels<MIN_PIXELS||physicalPixels>MAX_PIXELS)throw new IllegalArgumentException("Badge diameter outside 12..192 physical pixels");
         return Math.max(2,(physicalPixels+7)/8);
     }
 
     public static Raster raster(Kind kind,int physicalPixels){return raster(kind,physicalPixels,false);}
-    /** Dark badges sit on graphite glass; the vector geometry is identical in both themes. */
+
     public static Raster raster(Kind kind,int physicalPixels,boolean dark){
         Style style=dark?DARK:LIGHT;
         Objects.requireNonNull(kind,"kind");int pad=padding(physicalPixels),edge=physicalPixels+pad*2,high=edge*SUPERSAMPLING;
@@ -80,7 +77,7 @@ public final class StatusBadgeArt {
         g.setColor(hidden?style.muted():style.eye());var path=eyePath();
         if(!hidden){g.draw(path);g.fill(new Ellipse2D.Double(.426,.426,.148,.148));return;}
         var slash=new Line2D.Double(.269,.261,.731,.739);
-        // Do not paint over crossing strokes: leave an intentional, background-colored gutter.
+
         var visible=new Area(new Rectangle2D.Double(0,0,1,1));
         visible.subtract(new Area(new BasicStroke((float)(stroke*2.5),BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND).createStrokedShape(slash)));
         var clipped=(Graphics2D)g.create();try{clipped.clip(visible);clipped.draw(path);}finally{clipped.dispose();}
@@ -100,7 +97,6 @@ public final class StatusBadgeArt {
         g.draw(new Line2D.Double(.409,.653,.591,.653));g.draw(new Line2D.Double(.409,.709,.552,.709));g.setStroke(previous);
     }
 
-    /** Box-filter premultiplied coverage before converting to straight ARGB; avoids dark fringes. */
     static int[] reduce(int[] source,int edge){
         int factor=SUPERSAMPLING,high=edge*factor;int[] output=new int[edge*edge];
         if(source.length!=(long)high*high)throw new IllegalArgumentException("Invalid supersampled badge");

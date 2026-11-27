@@ -6,7 +6,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Composite after clouds and particles, while the camera matrix is still installed. */
 @Mixin(WorldRenderer.class)
 abstract class ProjectionWorldFinishMixin {
     @Inject(method="method_62214",at=@At(value="INVOKE_STRING",target="Lnet/minecraft/util/profiler/Profiler;swap(Ljava/lang/String;)V",args="ldc=translucent"))

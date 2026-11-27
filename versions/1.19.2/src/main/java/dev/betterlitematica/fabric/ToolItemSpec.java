@@ -3,7 +3,7 @@ import net.minecraft.item.*;
 import net.minecraft.nbt.*;
 import net.minecraft.util.registry.Registry;
 import net.minecraft.util.Identifier;
-/** User-defined tool with optional exact SNBT matching; durability is not an identity. */
+
 final class ToolItemSpec {
     private final Item item;private final NbtCompound nbt;
     private ToolItemSpec(Item item,NbtCompound nbt){this.item=item;this.nbt=nbt;}

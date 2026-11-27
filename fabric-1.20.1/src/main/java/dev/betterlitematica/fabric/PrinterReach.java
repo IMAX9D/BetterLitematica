@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
-/** A block is in reach when some point on its surface is in reach. */
 final class PrinterReach {
     private PrinterReach(){}
 
@@ -20,11 +19,10 @@ final class PrinterReach {
         return 0;
     }
 
-    /** Covers every reachable cell corner despite rounding the eye to an integer scan center. */
     static double candidateRadius(double reach){return reach+1.5*Math.sqrt(3);}
 
     static boolean intersectsBuildHeight(Vec3d eye,double reach,dev.betterlitematica.core.PrinterRange.Shape shape,int bottom,int top){
-        // The topmost block's upper surface is at top, which is exclusive for block coordinates.
+
         if(shape==dev.betterlitematica.core.PrinterRange.Shape.SPHERE)return eye.y+reach>=bottom&&eye.y-reach<=top;
         long center=Math.round(eye.y),radius=(long)Math.floor(reach);
         return center+radius>=bottom&&center-radius<top;

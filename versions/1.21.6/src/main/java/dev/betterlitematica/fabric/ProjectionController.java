@@ -21,7 +21,6 @@ import java.util.function.UnaryOperator;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** Main-thread placement ownership. Disk workers receive snapshots, never a live game world. */
 final class ProjectionController implements AutoCloseable {
     private static final class Entry {
         Placement placement; ProjectionRenderer1201 renderer; BlueprintMetadata metadata; long[] counts; FileMaterials materials;
@@ -73,7 +72,7 @@ final class ProjectionController implements AutoCloseable {
     private final RenderResources gpuResources=new RenderResources(1L<<30,65536,65536,8L<<20,8192,1);
     { gpuResources.distanceOrdered(true); }
     private long usableVram=-1;
-    /** Player budget, or for "自动" part of the memory the graphics driver reports (previous 1 GiB when it reports none). */
+
     private void applyRenderBudget(){
         int choice=options.display.renderBudget();long bytes;
         if(choice<0)bytes=Long.MAX_VALUE>>2;else if(choice>0)bytes=(long)choice<<30;
@@ -186,7 +185,7 @@ final class ProjectionController implements AutoCloseable {
         if (restoring != null && restoring.isDone()) {
             try {
                 PlacementSession session = restoring.join();
-                // 0.45 was the untouched former default (only a command changes it); new placements now start at 80%.
+
                 layer = session.layer(); opacity = session.opacity()==LEGACY_DEFAULT_OPACITY?DEFAULT_OPACITY:session.opacity(); rendering = session.rendering(); selected = session.selected();
                 for (Placement placement : session.placements()) { entries.put(placement.id(), new Entry(placement)); queued.add(placement.id()); }
                 message = entries.isEmpty() ? "Press M to load a blueprint" : "Restored " + entries.size() + " placements";
@@ -213,12 +212,12 @@ final class ProjectionController implements AutoCloseable {
         tickDraftAssociation();tickDraftRecovery();editor.tick();
         if(draftFile!=null){var status=draftWriter.status(draftFile);if(!status.error().isEmpty()&&!status.error().equals(checkpointFailure)){checkpointFailure=status.error();fail("草稿保存失败，正在重试："+status.error());}else if(status.error().isEmpty())checkpointFailure="";}
         if(ready&&client.player!=null&&options.followLayer&&layer.mode()!=LayerRange.Mode.ALL)followPlayerLayer();
-        // Follow can be switched on without the range changing (wheel); keep renderers in the matching build mode.
+
         if(ready){boolean smooth=smoothFollow();for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.layer(layer,smooth);}
         if (analysis != null) {analysis.tick();if(errorOverlay&&client.player!=null){var position=net.minecraft.util.math.BlockPos.ofFloored(client.player.getEyePos());analysis.updateHighlights(new Vec3i(position.getX(),position.getY(),position.getZ()));}}
         nearbyHighlights.tick(client,this);
         materialTotals();
-        // A screen can remain pinned to a placement after the global selection changes.
+
         var pendingMaterials=entries.values().stream().map(e->e.materials).filter(Objects::nonNull).filter(m->!m.finished()).toList();
         if(!pendingMaterials.isEmpty())pendingMaterials.get(Math.floorMod(materialTurn++,pendingMaterials.size())).tick();
         if (++ticks % 20 == 0) save();
@@ -295,7 +294,7 @@ final class ProjectionController implements AutoCloseable {
         if(renderChanges.takeAll()){for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldAllChanged();}
         else{var changes=renderChanges.drain(8);if(!changes.isEmpty())for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.worldChanged(changes);}
         boolean show=rendering&&!temporarilyHidden&&options.display.projection;
-        // All placements publish their visibility before any one can reclaim memory.
+
         for(var entry:entries.values())if(entry.renderer!=null)entry.renderer.prepareFrame(context,show&&entry.placement.enabled()&&entry.placement.renderBlocks());
         cleanupEditorBaselines();releaseGpu(64,System.nanoTime()+1_000_000L);
         if (!rendering||temporarilyHidden) return;
@@ -306,7 +305,7 @@ final class ProjectionController implements AutoCloseable {
         if(!active.isEmpty()&&options.display.projection){
             composite.begin(client);
             try{
-                // Player-set build budget per frame; uploads scale with it (512 KiB per millisecond, the former 2 MiB per 4 ms).
+
                 int budget=options.display.buildBudget();
                 buildTurn=RenderScheduler.run(active.stream().map(entry->entry.renderer).toList(),buildTurn,Math.max(32,budget*16),System.nanoTime()+budget*1_000_000L,budget*512*1024);
                 var clip=visualLayer(context.tickCounter().getTickProgress(false));for(var entry:active){entry.renderer.visualClip((int)clip[0],clip[1],clip[2],clip[3]);entry.renderer.drawFrame(context);}
@@ -343,22 +342,21 @@ final class ProjectionController implements AutoCloseable {
     List<PrinterSource> printerSources(){return entries.values().stream().filter(e->e.placement.enabled()).map(e->new PrinterSource(e.placement,e.renderer,e.renderer==null?e.metadata:e.renderer.metadata())).toList();}
     java.util.function.Function<Vec3i,PrinterSample> printerSampler(){
         var sources=printerSources();for(var source:sources)if(source.renderer()!=null)source.renderer().drain();
-        return new PrinterProjectionView(sources);
+        return PrinterIcePolicy.view(new PrinterProjectionView(sources),options.printer,client.world);
     }
     java.util.function.Function<Vec3i,PrinterSample> printerSampler(UUID id){
         Entry entry=entries.get(id);if(entry==null||entry.renderer==null)return world->null;var r=entry.renderer;r.drain();
         var source=new PlacementLayout.Source(){public int state(PlacementLayout.Part p,Vec3i local){return r.sampleRaw(p.section(local),p.cell(local));}public BlockStateSpec spec(int region,int state){return r.metadata().palette().get(state);}};
-        // The client-thread batch owns this view only until the end of its tick. Sampling still
-        // reads live decoded source cells; an unavailable section remains unknown.
-        var layout=r.layout();return world->{var cell=layout.sample(world,source);
+
+        var layout=r.layout();java.util.function.Function<Vec3i,PrinterSample> view=world->{var cell=layout.sample(world,source);
             if(cell==null)return new PrinterSample(false,null);return new PrinterSample(true,cell.unknown()||r.resolver(cell.part().index()).unresolved(cell.state())?null:r.resolve(cell.part().index(),cell.state()));
-        };
+        };return PrinterIcePolicy.view(view,options.printer,client.world);
     }
     LayerRange layerRange() { return layer; }
     float opacity() { return opacity; }
     InteractionOptions options(){return options;}
     void saveOptions(){if(!optionsWritable)throw new IllegalStateException("设置原文件损坏，已禁用覆盖保存");var snapshot=options.snapshot();persist("设置保存",()->{InteractionOptions.write(optionsFile,snapshot);return "设置已保存";});}
-    /** Bounded hit lookup with the same overlap ordering as the renderer. */
+
     ProjectionScene.Cell informationCell(Vec3i position){
         var parts=new ArrayList<ProjectionScene.Part>();
         for(var entry:entries.values()){
@@ -391,7 +389,7 @@ final class ProjectionController implements AutoCloseable {
         }return result;
     }
     FileMaterials materialTotals(){return materialTotals(selected);}
-    /** Complete source histogram; independent of selection, visibility and resident sections. */
+
     record BlockFilterSource(BlueprintMetadata metadata,long[] counts){
         List<String> blockIds(){
             var ids=new TreeSet<String>();
@@ -429,7 +427,7 @@ final class ProjectionController implements AutoCloseable {
         if(analysis!=null&&analysis.world(client.world))analysis.chunkChanged(x,z);
     }
     void startAnalysis(){startAnalysis(selected);}
-    /** Verification covers the whole placement; layers only filter what is shown, so following the player never restarts it. */
+
     void startAnalysis(UUID id) { Entry entry=entries.get(id);if(entry==null)throw new IllegalStateException("投影已移除"); if (entry.renderer == null) throw new IllegalStateException("请等待投影加载完成"); cancelAnalysis(); analysis = new PlacementAnalysis(entry.renderer, client.world, LayerRange.ALL); }
     void pauseAnalysis() { if (analysis == null) throw new IllegalStateException("尚无扫描任务"); analysis.pause(); }
     void cancelAnalysis() { errorOverlay = false; if (analysis != null) analysis.cancel(); ProjectionOverlays.releaseVerificationIndex(); }
@@ -656,7 +654,7 @@ final class ProjectionController implements AutoCloseable {
         if(!rendering)return "投影已隐藏";
         Entry entry=entries.get(selected);
         if(entry!=null){
-            // The HUD card is narrow: the state leads and the name, without its extension, may be cut.
+
             if(entry.renderer==null)return entryStatus(selected)+" · "+hudName(entry.placement.name());
             if(!entry.renderer.error().isEmpty())return "渲染异常 · "+hudName(entry.placement.name());
         }
@@ -912,20 +910,13 @@ final class ProjectionController implements AutoCloseable {
     void cycleLayer(){cycleLayer(1);}
     void cycleLayer(int step){var mode=LayerRange.Mode.values()[Math.floorMod(layer.mode().ordinal()+step,LayerRange.Mode.values().length)];var p=playerPosition();int value=layer.min()==Integer.MIN_VALUE?layer.max()==Integer.MAX_VALUE?switch(layer.axis()){case X->p.x();case Y->p.y();case Z->p.z();}:layer.max():layer.min();var next=LayerRange.of(layer.axis(),mode,value,value);layer(next.axis(),next.min(),next.max());explicitLayerMode(mode);}
     boolean smoothFollow(){return options.followLayer&&layer.axis()==LayerRange.Axis.Y&&(layer.mode()==LayerRange.Mode.ABOVE||layer.mode()==LayerRange.Mode.BELOW);}
-    /**
-     * The visible slab {axis, from, to, fade} drawn this frame, in whole cells: a followed layer steps one block
-     * at a time with the player. Meshes for it are built past the boundary, so each step is a shader cut, not a rebuild.
-     */
+
     double[] visualLayer(float tickDelta){
         if(layer.mode()==LayerRange.Mode.ALL)return new double[]{-1,0,0,0};
         return new double[]{layer.axis().ordinal(),layer.min()==Integer.MIN_VALUE?-1e9:layer.min(),layer.max()==Integer.MAX_VALUE?1e9:(double)layer.max()+1,0};
     }
     void layerAtPlayer(){var next=playerLayer();layer(next.axis(),next.min(),next.max());}
-    /**
-     * Vertical "above"/"below" layers hinge on the player's body, not one point: above starts over the head and
-     * below ends under the feet. The body's own two cells stay outside as a safety zone, so the printer never
-     * places into the space the player occupies.
-     */
+
     static int playerAnchor(LayerRange.Axis axis,LayerRange.Mode mode,int feet){
         if(axis!=LayerRange.Axis.Y)return feet;
         return mode==LayerRange.Mode.ABOVE?feet+2:mode==LayerRange.Mode.BELOW?feet-1:feet;
@@ -936,7 +927,7 @@ final class ProjectionController implements AutoCloseable {
         int last=mode==LayerRange.Mode.RANGE?Math.addExact(value,Math.subtractExact(layer.max(),layer.min())):value;
         return LayerRange.of(layer.axis(),mode,value,last);
     }
-    /** Jumping must not shift the layer; flying follows every block so the boundary moves smoothly. */
+
     private void followPlayerLayer(){
         var next=playerLayer();if(next.equals(layer))return;
         long shift=layer.mode()==LayerRange.Mode.BELOW?(long)next.max()-layer.max():(long)next.min()-layer.min();

@@ -1,6 +1,5 @@
 package dev.betterlitematica.fabric;
 
-/** Retargetable cubic ease-out; changing counts does not restart a settled card. */
 final class HudExpansion {
     private double from,value,target;
     private long started;

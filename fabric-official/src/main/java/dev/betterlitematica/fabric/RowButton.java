@@ -4,7 +4,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
-/** List row: left-aligned name, a state dot and an accent rail when selected. */
 final class RowButton extends UiButton {
     private final boolean selected,live;private final UiMotion motion;private long hoverStart;private boolean incompatible;
     void incompatible(boolean value){incompatible=value;}

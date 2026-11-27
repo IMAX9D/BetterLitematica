@@ -6,7 +6,6 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
-/** Complete temporary sources, distinct from lossy/resident render caches and persistent user files. */
 public final class TemporarySources implements AutoCloseable {
     private static final String PREFIX="@temporary/";
     private static final long ENTRY_BYTES=4096,MAX_BYTES=256L*1024*1024;
@@ -41,7 +40,7 @@ public final class TemporarySources implements AutoCloseable {
         }finally{if(!committed){synchronized(this){if(entries.remove(key,entry))bytes-=entry.bytes;}Files.deleteIfExists(entry.path);}}
     }
     private synchronized boolean stale(long epoch){return epoch!=generation;}
-    /** Retired files retain their budget and identity until deletion succeeds. */
+
     public synchronized List<Path> clear(){generation++;for(var entry:entries.values())retired.put(entry.path,entry);entries.clear();return List.copyOf(retired.keySet());}
     public synchronized List<Path> remove(String source){var entry=entries.remove(source);if(entry==null)return List.of();retired.put(entry.path,entry);return List.of(entry.path);}
     private synchronized List<Path> clearRetired(){return retired.entrySet().stream().filter(e->e.getValue().readers==0).map(Map.Entry::getKey).toList();}

@@ -10,8 +10,6 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
-
-/** Tool-only actions. Never delegates a consumed tool click to a real attack or item use. */
 final class ToolInteractions {
     private final Minecraft client;private final ProjectionController controller;
     private final Set<Integer> consumed=new HashSet<>();
@@ -31,7 +29,7 @@ final class ToolInteractions {
     ToolMode mode(){
         var stored=ToolMode.valueOf(controller.options().mode);
         var available=stored.usable(client.player==null||client.player.isCreative());
-        // Migrate preferences only. Reading a mode must never start a paste or another world task.
+
         if(stored!=available)controller.options().mode=available.name();
         return available;
     }
@@ -60,7 +58,7 @@ final class ToolInteractions {
         if(!active())return false;
         boolean select=matches("toolSelect",key),first=matches("toolPrimary",key),second=matches("toolSecondary",key);
         if(!select&&!first&&!second)return false;
-        // The editor owns its complete click/hold lifecycle while armed.
+
         if(mode()==ToolMode.REBUILD&&controller.editor().claimsInput())return false;
         consumed.add(key);controller.printer().pause("工具操作");
         controller.action(()->{if(select)select();else click(first);});return true;

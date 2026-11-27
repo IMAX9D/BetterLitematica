@@ -4,7 +4,6 @@ import dev.betterlitematica.core.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-/** Client-thread working set; ledger IO and box merging stay on its serial worker. */
 public final class VerificationHighlights implements AutoCloseable {
     public static final long MAX_BYTES=64L<<20;
     public static final int MAX_SECTIONS=32768;
@@ -38,7 +37,7 @@ public final class VerificationHighlights implements AutoCloseable {
     public void update(Vec3i camera){update(camera,(x,z)->true);}
     public void update(Vec3i camera,java.util.function.BiPredicate<Integer,Integer> loaded){
         if(closed)return;ticks++;
-        // Re-query after four blocks of travel; cached geometry remains drawable while IO catches up.
+
         if(center==null||distance(center,camera)>=16){center=camera;cancelQuery();queryRevision=-1;pressure.clear();}
         try{
             if(query!=null&&query.isDone()){
@@ -53,7 +52,7 @@ public final class VerificationHighlights implements AutoCloseable {
                     if(!loaded(value.bounds(),loaded)){pending(key);continue;}
                     remove(key);long size=weight(value);
                     if(bytes+size>MAX_BYTES){
-                        // Admission evicts only farther sections, never a closer section just filled.
+
                         int rank=candidates.indexOf(key);
                         for(int i=candidates.size()-1;i>rank&&bytes+size>MAX_BYTES;i--){var evicted=candidates.get(i);if(cache.containsKey(evicted)){remove(evicted);pressure.add(evicted);}}
                     }

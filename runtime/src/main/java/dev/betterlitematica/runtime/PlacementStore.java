@@ -6,7 +6,6 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.zip.CRC32;
 
-/** Small versioned settings file. Never stores or edits source blueprint data. Call from an IO worker. */
 public final class PlacementStore {
     private static final int MAGIC = 0x424c5053, VERSION = 5, MAX_BYTES = 8 * 1024 * 1024;
     private PlacementStore() {}
@@ -28,7 +27,7 @@ public final class PlacementStore {
             if (axis >= LayerRange.Axis.values().length) throw new IOException("Invalid layer axis");
             LayerRange layer = new LayerRange(LayerRange.Axis.values()[axis], in.readInt(), in.readInt());
             float opacity = in.readFloat(); boolean rendering = in.readBoolean(); int count = in.readInt();
-            // Reject impossible declared counts before allocating or iterating, without a UI placement limit.
+
             int minimumRecordBytes=version==1?37:version==2?41:version==3?48:version==4?53:57;
             if (count < 0 || count > (in.available()-Long.BYTES)/minimumRecordBytes) throw new IOException("Invalid placement count");
             List<Placement> entries = new ArrayList<>();

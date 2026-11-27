@@ -2,7 +2,6 @@ package dev.betterlitematica.fabric;
 
 import java.util.Objects;
 
-/** Machine-readable state; wording is presentation only and never determines the cause. */
 record PrinterReason(Id id,String description) {
     enum Id {
         NONE(""), RUNNING(""), STOPPED(""), PAUSED(""), ERROR("施工异常"),
@@ -28,7 +27,7 @@ record PrinterReason(Id id,String description) {
     boolean isEmpty(){return id==Id.NONE;}
     boolean missing(){return id==Id.MISSING;}
     boolean blocked(){return !shortLabel().isEmpty();}
-    /** Only typed operational failures may supply player-facing details. */
+
     static PrinterReason failure(RuntimeException failure){return failure instanceof Failure typed?typed.reason:ERROR;}
     static final class Failure extends IllegalStateException {
         final PrinterReason reason;

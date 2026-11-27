@@ -13,7 +13,6 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-/** Server-thread-only temporary chunk ownership. Never blocks on generation or joins an unfinished future. */
 final class PasteChunks implements AutoCloseable {
     static final int LIMIT=64,REQUESTS_PER_TICK=4;
     private static final TicketType TICKET=new TicketType(Long.MAX_VALUE,TicketType.FLAG_LOADING);

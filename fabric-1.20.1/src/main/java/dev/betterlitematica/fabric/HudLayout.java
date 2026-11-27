@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import dev.betterlitematica.core.UiViewport;
 import net.minecraft.client.MinecraftClient;
 
-/** Shared safe-area docking for all independent in-world cards. */
 record HudLayout(UiViewport viewport,double left,double top,double right,double bottom,
                  double statusWidth,double informationWidth) {
     static final double GAP=6;

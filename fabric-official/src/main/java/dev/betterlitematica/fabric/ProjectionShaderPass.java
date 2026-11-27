@@ -2,7 +2,6 @@ package dev.betterlitematica.fabric;
 import net.fabricmc.loader.api.FabricLoader;
 import java.lang.reflect.Method;
 
-/** Defer a shader-pack draw until the caller has finished the world pass. */
 public final class ProjectionShaderPass {
     private static Object irisApi;
     private static Method shaders,shadows;

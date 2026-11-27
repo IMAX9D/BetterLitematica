@@ -14,7 +14,6 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Explicit creative world operations. Server work never touches the client world or GPU. */
 final class ToolWorldOperations implements AutoCloseable {
     record Result(long changed,AreaSelection selection,boolean confirmed,String message){}
     private record Prepared(SchematicDocument document,Path recovery,List<UUID> entities){}
@@ -85,7 +84,7 @@ final class ToolWorldOperations implements AutoCloseable {
                     if(prepared==null){if(!preparing.isDone())return;prepared=preparing.join();preparing=null;recovery=prepared.recovery();
                         var domains=new ArrayList<Region>();for(var box:boxes)domains.add(box.region());for(var box:validateMove(selection,destination).boxes())domains.add(box.region());admission=new ChunkAdmission(domains);}
                     if(!admission.tick(p->world.isChunkLoaded(p.x(),p.z()),256,System.nanoTime()+2_000_000L)){status="移动等待源或目标区块";return;}
-                    // Construct and validate the destination task before touching the original region.
+
                     var placement=recoveryPlacement(recovery,destination);
                     paste=new CreativePasteTask(world,player,prepared.document(),placement,LayerRange.ALL,ReplaceRule.ALL,entities,true);
                     fill=new CreativeFillTask(world,player,boxes,BlockStateSpec.AIR,null);phase=2;return;
@@ -148,7 +147,7 @@ final class ToolWorldOperations implements AutoCloseable {
         }
         boolean loadedRegion(Region region){int minX=region.min().x()>>4,minZ=region.min().z()>>4,maxX=(region.min().x()+region.size().x()-1)>>4,maxZ=(region.min().z()+region.size().z()-1)>>4;for(int x=minX;x<=maxX;x++)for(int z=minZ;z<=maxZ;z++)if(!WorldChunks.loaded(clientWorld,x,z))return false;return true;}
     }
-    /** Readiness is completed before the first destructive step; never force-loads a target. */
+
     static final class ChunkAdmission {
         private final List<Region> regions;private int part,x,z;private boolean initialized;
         ChunkAdmission(List<Region> regions){this.regions=List.copyOf(regions);}
@@ -159,7 +158,7 @@ final class ToolWorldOperations implements AutoCloseable {
             }return part==regions.size();
         }
     }
-    /** Fixed-size 3D pages; tail pages cannot shift the next row or exceed the command volume. */
+
     static final class CommandPages {
         private final List<Region> regions;private final int volume;private int part,x,y,z,sx,sy,sz;
         CommandPages(List<Region> regions,int volume){if(volume<1||volume>32768)throw new IllegalArgumentException("命令体积无效");this.regions=List.copyOf(regions);this.volume=volume;strides();}

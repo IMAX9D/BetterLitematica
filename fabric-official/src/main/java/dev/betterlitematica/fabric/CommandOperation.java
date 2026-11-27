@@ -11,7 +11,6 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Bounded preparation and vanilla commands. Sent is not server-confirmed. */
 final class CommandOperation {
     private record Cell(DeferredSections.Work work,int bit,long key,Vec3i at,String state,List<String> tag){
         void done(){work.done.set(bit);}
@@ -32,7 +31,7 @@ final class CommandOperation {
     private final ArrayBlockingQueue<List<String>> outputQueue=new ArrayBlockingQueue<>(4);private final CompletableFuture<String> result=new CompletableFuture<>();
     private final dev.betterlitematica.runtime.NewFileCommit fileCommit=new dev.betterlitematica.runtime.NewFileCommit();
     private final List<BitSet> entitiesDone=new ArrayList<>();private long entitiesRemaining;
-    // At most one materialized dispatch. Parked NBT retains only a cursor into the bounded immutable plan.
+
     private final Map<Long,Integer> nbtCursors=new HashMap<>();private Dispatch sending;
     private final CommandChunkWakeups wakeups;private boolean waitingChunks;
     private final List<Cell> runCells=new ArrayList<>();

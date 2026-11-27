@@ -6,7 +6,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import org.joml.*;
 import org.lwjgl.system.MemoryStack;
 
-/** Tiny immutable mode blocks and Minecraft's frame-managed transform uniform ring. */
 final class ProjectionUniforms {
     private static final GpuBuffer[] modes=new GpuBuffer[16];
     private static GpuBuffer identityProjection;

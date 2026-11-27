@@ -5,15 +5,14 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
-/** Disk decode only. Bounded task count, bounded completed queue, bounded CPU cache. Never accesses Minecraft. */
+
 public final class SectionStreamer implements AutoCloseable {
     private record Request(long epoch,long serial){}
     private record Ready(SectionKey key,Request request,PackedSection section,String error){}
     private final BlueprintCache source;private final boolean ownsSource;
     private final ThreadPoolExecutor workers=new ThreadPoolExecutor(2,2,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(32),r->{Thread t=new Thread(r,"betterlitematica-section");t.setDaemon(true);return t;});
     private final ConcurrentHashMap<SectionKey,Request> inFlight=new ConcurrentHashMap<>();
-    // Each section is <= ~23 KiB in memory by format construction. 16 ready slots plus
-    // at most two worker-local sections; producers wait rather than discard decoded data.
+
     private final ArrayBlockingQueue<Ready> ready=new ArrayBlockingQueue<>(16);
     private final WeightedLru<SectionKey,PackedSection> cache;
     private final AtomicLong sequence=new AtomicLong();private final AtomicLong epoch=new AtomicLong();private volatile boolean closed;private String error="";
@@ -25,7 +24,7 @@ public final class SectionStreamer implements AutoCloseable {
             if(r.section!=null&&cache.put(r.key,r.section))revision++;if(!r.error.isEmpty())error=r.error;
         }
     }
-    /** Opt-in decoding threads (1..8); the request queue, ready queue and cache stay bounded as before. */
+
     public void parallelism(int threads){
         int n=Math.max(1,Math.min(8,threads));
         synchronized(workers){if(n>workers.getMaximumPoolSize()){workers.setMaximumPoolSize(n);workers.setCorePoolSize(n);}else{workers.setCorePoolSize(n);workers.setMaximumPoolSize(n);}}
@@ -58,12 +57,12 @@ public final class SectionStreamer implements AutoCloseable {
 
     public void cancelPending(){epoch.incrementAndGet();workers.getQueue().clear();inFlight.clear();ready.clear();}
     public long cachedBytes(){return cache.usedBytes();}public int queuedJobs(){return inFlight.size();}public String error(){return error;}
-    /** Owner-thread wakeup token: advances only when a current decode is admitted by drain(). */
+
     public long revision(){return revision;}
     public BlueprintCache source(){return source;}
     @Override public void close(){
         if(closed)return;closed=true;cancelPending();workers.shutdownNow();cache.close();
-        // One bounded section read may finish before close acquires the file lock; no awaitTermination on the render thread.
+
         try{if(ownsSource)source.close();}catch(IOException e){error=e.toString();}
     }
 }

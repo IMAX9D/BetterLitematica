@@ -5,7 +5,6 @@ import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 
-/** Render-thread lifecycle bridge; each hook is pinned to the corresponding vanilla draw stage. */
 public final class ProjectionWorldHooks {
     private static ProjectionController controller;
     private static ProjectionRenderContext context;

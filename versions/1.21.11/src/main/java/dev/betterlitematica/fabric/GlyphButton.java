@@ -5,7 +5,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 
-/** Square icon control; its accessible name is the narrated message, its tooltip comes from the screen hint. */
 final class GlyphButton extends ButtonWidget {
     private final UiGlyphArt.Kind glyph;private final MenuScreen.Look look;private final int tint;
     private final UiMotion motion;

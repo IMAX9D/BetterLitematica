@@ -12,7 +12,6 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import java.util.*;
 
-/** One bounded, owned material request. GUI exceptions never authorize world actions. */
 final class PrinterSupply {
     enum Source {NONE,AUTO,QUICK_SHULKER,AX_SHULKERS,TAKE_IT_OUT_2,TAKE_IT_OUT_3;
         String label(){return switch(this){case NONE->"关闭";case AUTO->"自动";case QUICK_SHULKER->"Quick Shulker";case AX_SHULKERS->"AxShulkers";case TAKE_IT_OUT_2->"TakeItOut 旧协议";case TAKE_IT_OUT_3->"TakeItOut 新协议";};}}

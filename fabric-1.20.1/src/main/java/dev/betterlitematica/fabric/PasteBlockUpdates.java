@@ -5,7 +5,6 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
-/** Only the exact synchronous schematic write suppresses placement/removal callbacks. */
 public final class PasteBlockUpdates {
     private static final class Context { World world; BlockPos pos; }
     private static final ThreadLocal<Context> ACTIVE=ThreadLocal.withInitial(Context::new);

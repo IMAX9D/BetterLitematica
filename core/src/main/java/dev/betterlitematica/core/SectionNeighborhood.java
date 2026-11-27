@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** A pinned center plus six decoded face neighbors. Null means known absent, never pending IO. */
 public record SectionNeighborhood(PackedSection center,PackedSection west,PackedSection east,
                                   PackedSection down,PackedSection up,PackedSection north,PackedSection south) {
     public SectionNeighborhood {java.util.Objects.requireNonNull(center);}

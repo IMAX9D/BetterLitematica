@@ -9,7 +9,6 @@ import net.minecraft.util.Identifier;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Main-thread texture ownership; bounded pure-vector rasterization on one background worker. */
 final class StatusBadgeTextures implements AutoCloseable {
     record Key(StatusBadgeArt.Kind kind,int pixels,boolean dark) {}
     record Texture(Identifier id,int size,int padding) {long bytes(){return (long)size*size*4;}}
@@ -25,7 +24,7 @@ final class StatusBadgeTextures implements AutoCloseable {
         if(closed)return;
         if(pixels!=size||dark!=darkTheme){cancel();pixels=size;dark=darkTheme;}
         drain();
-        // Once warmed, every state at this resolution is ready for immediate toggles.
+
         for(var kind:StatusBadgeArt.Kind.values()){
             var key=new Key(kind,size,darkTheme);if(textures.contains(key)||pending.containsKey(key)||failed.contains(key))continue;
             try{pending.put(key,worker.submit(()->StatusBadgeArt.raster(kind,size,darkTheme)));}

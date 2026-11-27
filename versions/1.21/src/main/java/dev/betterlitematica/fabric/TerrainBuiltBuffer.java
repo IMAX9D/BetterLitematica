@@ -4,7 +4,7 @@ import net.minecraft.client.render.BuiltBuffer;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.client.util.BufferAllocator;
-/** Keeps vertex data and separately produced sorting data in the same stamped upload protocol. */
+
 public final class TerrainBuiltBuffer {
     public record Parameters(VertexFormat format,VertexFormat.DrawMode mode,int vertexCount,int indexCount,VertexFormat.IndexType indexType,boolean indexOnly,boolean sequentialIndex,int getBufferSize){}
     private final Parameters parameters;private final ByteBuffer vertices,indices;private final Runnable release;

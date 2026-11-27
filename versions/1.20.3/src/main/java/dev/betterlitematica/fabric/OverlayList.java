@@ -6,7 +6,6 @@ import net.minecraft.text.Text;
 import java.util.*;
 import java.util.function.Consumer;
 
-/** Virtual scrolling list with one identity per row and keyboard selection. */
 final class OverlayList extends ButtonWidget {
     record Row(String id,String name,boolean enabled,dev.betterlitematica.core.ProjectionCompatibility compatibility){
         Row(String id,String name,boolean enabled){this(id,name,enabled,dev.betterlitematica.core.ProjectionCompatibility.NONE);}

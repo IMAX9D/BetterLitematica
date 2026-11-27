@@ -6,7 +6,6 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 
-/** Announce actual optional takeovers once per installed mod and policy revision. Never edits other mods' settings. */
 final class CompatibilityNotice {
     private static boolean checked;
     static Map<String,String> detected(){

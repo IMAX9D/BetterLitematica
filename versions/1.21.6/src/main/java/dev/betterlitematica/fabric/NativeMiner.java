@@ -26,8 +26,6 @@ import net.minecraft.util.math.*;
 
 import net.minecraft.world.GameMode;
 
-/** A single, bounded vanilla piston transaction. Only server updates settle writes. */
-
 final class NativeMiner {
 
     private static NativeMiner owner;
@@ -82,10 +80,6 @@ final class NativeMiner {
 
     static boolean busy(){return owner!=null||!parked.isEmpty();}
 
-    /** The controller owns two instances (manual and printer); switching modes drains
-
-     * their retained temporary structures before either starts new world writes. */
-
     static boolean recoverSuspended(int tick){for(var miner:List.copyOf(parked))if(miner.recoverPending(tick))return true;return false;}
 
     static void update(BlockPos pos,BlockState state){if(owner!=null)owner.confirmed(pos,state);for(var miner:parked)if(miner!=owner)miner.confirmed(pos,state);}
@@ -112,8 +106,6 @@ final class NativeMiner {
 
     }
 
-    /** Capture before material selection changes the held slot; retain it across queued targets. */
-
     void arm(){
 
         check();if(suspended)return;
@@ -133,10 +125,6 @@ final class NativeMiner {
         if(plan!=null&&(pos.equals(at(plan.piston()))||pos.equals(at(plan.torch()))||pos.equals(at(plan.support()))||pos.equals(at(plan.head())))){
 
             receipts.put(pos.toImmutable(),state);
-
-            // The stale retract event keeps its original facing in the moving block
-
-            // entity, so the replacement settles back to the initial facing.
 
             if(phase>=6&&pos.equals(at(plan.piston()))&&state.isOf(Blocks.PISTON)
 
@@ -284,10 +272,6 @@ final class NativeMiner {
 
                 if(count(Items.PISTON)<1)throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.MISSING,"缺少重放活塞"));
 
-                // The unpower, break and replacement must reach the server in this order
-
-                // without a tick boundary or inventory SWAP in between.
-
                 reason=PrinterReason.of(PrinterReason.Id.BEDROCK,"破除目标");
 
                 if(!ownedState(at(plan.torch()),client.world.getBlockState(at(plan.torch())))||!ownedState(at(plan.piston()),client.world.getBlockState(at(plan.piston()))))throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.BEDROCK_FAILED,"施工结构已被更改"));
@@ -382,8 +366,6 @@ final class NativeMiner {
 
         var inv=client.player.getInventory();var stack=inv.getStack(armedSlot);
 
-        // Keep the original slot and item identity, allowing server-updated damage, energy or charge NBT.
-
         if(!transfers.usableForPrinter(stack)||(armedTool.isEmpty()?!stack.isEmpty():stack.isEmpty()||stack.getItem()!=armedTool.getItem()))return false;
 
         inv.setSelectedSlot(armedSlot);client.interactionManager.syncSelectedSlot();return true;
@@ -432,8 +414,6 @@ final class NativeMiner {
 
         for(var pos:List.of(at(p.piston()),at(p.head()),support))if(!client.world.getBlockState(pos).isSideSolidFullSquare(client.world,pos,Direction.UP)&&!client.world.canPlace(Blocks.PISTON.getDefaultState(),pos,net.minecraft.block.ShapeContext.absent()))return false;
 
-        // Never disturb somebody else's power source or start with an already powered piston.
-
         var piston=at(p.piston());if(client.world.isReceivingRedstonePower(piston)||client.world.isReceivingRedstonePower(piston.up()))return false;
 
         return true;
@@ -471,10 +451,6 @@ final class NativeMiner {
         float yaw=rotation(face,client.player.getYaw());
 
         if(!lookLocked||aimYaw!=yaw){aimYaw=yaw;aimPitch=0;aimTick=tick;lookLocked=true;client.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(yaw,0,client.player.isOnGround(),client.player.horizontalCollision));return false;}
-
-        // PlayerEntity updates headYaw in its next tick; the placement path reads
-
-        // that head rotation, not the body yaw just received in the movement packet.
 
         return tick-aimTick>=2;
 
@@ -534,10 +510,6 @@ final class NativeMiner {
 
             client.interactionManager.sendSequencedPacket(client.world,sequence->{
 
-                // Piston prediction can also alter the adjacent target through neighbor updates.
-
-                // Preserve its last server-confirmed state in the same vanilla acknowledgement.
-
                 if(target!=null&&!removed)client.world.getPendingUpdateManager().addPendingUpdate(target,targetState,client.player);
 
                 client.interactionManager.breakBlock(pos);
@@ -583,8 +555,6 @@ final class NativeMiner {
             if(!selectTool(pos))throw new PrinterReason.Failure(PrinterReason.of(PrinterReason.Id.TOOL_REQUIRED,"工具不足，施工材料等待手动回收"));
 
             if(heldToolMode&&actual.calcBlockBreakingDelta(client.player,client.world,pos)<.7f){
-
-                // Ordinary cleanup can take longer than the time-sensitive piston transaction.
 
                 if(!pos.equals(cleanupBreaking)){cancelCleanupBreaking();cleanupBreaking=pos;client.interactionManager.attackBlock(pos,Direction.UP);}
 

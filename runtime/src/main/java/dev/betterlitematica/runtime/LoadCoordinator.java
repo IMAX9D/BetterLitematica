@@ -4,9 +4,9 @@ import dev.betterlitematica.io.*;
 import java.io.*;
 import java.nio.file.*;
 import java.util.concurrent.*;
-/** Single bounded import worker; an old request can never publish into a newer session. */
+
 public final class LoadCoordinator implements AutoCloseable {
-    /** Each lease is independently closeable; immutable source data and decoded sections are shared. */
+
     public static final class Loaded implements AutoCloseable {
         private static final class Shared {final BlueprintCache cache;final SpatialIndex index;final AuxiliaryData details;final String error;final boolean hit;final long elapsed;final SectionStreamer stream;final long estimatedBytes;int references=1;
             Shared(BlueprintCache cache,SpatialIndex index,AuxiliaryData details,String error,boolean hit,long elapsed){this.cache=cache;this.index=index;this.details=details;this.error=error;this.hit=hit;this.elapsed=elapsed;long capacity=Math.min(32L<<20,Math.max(32L<<10,(long)cache.index().size()*(32L<<10)));estimatedBytes=estimate(cache,details,capacity);stream=new SectionStreamer(cache,capacity,false);}}
@@ -16,7 +16,7 @@ public final class LoadCoordinator implements AutoCloseable {
         public Loaded retain(){synchronized(shared){if(closed)throw new IllegalStateException("Source lease closed");shared.references++;return new Loaded(shared);}}
         public BlueprintCache cache(){return shared.cache;}public SpatialIndex index(){return shared.index;}public AuxiliaryData details(){return shared.details;}public String detailsError(){return shared.error;}public boolean cacheHit(){return shared.hit;}public long elapsedNanos(){return shared.elapsed;}public SectionStreamer stream(){return shared.stream;}
         public long estimatedBytes(){return shared.estimatedBytes;}
-        /** Computed once on the import worker; getters and retain never traverse source metadata. */
+
         private static long estimate(BlueprintCache cache,AuxiliaryData details,long decodedCapacity){
             var meter=new MemoryMeter();meter.add((4L<<20)+decodedCapacity+(long)cache.index().size()*512);
             var metadata=cache.metadata();meter.value(metadata.name(),0);
@@ -73,7 +73,7 @@ public final class LoadCoordinator implements AutoCloseable {
     private synchronized boolean outdated(long epoch){return closed||epoch!=generation;}
     private synchronized void publishStatus(long epoch,Status value){if(!closed&&epoch==generation)status=value;}
     public Status status(){return status;}
-    /** Transfers ownership of the opened cache to the caller; must be called from the game owner thread. */
+
     public synchronized Loaded poll(){Loaded value=completed;completed=null;return value;}
     public synchronized void cancel(){cancelInternal();status=new Status("cancelled",0,0,"");}
     private void cancelInternal(){generation++;if(job!=null){job.cancel(true);job=null;}executor.getQueue().clear();if(completed!=null){closeQuietly(completed);completed=null;}}

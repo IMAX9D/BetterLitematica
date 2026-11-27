@@ -78,7 +78,7 @@ public final class BetterLitematicaClient implements ClientModInitializer {
         BugReports.register(client,controller);
         interactions=new BuildingInteractions(client,controller);
         ClientTickEvents.START_CLIENT_TICK.register(mc->{UiTexture.collect();modeWheelInput.tick();menuOpen.tick(mc.level,mc.getConnection(),ClientUi.screen(mc));});
-        // Shortcut transitions are captured by inputEvent, including taps between ticks.
+
         ClientTickEvents.END_CLIENT_TICK.register(mc->{controller.tick();CompatibilityNotice.tick(mc);interactions.tick();if(!controller.printer().running())PrinterColdWarmup.step(mc);controller.printer().tickHud();controller.bedrock().tick();if(!controller.bedrock().enabled())controller.printer().tick();});
         net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player,world,hand,pos,direction)->{
             if(world==client.level&&controller.bedrock().attack(pos))return net.minecraft.world.InteractionResult.FAIL;
@@ -86,7 +86,7 @@ public final class BetterLitematicaClient implements ClientModInitializer {
         });
         net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player,world,hand,hit)->world==client.level&&(controller.bedrock().use(hit.getBlockPos())||interactions.blockClick(false,hit))?net.minecraft.world.InteractionResult.FAIL:net.minecraft.world.InteractionResult.PASS);
         ClientPlayConnectionEvents.DISCONNECT.register((handler,mc)->mc.execute(()->{
-            // Network-driven disconnects may arrive off-thread, after another session has opened.
+
             if(mc.getConnection()!=null&&mc.getConnection()!=handler)return;
             modeWheelInput.clear();menuOpen.clear();controller.disconnect();EntityOverlayMask.close();
         }));

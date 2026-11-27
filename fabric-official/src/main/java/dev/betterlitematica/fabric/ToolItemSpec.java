@@ -5,7 +5,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-/** User-defined tool with optional exact SNBT matching; durability is not an identity. */
+
 final class ToolItemSpec {
     private final Item item;private final CompoundTag nbt;private CompoundTag identity;
     private ToolItemSpec(Item item,CompoundTag nbt){this.item=item;this.nbt=nbt;}

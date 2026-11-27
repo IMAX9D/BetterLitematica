@@ -54,8 +54,6 @@ import net.minecraft.world.phys.BlockHitResult;
 
 import net.minecraft.world.phys.Vec3;
 
-/** Independent V2/V3 wire codec. Local decoding is scoped to our own recorded use action. */
-
 public final class AccuratePlacement {
 
     public enum Mode {AUTO,SLAB,V2,V3,NONE;
@@ -106,7 +104,7 @@ public final class AccuratePlacement {
 
             }}else if(type==1&&carpetConnection==connection){var tag=data.readNbt();Boolean enabled=carpetRule(tag);if(enabled!=null)carpetAccurate=enabled;}}
 
-        catch(RuntimeException ignored){/* An unknown protocol never enables encoded placement. */}
+        catch(RuntimeException ignored){ }
 
         finally{data.release();}
 
@@ -125,8 +123,6 @@ public final class AccuratePlacement {
     private record Key(UUID player,String dimension,long clicked,int side,InteractionHand hand,int x,int y,int z){}
 
     private record Pending(MinecraftServer server,Scope scope,BlockHitResult physical){}
-
-    /** The same bounded store is exercised headlessly and used by both client and server threads. */
 
     static final class PendingSlots<K,V> {
 
@@ -218,8 +214,6 @@ public final class AccuratePlacement {
 
         }
 
-        // Keep the encoded fraction strictly inside the target cell, including hits on its east face.
-
         double x=data?encodedX(target.getX(),hit.getBlockPos().getX(),p.x,packed):p.x;
 
         return new BlockHitResult(new Vec3(x,y,p.z),hit.getDirection(),hit.getBlockPos(),hit.isInside());
@@ -229,10 +223,6 @@ public final class AccuratePlacement {
     static double encodedX(int targetX,int clickedX,double physicalX,int packed){
 
         double x=targetX+Math.max(.001,Math.min(.999,physicalX-targetX))+2+packed;
-
-        // The packet stores a float relative to the clicked block, not a double world coordinate.
-
-        // At the largest supported payload a fraction near one can round into the next state.
 
         double received=clickedX+(double)(float)(x-clickedX);
 
@@ -303,8 +293,6 @@ public final class AccuratePlacement {
         return validatePlacement(item,adjusted,base,finalState);
 
     }
-
-    /** Vanilla's exact BlockItem already validated its unchanged getPlacementState result. */
 
     public static BlockState validatePlacement(BlockItem item,BlockPlaceContext context,BlockState base,BlockState modified){
 

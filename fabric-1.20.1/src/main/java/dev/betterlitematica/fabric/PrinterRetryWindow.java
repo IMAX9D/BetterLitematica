@@ -1,6 +1,6 @@
 package dev.betterlitematica.fabric;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
-/** Backoff applies exclusively to already-failed placement/support checks, never fresh work. */
+
 final class PrinterRetryWindow {
  private final Long2ObjectLinkedOpenHashMap<Entry> entries=new Long2ObjectLinkedOpenHashMap<>();
  private static final class Entry {int expected,observed,reason,count;long generation,tick;}

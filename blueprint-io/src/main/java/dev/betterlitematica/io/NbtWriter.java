@@ -6,7 +6,6 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
-/** Budgeted NBT output. New blueprint exports never replace an existing file. */
 public final class NbtWriter {
     public interface StreamBytes {int length();void write(DataOutputStream out,Cancellation cancel)throws IOException;}
     public interface StreamLongs {int length();void write(DataOutputStream out,Cancellation cancel)throws IOException;}
@@ -27,7 +26,7 @@ public final class NbtWriter {
             }
             cancel.check();
             if (replace) Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            else Files.move(temporary, target); // No REPLACE_EXISTING: even a concurrent writer cannot overwrite a source.
+            else Files.move(temporary, target);
         } finally { Files.deleteIfExists(temporary); }
     }
     private static int type(Object v) throws IOException {

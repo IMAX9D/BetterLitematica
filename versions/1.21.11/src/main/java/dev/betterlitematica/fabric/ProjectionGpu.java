@@ -13,7 +13,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
 
-/** A bounded vertex allocation; sequential indices remain owned and shared by Minecraft. */
 final class ProjectionGpu implements AutoCloseable {
     private final GpuBuffer vertices;
     private final VertexFormat.DrawMode mode;

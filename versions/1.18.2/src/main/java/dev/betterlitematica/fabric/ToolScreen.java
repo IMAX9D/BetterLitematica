@@ -8,7 +8,6 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 import java.util.*;
 
-/** Tool preferences and an explicit execution action, separate from printer modes. */
 final class ToolScreen extends MenuScreen {
     private String item,primary,secondary,distance,error="";
     private boolean executeRequiresTool,expand,deleteEntities,deletePlacement,pasteEntities,pasteNbt;
@@ -34,7 +33,7 @@ final class ToolScreen extends MenuScreen {
         int half=(rw-8)/2;
         setting(SettingId.TOOL_EXPAND,buttonAt(expand?"选点：扩展":"选点：角点",right,88,half,()->{expand=!expand;edited();refresh();},mode.selection(),expand));
         distanceField=setting(SettingId.TOOL_DISTANCE,fieldAt("距离",distance,right+half+8,74,half,3));distanceField.setChangedListener(v->{distance=v;edited();});
-        // Keep both raw state fields reachable so an invalid draft can always be corrected before saving.
+
         primaryField=setting(SettingId.TOOL_PRIMARY,fieldAt(mode==ToolMode.REPLACE?"替换为":"主方块",primary,right,124,half,512));primaryField.setChangedListener(v->{primary=v;edited();});
         secondaryField=setting(SettingId.TOOL_SECONDARY,fieldAt(mode==ToolMode.REPLACE?"匹配方块":"副方块",secondary,right+half+8,124,half,512));secondaryField.setChangedListener(v->{secondary=v;edited();});
         hint(primaryField,"方块 ID 与状态，例如 minecraft:oak_log[axis=x]");hint(secondaryField,"替换时匹配此方块状态");

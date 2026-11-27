@@ -3,8 +3,6 @@ package dev.betterlitematica.fabric;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Scope only the native terrain upload pass. Engine pages, sorting and backend fences stay owned
- * by the engine; pending native staging entries survive the end of a budgeted pass. */
 public final class TerrainNativeBudget {
     private TerrainNativeBudget(){}
     public static boolean active;

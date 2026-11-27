@@ -21,12 +21,6 @@ import java.nio.IntBuffer;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-/**
- * Independently implemented terrain transport, reusing BetterLitematica's region/page design.
- * Vanilla model, fluid, lighting and resource-pack shaders are the compatibility boundary.
- * Pages hold many sections. Opaque layers group by page; translucent layers only merge adjacent
- * runs, keeping the exact section and per-quad order chosen by the game's sorter.
- */
 public final class TerrainRegions {
     public static final TerrainRegions INSTANCE=new TerrainRegions();
     static final int STRIDE=32;
@@ -71,7 +65,7 @@ public final class TerrainRegions {
             this.arena=arena;this.type=type;ranges=new RangeAllocator(capacity);
             buffer=GlStateManager._glGenBuffers();
             try{
-                // COPY_WRITE_BUFFER does not alter any VAO's element-buffer binding.
+
                 GL15.glBindBuffer(GL32.GL_COPY_WRITE_BUFFER,buffer);
                 GL15.glBufferData(GL32.GL_COPY_WRITE_BUFFER,(long)capacity*type.size,GL15.GL_DYNAMIC_DRAW);
             }catch(RuntimeException|Error failure){GlStateManager._glDeleteBuffers(buffer);throw failure;}
@@ -97,8 +91,7 @@ public final class TerrainRegions {
             if(--page.references==0){page.close();page.arena.vertices.remove(page);page.arena.prune();}
         }
     }
-    /** A partial upload owns fresh ranges until commit; neither geometry nor sorted indices become
-     * visible halfway through an upload. Byte offsets are long; allocator units remain vertices/indices. */
+
     final class Transfer {
         final Slice destination;final boolean indexOnly;final IndexSlot indices;
         private final ByteBuffer vertices,indexBytes;
@@ -165,12 +158,10 @@ public final class TerrainRegions {
             if(sequential&&aligned){
                 int bytes=type==GL11.GL_UNSIGNED_SHORT?2:4;
                 for(int i=0;i<size;i++)offsets.put(i,(long)(bases.get(i)/4)*6*bytes);
-                // Absolute sequential indices avoid base-vertex multi-draw lighting differences
-                // observed with Minecraft's integer lightmap attribute. Keep one call per page.
+
                 GL14.glMultiDrawElements(GL11.GL_TRIANGLES,counts,type,offsets);calls=1;
             }else{
-                // Sorted indices are section-local. Preserve order and exact vanilla attribute
-                // addressing while still sharing the region binding and uniform update.
+
                 for(int i=0;i<size;i++)GL32.glDrawElementsBaseVertex(GL11.GL_TRIANGLES,counts.get(i),type,offsets.get(i),bases.get(i));
                 calls=size;
             }
@@ -209,7 +200,6 @@ public final class TerrainRegions {
     Transfer begin(BufferBuilder.BuiltBuffer data,Origin origin,Slice existing){return new Transfer(data,origin,existing);}
     void retire(Slice slice){if(!slice.retired&&!slice.page.closed){slice.retired=true;pendingRetirement.add(slice);}}
 
-    /** Recycle only after the GPU has consumed earlier draws. No client wait with a nonzero timeout. */
     public void beginFrame(){
         while(!retirement.isEmpty()){
             var oldest=retirement.peekFirst();int status=GL32.glClientWaitSync(oldest.fence,0,0);
@@ -249,7 +239,7 @@ public final class TerrainRegions {
         active.clear();pass++;Object[] values=visible.elements();int sections=0;
         for(int i=0,size=visible.size();i<size;i++){
             var slice=slice(values[i],layer);if(slice==null)continue;
-            // Opaque layers should be sequential. Preserve correctness if a mod supplies sorted data.
+
             if(slice.sorted!=null){drawOrdered(visible,layer,shader,x,y,z);return;}
             var page=slice.page;
             if(page.pass!=pass){page.pass=pass;page.commands.clear();active.add(page);}

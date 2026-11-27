@@ -1,6 +1,5 @@
 package dev.betterlitematica.fabric;
 
-/** HSV math keeps alpha independent, including RGB values in fully transparent colors. */
 final class ColorPickerColor {
     record Hsv(double hue,double saturation,double value,int alpha){}
     private ColorPickerColor(){}

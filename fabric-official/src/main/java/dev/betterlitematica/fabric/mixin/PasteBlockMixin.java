@@ -10,8 +10,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 
-/** Wrap the existing callback chain, including Carpet's fillUpdates Redirect.
- * Outside this exact paste position the original operation is always delegated unchanged. */
 @Mixin(LevelChunk.class)
 abstract class PasteBlockMixin {
     @WrapOperation(method="setBlockState",at=@At(value="INVOKE",target="Lnet/minecraft/world/level/block/state/BlockState;onPlace(Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Z)V"))
@@ -25,7 +23,7 @@ abstract class PasteBlockMixin {
     }
     @WrapOperation(method="setBlockState",at=@At(value="INVOKE",target="Lnet/minecraft/world/level/block/entity/BlockEntity;preRemoveSideEffects(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)V"))
     private void betterlitematica$pasteInventory(net.minecraft.world.level.block.entity.BlockEntity entity,BlockPos pos,BlockState previous,Operation<Void> original){
-        // Vanilla removes the old entity immediately after this callback; only drop/physics side effects are suppressed.
+
         if(!PasteBlockUpdates.quiet(entity.getLevel(),pos))original.call(entity,pos,previous);
     }
 }

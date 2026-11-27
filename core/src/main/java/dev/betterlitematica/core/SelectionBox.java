@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.Objects;
 
-/** Inclusive corners, independent of corner order. */
 public record SelectionBox(String name, Vec3i first, Vec3i second) {
     public SelectionBox { Objects.requireNonNull(first); Objects.requireNonNull(second); if (name == null || name.isBlank() || name.length() > 120) throw new IllegalArgumentException("Invalid selection name"); }
     public Region region() {

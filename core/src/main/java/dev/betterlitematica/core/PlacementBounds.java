@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** Axis-aligned world bounds after an orthogonal placement transform and world-space layer clipping. */
 public record PlacementBounds(Vec3i min,Vec3i max) {
     public static PlacementBounds clipped(Region region,PlacementTransform transform,LayerRange layer){
         Vec3i a=transform.apply(region.min()),b=transform.apply(region.min().add(new Vec3i(region.size().x()-1,region.size().y()-1,region.size().z()-1)));

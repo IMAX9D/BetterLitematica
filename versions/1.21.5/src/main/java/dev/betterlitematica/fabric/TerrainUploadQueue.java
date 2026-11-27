@@ -6,7 +6,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.*;
 
-/** Bounded by the game's builder pool. Workers retain their mesh until every upload completes. */
 public final class TerrainUploadQueue {
     private static final class Pending {
         final TerrainBuiltBuffer mesh;final TerrainBuildStamp stamp;final Supplier<Buffers> current;final Consumer<Buffers> publish;

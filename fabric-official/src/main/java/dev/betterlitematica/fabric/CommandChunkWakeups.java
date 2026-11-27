@@ -4,7 +4,6 @@ import dev.betterlitematica.core.*;
 import java.util.*;
 import java.util.function.*;
 
-/** Chunk events are only discovery hints; unfinished source progress remains in DeferredSections. */
 final class CommandChunkWakeups {
     private static final int MAX_HINTS=4096;
     private final PlacementLayout layout;private final LayerRange layer;private final int bottom,top;

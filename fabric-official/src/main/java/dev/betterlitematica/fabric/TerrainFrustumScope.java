@@ -1,5 +1,5 @@
 package dev.betterlitematica.fabric;
-/** Expanded boxes are used only while producing this mod's conservative visibility cache. */
+
 public final class TerrainFrustumScope {
     private TerrainFrustumScope(){}
     private static final ThreadLocal<Integer> DEPTH=ThreadLocal.withInitial(()->0);

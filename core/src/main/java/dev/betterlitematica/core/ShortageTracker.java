@@ -3,7 +3,6 @@ package dev.betterlitematica.core;
 import java.util.*;
 import java.util.function.Predicate;
 
-/** Records actual supply failures; stock recovery never waits for a spatial scan. */
 public final class ShortageTracker<T> {
     private final LinkedHashMap<T,Integer> entries=new LinkedHashMap<>();
     private final int limit;

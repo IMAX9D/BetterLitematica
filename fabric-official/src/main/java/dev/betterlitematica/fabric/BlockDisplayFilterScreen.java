@@ -6,7 +6,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-/** A placement-bound draft whose candidates come from the complete source histogram. */
+
 final class BlockDisplayFilterScreen extends MenuScreen {
     private final UUID id;
     private final long epoch;
@@ -63,7 +63,7 @@ final class BlockDisplayFilterScreen extends MenuScreen {
         save=fixedAction("保存",innerWidth-168,84,this::save);
     }
     private boolean matches(BlockFilterGrid.Entry e){if(terms.length==0)return true;String value=e.id()+" "+e.name();for(String part:terms)if(!SearchText.matches(value,part))return false;return true;}
-    /** Ordering is fixed when the view changes (search, mode, scope) so ticking a block never moves cards under the pointer. */
+
     private void refilter(boolean reset){
         if(grid==null)return;
         if(reset)grid.rows(candidates.stream().filter(this::matches).filter(e->!selectedOnly||selected.contains(e.id())).sorted(Comparator.comparingInt((BlockFilterGrid.Entry e)->SearchText.rank(e.name(),e.id(),query)).thenComparing(e->!selected.contains(e.id()))).toList(),true);
@@ -75,7 +75,7 @@ final class BlockDisplayFilterScreen extends MenuScreen {
     private void toggle(String blockId){if(!selected.remove(blockId))selected.add(blockId);changed();}
     private void selectResults(){for(var entry:candidates)if(matches(entry))selected.add(entry.id());changed();}
     private void save(){if(epoch!=controller.sessionEpoch()||controller.placement(id)==null)throw new IllegalStateException("投影已移除");controller.placementDisplayFilter(id,new BlockDisplayFilter(mode,blacklist,whitelist));super.onClose();}
-    /** Leaving with unsaved edits takes a second, deliberate press; Esc follows the same path. */
+
     @Override public void onClose(){
         if(controller.placement(id)==null||!dirty()||discardArmed){super.onClose();return;}
         discardArmed=true;refresh();

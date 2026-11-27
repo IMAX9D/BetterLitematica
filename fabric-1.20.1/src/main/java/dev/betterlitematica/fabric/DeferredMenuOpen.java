@@ -1,6 +1,5 @@
 package dev.betterlitematica.fabric;
 
-/** One bounded pending command, dispatched after the submitting chat closes. */
 final class DeferredMenuOpen {
     private Object world,connection,origin;
     private Runnable pending;

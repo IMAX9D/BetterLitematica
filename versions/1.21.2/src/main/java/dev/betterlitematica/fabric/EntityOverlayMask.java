@@ -6,7 +6,6 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL14;
 import org.lwjgl.opengl.GL30;
 
-/** Two GPU-only depth snapshots isolate visible entity pixels without hiding terrain overlays. */
 final class EntityOverlayMask {
     private static int before,after,width,height;
     private static boolean captured,ready;

@@ -1,11 +1,10 @@
 package dev.betterlitematica.fabric;
 
-/** Time based motion; UI animation is independent of game ticks and frame rate. */
 final class UiMotion {
     private long hoverTime, pressTime;
     private double hover;
     UiMotion(){}
-    /** Starts settled at a value, so rebuilt controls do not replay an animation. */
+
     UiMotion(double settled){hover=clamp(settled);}
 
     double hover(boolean active) {

@@ -7,7 +7,6 @@ import net.minecraft.client.texture.Sprite;
 import net.minecraft.item.ItemDisplayContext;
 import net.minecraft.util.math.random.Random;
 
-/** Resolve the light item's component-dependent model, including its selected light level. */
 final class LightProjectionSprite {
     private LightProjectionSprite(){}
     static Sprite sprite(MinecraftClient client,BlockState state){

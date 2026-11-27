@@ -15,9 +15,8 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Physical-pixel overlay. Font textures are copied 1:1, never enlarged game glyphs. */
 final class IndependentUi implements AutoCloseable {
-    // Keep menus ahead of HUD depth (including transparent full-screen HUD quads).
+
     static final int MENU_DEPTH=2000;
     static final IndependentUi INSTANCE=new IndependentUi();
     private record Key(String text,int pixels){}
@@ -53,7 +52,7 @@ final class IndependentUi implements AutoCloseable {
         ctx.pose().pushMatrix();ctx.pose().identity();ctx.pose().scale((float)(1/view.guiScale()),(float)(1/view.guiScale()));
         active=true;return true;
     }
-    /** HUD callbacks run after chat, but chat's depth still occludes z=0 textures and items. */
+
     boolean beginHud(GuiGraphicsExtractor ctx,UiViewport viewport){
         if(!begin(ctx,viewport))return false;
         ctx.nextStratum();
@@ -64,7 +63,7 @@ final class IndependentUi implements AutoCloseable {
         ctx.nextStratum();
         return true;
     }
-    /** Translation only: glyphs keep their physical resolution throughout a transition. */
+
     void effect(double x,double y,double alpha){
         if(!clips.isEmpty())throw new IllegalStateException("UI effect changed inside a clip");
         offsetX=x;offsetY=y;opacity=UiMotion.clamp(alpha);
@@ -93,7 +92,7 @@ final class IndependentUi implements AutoCloseable {
             glyphs.put(entry.getKey(),new Texture(id,raster.size(),raster.size()));
         }
     }
-    /** Vector line icon at its exact physical size, tinted with any theme colour. */
+
     void glyph(dev.betterlitematica.runtime.UiGlyphArt.Kind kind,double x,double y,double size,int color){
         int pixels=Math.max(dev.betterlitematica.runtime.UiGlyphArt.MIN_PIXELS,Math.min(dev.betterlitematica.runtime.UiGlyphArt.MAX_PIXELS,(int)Math.round(size*view.scale())));
         var key=new GlyphKey(kind,pixels);Texture ready=glyphs.get(key);
@@ -103,7 +102,7 @@ final class IndependentUi implements AutoCloseable {
     }
     private Texture texture(String text,int size){
         Key key=new Key(text,size);Texture ready=textures.get(key);if(ready!=null)return ready;
-        // Glyphs share this bounded worker. Backpressure defers a cold run to a later frame.
+
         if(pending.size()<24&&!pending.containsKey(key))try{pending.put(key,CompletableFuture.supplyAsync(()->font.raster(text,size,0xffffffff),worker));}catch(RejectedExecutionException busy){}
         return null;
     }
@@ -124,22 +123,21 @@ final class IndependentUi implements AutoCloseable {
     void roundFrame(double x,double y,double right,double bottom,double radius,int color){roundedBatch(x,y,right,bottom,radius,color,true);}
     private void roundedBatch(double x,double y,double right,double bottom,double radius,int color,boolean outline){
         if((UiMotion.alpha(color,opacity)>>>24)==0)return;
-        // DrawContext.fill otherwise flushes every antialiased span. Keep one geometry-only
-        // batch per shape; texture tint, scissor and matrix changes still flush at their boundaries.
+
         rounded(x,y,right,bottom,radius,color,outline);
     }
-    /** Soft focus halo drawn outside a control. */
+
     void ring(double x,double y,double right,double bottom,double radius,double strength){
         if(strength<=.01)return;
         roundFrame(x-2,y-2,right+2,bottom+2,radius+2,UiMotion.alpha(UiTheme.RING,strength*.55));
         roundFrame(x-1,y-1,right+1,bottom+1,radius+1,UiMotion.alpha(UiTheme.RING,strength));
     }
-    /** One physical pixel of light along the inside top edge; gives dark surfaces their lift. */
+
     void sheen(double x,double y,double right,double radius){
         if((UiTheme.SHEEN>>>24)==0)return;double inset=Math.max(radius*.7,1);
         rect(x+inset,y,right-inset,y+1/view.scale(),UiTheme.SHEEN);
     }
-    /** Rounded coverage is batched in the normal GUI layer; no extra shader/FBO per control. */
+
     private void rounded(double x,double y,double right,double bottom,double radius,int color,boolean outline){
         int l=px(x),t=py(y),r=px(right),b=py(bottom);if(r<=l||b<=t)return;
         double rad=Math.max(0,Math.min(Math.min(r-l,b-t)/2d,radius*view.scale()));
@@ -165,7 +163,7 @@ final class IndependentUi implements AutoCloseable {
         if(last>whole)context.fill(whole,y,last,y+1,color);
         if(right>last)context.fill(last,y,last+1,y+1,UiMotion.alpha(color,right-last));
     }
-    /** Cached physical-pixel coverage keeps both circular and radial edges smooth. */
+
     void sector(double cx,double cy,double inner,double outer,double start,double end,int color){
         var mesh=sectors.get(inner*view.scale(),outer*view.scale(),start,end);
         int tint=UiMotion.alpha(color,opacity);if(mesh.vertexCount()==0||(tint>>>24)==0)return;
@@ -207,7 +205,7 @@ final class IndependentUi implements AutoCloseable {
     int startForCursor(String text,int cursor,double width){return font.startForCursor(text,cursor,textPixels,(float)(width*view.scale()));}
     String fittingText(String text,double width){return font.trim(text,textPixels,(float)Math.min(rasterWidthLimit(textPixels),width*view.scale()),false);}
     void rawText(String text,double x,double y,int color){draw(text,px(x),py(y),textPixels,color);}
-    /** Queue a stable label before its first animated reveal, using the existing bounded worker. */
+
     void prepareText(String text){if(!text.isEmpty())texture(text,textPixels);}
     double lineHeight(){return font.lineHeight(textPixels)/view.scale();}
     double titleLineHeight(){return font.lineHeight(UiTypography.titlePixels(view.scale(),font))/view.scale();}

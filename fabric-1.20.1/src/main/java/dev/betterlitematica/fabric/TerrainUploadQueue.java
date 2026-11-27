@@ -6,10 +6,6 @@ import java.util.ArrayDeque;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.LongAdder;
 
-/**
- * Worker-to-render handoff. A job retains its builder until the upload future completes, so the
- * game's existing fixed builder pool also bounds this queue. Never wait on the GPU from a worker.
- */
 public final class TerrainUploadQueue {
     private static final class Pending {
         final TerrainBuffer target;final BufferBuilder.BuiltBuffer data;final TerrainBuildStamp stamp;
@@ -34,8 +30,7 @@ public final class TerrainUploadQueue {
             if(!stamp.current()||target.isClosed()){
                 data.release();discarded.increment();completion.complete(null);return completion;
             }
-            // The builder is still exclusively owned by this worker. Change positions in-place,
-            // avoiding a second full native mesh allocation. Sorting centres stay section-local.
+
             target.prepare(data,stamp);
             long bytes=data.getParameters().getBufferSize();
             synchronized(this){
@@ -74,7 +69,7 @@ public final class TerrainUploadQueue {
             if(finished){
                 active=null;synchronized(this){queuedBytes-=next.bytes;}
                 next.data.release();
-                // Publish ChunkData only after every layer is resident, using vanilla's future chain.
+
                 if(failure==null)next.completion.complete(null);else next.completion.completeExceptionally(failure);
             }
         }while(bytes<limit&&System.nanoTime()-start<budget);
@@ -86,7 +81,7 @@ public final class TerrainUploadQueue {
 
     public void stop(){
         RenderSystem.assertOnRenderThread();
-        // Complete outside the lock: completion handlers may return buffers or enqueue more work.
+
         ArrayDeque<Pending> cancelled;
         synchronized(this){stopped=true;cancelled=new ArrayDeque<>(pending);pending.clear();if(active!=null){cancelled.addFirst(active);active=null;}queuedBytes=0;}
         for(var next:cancelled)next.discard();

@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.*;
 public abstract class TerrainUploadQueueMixin implements TerrainUploadOwner {
     @Unique private final TerrainUploadQueue betterlitematica$uploads=new TerrainUploadQueue();
     @Unique private ExecutorService betterlitematica$workers;
-    // This point is after Object.<init>, so the handler may safely store our executor on this instance.
+
     @ModifyVariable(method="<init>",at=@At(value="INVOKE",target="Lcom/google/common/collect/Queues;newConcurrentLinkedQueue()Ljava/util/concurrent/ConcurrentLinkedQueue;",ordinal=0),argsOnly=true)
     private net.minecraft.util.thread.NameableExecutor betterlitematica$dedicatedWorkers(net.minecraft.util.thread.NameableExecutor original){
         betterlitematica$workers=TerrainWorkers.create();return new net.minecraft.util.thread.NameableExecutor(betterlitematica$workers);
@@ -32,8 +32,7 @@ public abstract class TerrainUploadQueueMixin implements TerrainUploadOwner {
     private void betterlitematica$stop(CallbackInfo ci){betterlitematica$uploads.stop();}
     @Inject(method="stop",at=@At("RETURN"))
     private void betterlitematica$stopWorkers(CallbackInfo ci){
-        // Running jobs finish and release their buffers into the closed upload queue. Never interrupt
-        // a model renderer midway through native writes; the pool's threads cannot keep the JVM alive.
+
         if(betterlitematica$workers!=null)betterlitematica$workers.shutdown();
     }
 }

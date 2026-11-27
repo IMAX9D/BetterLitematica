@@ -2,7 +2,6 @@ package dev.betterlitematica.core;
 
 import java.util.List;
 
-/** Constant-memory traversal, including implicit air cells. The caller owns its tick/time budget. */
 public final class RegionCursor {
     private final List<Region> regions;
     private int region, x, y, z;

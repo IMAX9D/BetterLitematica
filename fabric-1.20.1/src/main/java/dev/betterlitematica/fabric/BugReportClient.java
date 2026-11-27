@@ -12,7 +12,6 @@ import java.util.concurrent.*;
 import java.util.regex.Pattern;
 import java.util.function.Supplier;
 
-/** User-initiated feedback only. A persisted, immutable request makes an ambiguous timeout safe to retry. */
 final class BugReportClient {
     static final URI API=URI.create("https://forum.imax9d.dpdns.org/api/mods/betterlitematica/v1/");
     static final int DESCRIPTION_CHARS=3000;
@@ -41,7 +40,7 @@ final class BugReportClient {
     private final CompletableFuture<Draft> loading;
 
     BugReportClient(Path game){this(game,API);}
-    /** Non-public endpoint injection is for local contract checks; the game always uses the fixed HTTPS origin. */
+
     BugReportClient(Path game,URI api){this(game,api,()->"",java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime());}
     BugReportClient(Path game,URI api,Supplier<String> playerName,long startedAt){
         this.game=game;this.folder=game.resolve("config/betterlitematica/feedback");this.api=api;this.playerName=playerName;this.startedAt=startedAt;
@@ -90,7 +89,7 @@ final class BugReportClient {
                     if(!files.note.isEmpty())body.getAsJsonObject("diagnostics").addProperty("attachment_note",files.note);
                     fitBody(body);var candidate=new Pending(value,JSON.toJson(body));validateBody(candidate.body);
                     var saved=new JsonObject();saved.add("draft",JSON.toJsonTree(value));saved.addProperty("body",candidate.body);saved.addProperty("privacyVersion",PRIVACY_VERSION);
-                    // Disk persistence happens before POST, even on the first attempt.
+
                     write("pending.json",saved);pending=candidate;
                 }
                 view=new View(true,"正在提交…",false,view.receipt,0);
@@ -199,7 +198,7 @@ final class BugReportClient {
         String log="",report="";var selection=attachmentSelection(value);
         var identities=new LinkedHashSet<String>();String current=playerName.get();if(current!=null&&!current.isBlank())identities.add(current);
         Path file=selection.log;boolean compressed=selection.compressed;
-        // Historical login names also clean a crash-only report; this does not attach the log.
+
         if((value.logs||value.crash)&&Files.isRegularFile(file))identities.addAll(logIdentities(file,compressed));
         if(value.logs){
             if(Files.isRegularFile(file))log=compressed?gzipTail(file,128*1024):tail(file,128*1024);
@@ -213,7 +212,7 @@ final class BugReportClient {
     private AttachmentSelection attachmentSelection(Draft value)throws IOException {
         if(!value.logs&&!value.crash)return new AttachmentSelection(game.resolve("logs/latest.log"),false,null,"");
         var crash=value.crash?crashSelection(value):new CrashSelection(null,"",false);
-        // Entering a world after restarting must not detach the crash from its original log.
+
         boolean previous=crash.file!=null?crash.previousSession:value.previousSession;
         Path archive=previous?latestArchive():null,file=archive==null?game.resolve("logs/latest.log"):archive;
         String note=crash.note;
@@ -242,7 +241,7 @@ final class BugReportClient {
         if(previousStart<=0)return null;
         Path archive=newest(game.resolve("logs"),"*.log.gz");if(archive==null)return null;
         long time=Files.getLastModifiedTime(archive).toMillis();
-        // Log4j may finish compressing the previous log shortly after this JVM starts.
+
         return time>=previousStart&&time<=startedAt+120_000L?archive:null;
     }
     private Path latestCrash()throws IOException {Path managed=newest(game.resolve("crash-reports"),"crash-*.txt"),nativeCrash=newest(game,"hs_err_pid*.log");return managed==null?nativeCrash:nativeCrash!=null&&Files.getLastModifiedTime(nativeCrash).compareTo(Files.getLastModifiedTime(managed))>0?nativeCrash:managed;}

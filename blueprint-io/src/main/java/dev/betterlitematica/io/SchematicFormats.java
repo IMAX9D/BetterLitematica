@@ -4,7 +4,6 @@ import dev.betterlitematica.core.*;
 import java.io.*;
 import java.util.*;
 
-/** Independent structure/Sponge interoperability. Keeps entity and block-entity payloads. */
 public final class SchematicFormats {
     private SchematicFormats(){}
     public static Map<String,Object> canonical(Map<String,Object> root,Cancellation cancel)throws IOException{

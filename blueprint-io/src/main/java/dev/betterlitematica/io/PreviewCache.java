@@ -6,8 +6,6 @@ import java.nio.file.*;
 import java.nio.file.attribute.*;
 import java.util.*;
 
-/** Optional local thumbnail cache. Published entries <=128 MiB/512 files; one <=1.01 MiB scratch file.
- * All operations on an instance serialize, including eviction and atomic replacement. */
 public final class PreviewCache {
     public static final long MAX_BYTES=128L<<20;
     public static final int MAX_FILES=512;
@@ -44,7 +42,7 @@ public final class PreviewCache {
     }
     private record Entry(Path path,long size,long modified){}
     private void prune(Path replacement,long incoming,Cancellation cancel)throws IOException{
-        // At most 511 candidates retained even if an external process populated this directory.
+
         var newest=new PriorityQueue<Entry>(Comparator.comparingLong(Entry::modified));long bytes=0;int seen=0;
         try(var stream=Files.newDirectoryStream(directory)){
             for(var path:stream){if((seen++&31)==0)cancel.check();String name=path.getFileName().toString();if(path.equals(replacement)||!name.matches("v[0-9]+-[a-f0-9]{64}\\.blpv"))continue;

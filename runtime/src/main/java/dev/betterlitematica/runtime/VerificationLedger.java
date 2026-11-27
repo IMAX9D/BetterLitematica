@@ -7,7 +7,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.zip.*;
 
-/** Serial disk-backed section contributions. Main thread submits immutable data, never performs file IO. */
 public final class VerificationLedger implements AutoCloseable {
     public record Replacement(SectionKey key,VerificationSection before,VerificationSection after,long revision){}
     public record SpatialQuery(List<SectionKey> keys,int total,long revision){}
@@ -44,7 +43,7 @@ public final class VerificationLedger implements AutoCloseable {
         var result=track(new CompletableFuture<List<HighlightCuboids.Box>>());if(closed){result.cancel(false);return result;}
         try{dispatch(result,()->{try{if(closed||result.isCancelled())throw new CancellationException();result.complete(HighlightCuboids.coalesce(boxes));}catch(Exception e){result.completeExceptionally(e);}});}catch(RejectedExecutionException e){result.completeExceptionally(e);}return result;
     }
-    /** The index contains every committed spatial error; only the nearby working set is returned. */
+
     public CompletableFuture<SpatialQuery> nearby(Vec3i center,int radius,int limit){
         if(radius<1||radius>256||limit<1||limit>32768)throw new IllegalArgumentException("Spatial query budget");
         var result=track(new CompletableFuture<SpatialQuery>());if(closed){result.cancel(false);return result;}

@@ -8,7 +8,6 @@ import net.minecraft.registry.Registries;
 import net.minecraft.util.math.BlockPos;
 import java.util.*;
 
-/** Section results survive movement; edits invalidate only the affected sections. */
 final class NearbyBuildHud {
     record Entry(Block block,ItemStack icon,int count,int wrongBlock,int wrongState) {Entry(Block block,ItemStack icon,int count){this(block,icon,count,0,0);}}
     record Snapshot(List<Entry> entries,boolean scanning,int unknown) {static final Snapshot EMPTY=new Snapshot(List.of(),false,0);}
@@ -98,7 +97,7 @@ final class NearbyBuildHud {
     }
     private void reconcile(PlacementBounds nextArea,java.util.function.Predicate<PlacementBounds> relevant,java.util.function.Predicate<PlacementBounds> fullyInside){
         area=nextArea;
-            // Interior results are unchanged by walking. Replace only the boundary and departed sections.
+
             for(var iterator=tiles.values().iterator();iterator.hasNext();){var tile=iterator.next();var clipped=clip(tile.key);
                 if(clipped==null||!relevant.test(clipped)){drop(tile);iterator.remove();continue;}
                 boolean boundary=!fullyInside.test(clipped);

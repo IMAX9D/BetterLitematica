@@ -5,7 +5,6 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 
-/** Read-only name with full-width hover scrolling; never acts as a button or keyboard focus target. */
 final class OverlayLabel extends UiWidget {
     private long hoverStart;
     OverlayLabel(int x,int width,String text){super(x,0,width,20,Component.literal(text));active=false;}

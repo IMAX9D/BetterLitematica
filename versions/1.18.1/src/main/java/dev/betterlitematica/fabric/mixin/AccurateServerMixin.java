@@ -14,7 +14,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 @Mixin(ServerPlayNetworkHandler.class)
 public abstract class AccurateServerMixin {
     @Shadow public ServerPlayerEntity player;
-    // This protocol checks block-center reach directly; only placement decoding needs a wrapper.
+
     @WrapOperation(method="onPlayerInteractBlock",at=@At(value="INVOKE",target="Lnet/minecraft/server/network/ServerPlayerInteractionManager;interactBlock(Lnet/minecraft/server/network/ServerPlayerEntity;Lnet/minecraft/world/World;Lnet/minecraft/item/ItemStack;Lnet/minecraft/util/Hand;Lnet/minecraft/util/hit/BlockHitResult;)Lnet/minecraft/util/ActionResult;"))
     private ActionResult betterlitematica$use(ServerPlayerInteractionManager manager,ServerPlayerEntity player,World world,ItemStack stack,Hand hand,BlockHitResult hit,Operation<ActionResult> original){return AccuratePlacement.serverUse(player,hand,hit,()->original.call(manager,player,world,stack,hand,hit));}
 }

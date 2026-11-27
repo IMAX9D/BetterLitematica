@@ -19,14 +19,9 @@ import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.*;
 
-/**
- * Block geometry of every section in a 256x128x256 arena shares a few large vertex buffers, so a frame issues one
- * multi-draw per page instead of one draw per section part. Vertex positions are relative to the arena origin, so
- * one model-view matrix serves the whole arena. Render thread only.
- */
 final class ProjectionPages {
     static final int STRIDE=24,ARENA_XZ=256,ARENA_Y=128;
-    /** Vertices; a page grows with its arena, from 96 KiB to 6 MiB. Parts never exceed 16384 vertices. */
+
     private static final int MIN_PAGE=4096,MAX_PAGE=262144,MAX_PART_INDICES=16384/4*6;
     record Origin(int x,int y,int z){}
     static Origin origin(int x,int y,int z){return new Origin(Math.floorDiv(x,ARENA_XZ)*ARENA_XZ,Math.floorDiv(y,ARENA_Y)*ARENA_Y,Math.floorDiv(z,ARENA_XZ)*ARENA_XZ);}
@@ -44,7 +39,7 @@ final class ProjectionPages {
                 vao=GlStateManager._glGenVertexArrays();vbo=GlStateManager._glGenBuffers();
                 BufferRenderer.unbindAll();GlStateManager._glBindVertexArray(vao);
                 GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER,vbo);GlStateManager._glBufferData(GL15.GL_ARRAY_BUFFER,(long)capacity*STRIDE,GL15.GL_STATIC_DRAW);
-                // The same attribute layout MC's own buffers use for this format; the element buffer binding is VAO state.
+
                 VertexFormats.POSITION_TEXTURE_COLOR.startDrawing();
                 bindIndices();
             }catch(RuntimeException|Error failure){if(vao!=0)GlStateManager._glDeleteVertexArrays(vao);if(vbo!=0)GlStateManager._glDeleteBuffers(vbo);allocation.close();throw failure;}
@@ -53,7 +48,7 @@ final class ProjectionPages {
         }
         void delete(){GlStateManager._glDeleteVertexArrays(vao);GlStateManager._glDeleteBuffers(vbo);normal.close();tinted.close();allocation.close();reservedBytes-=(long)ranges.capacity()*STRIDE;pageCount--;}
     }
-    /** One section part inside a page; {@link #free()} returns its range, and an empty page deletes its buffers. */
+
     final class Slice {
         private final Page page;final int first,vertices;private boolean freed;
         private Slice(Page page,int first,int vertices){this.page=page;this.first=first;this.vertices=vertices;}
@@ -62,7 +57,7 @@ final class ProjectionPages {
             if(page.slices==0){page.delete();page.arena.pages.remove(page);if(page.arena.pages.isEmpty())arenas.remove(page.arena.origin);}
         }
     }
-    /** Draws collected for one page in one pass; near sections are added first. */
+
     private static final class Commands {
         int size;int[] firstQuad=new int[16],quads=new int[16],base=new int[16];
         private IntBuffer counts,bases;private PointerBuffer offsets;private int indexBytes;private boolean dirty=true;
@@ -94,7 +89,7 @@ final class ProjectionPages {
         owner.checkReference(vertices*STRIDE);
         var arena=arenas.computeIfAbsent(origin,Arena::new);
         for(var page:arena.pages){int at=page.ranges.allocate(vertices);if(at>=0)return slice(page,at,vertices,owner);}
-        // Charge actual page capacity. Spare capacity shrinks before evicting meshes under budget pressure.
+
         int wanted=(int)Math.max(MIN_PAGE,Math.max(vertices,Math.min(MAX_PAGE,
             Long.highestOneBit(Math.max(1,arena.live+vertices))*2)));
         long available=resources.availableBytes(owner.replacement())/STRIDE;
@@ -111,16 +106,15 @@ final class ProjectionPages {
         try{GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER,(long)slice.first*STRIDE,vertices);}finally{GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER,0);}
     }
 
-    /** Rebuild only after scene/visibility changes. Camera matrices and clipping uniforms remain per-frame. */
     void beginFrame(){for(var arena:order)for(var page:arena.pages){page.normal.clear();page.tinted.clear();}frame++;order.clear();}
     boolean queued(){return !order.isEmpty();}
-    /** Queue quads [firstQuad, firstQuad+quads) of a slice; tinted quads draw in a second pass. */
+
     void add(Slice slice,int firstQuad,int quads,boolean tinted){
         if(quads<1)return;var page=slice.page;var arena=page.arena;
         if(arena.frame!=frame){arena.frame=frame;arena.tinted=false;order.add(arena);}
         (tinted?page.tinted:page.normal).add(firstQuad,quads,slice.first);arena.tinted|=tinted;
     }
-    /** Issues the queued draws with the bound shader; returns the number of multi-draw calls. */
+
     int draw(Shader shader,Matrix4f view,double cameraX,double cameraY,double cameraZ,Matrix4f scratch){
         if(order.isEmpty())return 0;int calls=0;
         var indices=bindIndices();var tint=shader.getUniform("SurfaceTint");boolean anyTinted=false;

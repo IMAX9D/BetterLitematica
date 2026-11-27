@@ -7,7 +7,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 
-/** Creative fill / replace / delete over an immutable selection snapshot. */
 final class CreativeFillTask {
     private final ServerLevel world;private final UUID player;private final RegionCursor cursor;private final StateResolver1201 states;
     private final boolean replace;private final CompletableFuture<String> result=new CompletableFuture<>();
@@ -34,7 +33,7 @@ final class CreativeFillTask {
             status="已检查 "+cursor.processed()+" 格，修改 "+changed;if(cursor.done())result.complete("填充完成："+status);
         }catch(RuntimeException e){result.completeExceptionally(e);}
     }
-    // Container onStateReplaced scatters inventory independently of the SKIP_DROPS flag.
+
     static net.minecraft.nbt.CompoundTag emptyInventory(net.minecraft.world.level.block.entity.BlockEntity entity){
         if(!(entity instanceof net.minecraft.world.Container inventory))return null;
         var saved=entity.saveWithFullMetadata(entity.getLevel().registryAccess());inventory.clearContent();return saved;

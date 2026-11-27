@@ -5,14 +5,14 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.phys.Vec3;
-/** Only states obtainable by a normal use action are accepted. */
+
 final class EasyPlacementRules {
     static Vec3 hitPoint(BlockPos pos,Direction side,double height){
         return new Vec3(pos.getX()+0.5+side.getStepX()*0.5,
             pos.getY()+(side==Direction.UP?1:side==Direction.DOWN?0:height),
             pos.getZ()+0.5+side.getStepZ()*0.5);
     }
-    /** Closest point on the same legal face, for ordinary blocks without hit-height semantics. */
+
     static Vec3 nearestHitPoint(BlockPos pos,Direction side,Vec3 eye){
         double x=clamp(eye.x,pos.getX()),y=clamp(eye.y,pos.getY()),z=clamp(eye.z,pos.getZ());
         return switch(side){

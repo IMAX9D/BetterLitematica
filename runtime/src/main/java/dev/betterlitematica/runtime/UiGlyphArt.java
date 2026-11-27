@@ -13,10 +13,6 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.util.Objects;
 
-/**
- * Original line-icon set drawn on a 24-unit grid and rasterized at its final physical size.
- * Output is white coverage with straight alpha, tinted at draw time, so one raster serves every theme.
- */
 public final class UiGlyphArt {
     public enum Kind {
         BRAND, LOAD, PRINTER, SELECTION, PASTE, TASKS, VERSIONS, SETTINGS, RESTORE,
@@ -40,7 +36,7 @@ public final class UiGlyphArt {
             g.setRenderingHint(RenderingHints.KEY_RENDERING,RenderingHints.VALUE_RENDER_QUALITY);
             g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL,RenderingHints.VALUE_STROKE_PURE);
             g.scale(high/24d,high/24d);g.setColor(Color.WHITE);
-            // Thin strokes read as refined at large sizes; small sizes get a touch more weight to stay crisp.
+
             float stroke=(float)Math.max(1.45,Math.min(2.1,1.45+(20-pixels)*.04));
             g.setStroke(new BasicStroke(stroke,BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND));
             draw(g,kind,stroke);
@@ -59,7 +55,7 @@ public final class UiGlyphArt {
     private static void draw(Graphics2D g,Kind kind,float stroke){
         switch(kind){
             case BRAND -> {
-                // Isometric block: three faces, the top one solid.
+
                 var top=new Path2D.Double();top.moveTo(12,3.2);top.lineTo(20,7.6);top.lineTo(12,12);top.lineTo(4,7.6);top.closePath();g.fill(top);
                 var body=new Path2D.Double();body.moveTo(4,7.6);body.lineTo(4,16.4);body.lineTo(12,20.8);body.lineTo(20,16.4);body.lineTo(20,7.6);g.draw(body);
                 g.draw(new Line2D.Double(12,12,12,20.8));
@@ -76,7 +72,7 @@ public final class UiGlyphArt {
                 g.fill(new Ellipse2D.Double(16.6,11.1,1.6,1.6));
             }
             case SELECTION -> {
-                // Corner brackets around a solid core.
+
                 double a=4,b=20,l=4.2;
                 for(double[] c:new double[][]{{a,a,1,1},{b,a,-1,1},{a,b,1,-1},{b,b,-1,-1}}){
                     var p=new Path2D.Double();p.moveTo(c[0],c[1]+c[3]*l);p.lineTo(c[0],c[1]);p.lineTo(c[0]+c[2]*l,c[1]);g.draw(p);
@@ -148,7 +144,7 @@ public final class UiGlyphArt {
             case CHECK -> {var p=new Path2D.Double();p.moveTo(5,12.5);p.lineTo(10,17.5);p.lineTo(19.5,7);g.draw(p);}
             case PLUS -> {g.draw(new Line2D.Double(12,5,12,19));g.draw(new Line2D.Double(5,12,19,12));}
             case LAYERS -> {
-                // Flat slabs with the current one solid: reads as "one layer of many", unlike the isometric VERSIONS stack.
+
                 g.draw(new RoundRectangle2D.Double(4,4.2,16,3.8,1.6,1.6));
                 g.fill(new RoundRectangle2D.Double(4,10.1,16,3.8,1.6,1.6));
                 g.draw(new RoundRectangle2D.Double(4,16,16,3.8,1.6,1.6));

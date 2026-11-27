@@ -10,7 +10,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** Optional adapters use installed miners' existing task APIs. A lease owns one exact task object. */
 public final class ExternalMiner {
     private static ExternalMiner owner;
     private static boolean callback;
@@ -51,7 +50,7 @@ public final class ExternalMiner {
     }
     private void claimAcquired(){for(var queue:acquisitionQueues)for(var candidate:queue)if(driver.matches(candidate,(ClientLevel)world,position)){if(task!=null&&task!=candidate)throw new IllegalStateException("外部施工返回多个目标任务");task=candidate;}}
     void reset(){if(driver!=null&&active())try{cancelling=true;if(acquiring&&task==null){claimAcquired();if(task==null&&acquisitionQueues.stream().anyMatch(q->!q.isEmpty()))throw new IllegalStateException("无法确认新增的外部施工任务");}driver.release(task);}catch(RuntimeException e){if(problem.isEmpty())BetterLitematicaClient.LOGGER.error("Could not release owned mining task",e);problem="外部施工未能停止，已阻止继续执行";return;}task=null;world=null;connection=null;position=null;confirmed=false;cancelling=false;acquiring=false;acquisitionQueues=List.of();problem="";if(owner==this){owner=null;callback=false;}}
-    /** Invoked only around the installed manager's tick, so player input still pauses the printer. */
+
     public static boolean entering(Object manager){callback=false;if(owner==null||owner.driver.manager!=manager)return true;var lease=owner;try{if(lease.acquiring||lease.cancelling||lease.world!=lease.client.level||lease.connection!=lease.client.getConnection()||!lease.allowed.getAsBoolean()||lease.driver.foreign(lease.task)){lease.reset();return !lease.active();}lease.driver.beforeTick();callback=true;return true;}catch(RuntimeException e){lease.reset();return !lease.active();}}
     public static void leaving(Object manager){if(owner!=null&&owner.driver.manager==manager&&callback)try{owner.driver.afterTick();}catch(RuntimeException e){owner.reset();}callback=false;}
 

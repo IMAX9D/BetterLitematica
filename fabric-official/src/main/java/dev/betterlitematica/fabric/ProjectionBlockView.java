@@ -15,7 +15,6 @@ import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.material.FluidState;
 import java.util.List;
 
-/** Projection neighbors, real biome colors, and full-bright preview lighting. No world writes. */
 final class ProjectionBlockView implements BlockAndTintGetter {
     static final class Pending extends RuntimeException {private static final long serialVersionUID=1L;Pending(){super(null,null,false,false);}}
     private final ClientLevel world;private final ProjectionScene scene;private final List<ProjectionScene.Part> parts;private final LayerRange layer;

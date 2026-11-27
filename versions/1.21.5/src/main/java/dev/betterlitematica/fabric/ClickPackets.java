@@ -7,7 +7,6 @@ import net.minecraft.network.packet.c2s.play.ClickSlotC2SPacket;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.screen.sync.ItemStackHash;
 
-/** Hash exactly the predicted state; an unpredicted transfer still waits for server receipts. */
 final class ClickPackets {
     private ClickPackets(){}
     static ClickSlotC2SPacket create(int sync,int revision,int slot,int button,SlotActionType action,ItemStack cursor,Int2ObjectMap<ItemStack> changed){

@@ -6,7 +6,7 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 import java.util.*;
 import java.util.function.*;
-/** One shared printer session covers every enabled placement. */
+
 final class PrinterScreen extends MenuScreen {
     private final long sessionEpoch;
     private PrinterSettings draft;
@@ -88,9 +88,12 @@ final class PrinterScreen extends MenuScreen {
     private static String stateName(net.minecraft.block.BlockState state){var properties=new TreeMap<String,String>();for(var entry:state.getEntries().entrySet())properties.put(entry.getKey().getName(),propertyName(entry.getKey(),entry.getValue()));return new dev.betterlitematica.core.BlockStateSpec(net.minecraft.util.registry.Registry.BLOCK.getId(state.getBlock()).toString(),properties).toString();}
     @SuppressWarnings({"rawtypes","unchecked"}) private static String propertyName(net.minecraft.state.property.Property property,Comparable value){return property.name(value);}
     private void strategyPage(){
-        toggle(SettingId.PRINTER_ICE_WATER,"破冰放水",0,56,()->draft.iceWater,v->draft.iceWater=v);toggle(SettingId.PRINTER_CORAL,"珊瑚替代",1,56,()->draft.coralSubstitute,v->draft.coralSubstitute=v);toggle(SettingId.PRINTER_SAFE_OBSERVER,"侦测器顺序检查",0,82,()->draft.safeObserver,v->draft.safeObserver=v);
-        toggle(SettingId.PRINTER_CONTAINER_FILL,"容器填充",1,82,()->draft.containerFill,v->draft.containerFill=v);
-        setting(SettingId.PRINTER_SUPPLY,buttonAt("补给："+draft.supply.label(),cellX(0,2),118,cellWidth(2),()->{read();draft.supply=PrinterSupply.Source.values()[(draft.supply.ordinal()+1)%PrinterSupply.Source.values().length];refresh();},true,false));
+        toggle(SettingId.PRINTER_WATER_TO_ICE,"替水换为冰",0,56,()->draft.waterToIce,v->draft.waterToIce=v);
+        toggle(SettingId.PRINTER_AUTO_BREAK_ICE,"自动破冰",1,56,()->draft.autoBreakIce,v->draft.autoBreakIce=v);
+        toggle(SettingId.PRINTER_CORAL,"珊瑚替代",0,82,()->draft.coralSubstitute,v->draft.coralSubstitute=v);
+        toggle(SettingId.PRINTER_SAFE_OBSERVER,"侦测器顺序检查",1,82,()->draft.safeObserver,v->draft.safeObserver=v);
+        toggle(SettingId.PRINTER_CONTAINER_FILL,"容器填充",0,108,()->draft.containerFill,v->draft.containerFill=v);
+        setting(SettingId.PRINTER_SUPPLY,buttonAt("补给："+draft.supply.label(),cellX(0,2),144,cellWidth(2),()->{read();draft.supply=PrinterSupply.Source.values()[(draft.supply.ordinal()+1)%PrinterSupply.Source.values().length];refresh();},true,false));
     }
     private void highlightPage(){
         toggle(SettingId.PRINTER_HIGHLIGHTS,"施工高亮",0,56,()->draft.highlights,v->draft.highlights=v);toggle(SettingId.PRINTER_HIGHLIGHT_ON_TOP,"高亮置顶",1,56,()->draft.highlightOnTop,v->draft.highlightOnTop=v);
@@ -166,7 +169,7 @@ final class PrinterScreen extends MenuScreen {
         if(!draft.bedrock)enableSetting(SettingId.PRINTER_BEDROCK_SCOPE,false);
         if(!draft.fill)enableSetting(SettingId.PRINTER_FILL_SCOPE,false);
         if(!draft.fill&&!draft.fluid){enableSetting(SettingId.PRINTER_FILL_STATE,false);enableSetting(SettingId.PRINTER_FILL_DIRECTION,false);}
-        if(!draft.print)for(var id:List.of(SettingId.PRINTER_STRIP_LOGS,SettingId.PRINTER_NOTE_TUNING,SettingId.PRINTER_BONEMEAL,SettingId.PRINTER_COMPOSTER,SettingId.PRINTER_CONTAINER_FILL,SettingId.PRINTER_CORAL,SettingId.PRINTER_ICE_WATER,SettingId.PRINTER_SAFE_OBSERVER,SettingId.PRINTER_SKIP_WATERLOGGED,SettingId.PRINTER_FORCE_SNEAK,SettingId.PRINTER_FALLING_CHECK,SettingId.PRINTER_AIR_PLACE,SettingId.PRINTER_SKIP))enableSetting(id,false);
+        if(!draft.print)for(var id:List.of(SettingId.PRINTER_STRIP_LOGS,SettingId.PRINTER_NOTE_TUNING,SettingId.PRINTER_BONEMEAL,SettingId.PRINTER_COMPOSTER,SettingId.PRINTER_CONTAINER_FILL,SettingId.PRINTER_CORAL,SettingId.PRINTER_WATER_TO_ICE,SettingId.PRINTER_AUTO_BREAK_ICE,SettingId.PRINTER_SAFE_OBSERVER,SettingId.PRINTER_SKIP_WATERLOGGED,SettingId.PRINTER_FORCE_SNEAK,SettingId.PRINTER_FALLING_CHECK,SettingId.PRINTER_AIR_PLACE,SettingId.PRINTER_SKIP))enableSetting(id,false);
     }
     @Override protected void runAction(Runnable action){try{error="";notice="";action.run();}catch(RuntimeException e){error=Objects.toString(e.getMessage(),"操作失败");}}
     @Override protected String displayedStatus(){return statusLine();}

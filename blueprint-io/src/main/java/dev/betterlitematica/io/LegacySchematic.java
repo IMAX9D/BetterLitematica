@@ -4,7 +4,6 @@ import dev.betterlitematica.core.*;
 import java.io.*;
 import java.util.*;
 
-/** Classic Alpha/Schematica numeric block arrays, with optional twelve-bit IDs. */
 final class LegacySchematic {
     private LegacySchematic(){}
     static Map<String,Object> canonical(Map<String,Object> root,Cancellation cancel)throws IOException{

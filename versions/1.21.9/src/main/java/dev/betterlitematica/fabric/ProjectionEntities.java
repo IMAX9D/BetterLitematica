@@ -19,7 +19,6 @@ import org.joml.Quaternionf;
 import net.minecraft.entity.decoration.DisplayEntity;
 import java.util.*;
 
-/** Bounded static projection of source entities; no entities are spawned into the client world. */
 final class ProjectionEntities implements AutoCloseable {
     record Key(int region,int entity){}
     record Candidate(Key key,Vec3d position){}
@@ -114,8 +113,7 @@ final class ProjectionEntities implements AutoCloseable {
         meshes.forEach((key,mesh)->{if(changes.affects(sampleBounds(mesh.position())))affected.add(key);});
         for(var candidate:candidates)if(changes.affects(sampleBounds(candidate.position())))affected.add(candidate.key());
         for(var key:affected){meshes.remove(key);measuredBounds.remove(key);}
-        // Failed or resource-blocked candidates may no longer be in the current nearby list.
-        // Let them retry when visited, without dropping successful unrelated entity meshes.
+
         failed.clear();deferred.clear();waitingRevision=-1;
         if(!affected.isEmpty()){boundsRevision++;preparedBoundsRevision=-1;}
     }

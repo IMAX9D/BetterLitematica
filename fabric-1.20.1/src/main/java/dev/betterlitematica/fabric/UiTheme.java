@@ -1,12 +1,5 @@
 package dev.betterlitematica.fabric;
 
-/**
- * Two complete palettes behind one set of semantic tokens. Tokens are read every frame, so switching
- * palettes restyles every screen, HUD card and the wheel at once. World highlights never read these.
- *
- * Obsidian: graphite glass, warm ivory type and a single champagne accent.
- * Porcelain: warm ivory paper, deep ink type and a single indigo accent.
- */
 final class UiTheme {
     private UiTheme() {}
     enum Palette {
@@ -20,7 +13,6 @@ final class UiTheme {
         }
     }
 
-    /** Settled opaque colours; translucency is applied only where a token says so. */
     static int BACKDROP, SCRIM;
     static int PANEL, HEADER, FOOTER, SUNKEN, INPUT, TOOLTIP;
     static int OVERLAY_PANEL, OVERLAY_SURFACE, OVERLAY_SELECTED;

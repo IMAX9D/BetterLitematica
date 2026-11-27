@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.At;
 
 @Mixin(InGameHud.class)
 public abstract class WheelPlayerListMixin {
-    // Share only this HUD query; keep vanilla visibility rules and avoid sticky global key state.
+
     @WrapOperation(method="render",at=@At(value="INVOKE",target="Lnet/minecraft/client/option/KeyBinding;isPressed()Z"))
     private boolean betterlitematica$sharedHold(KeyBinding binding,Operation<Boolean> original){
         return original.call(binding)||(binding==MinecraftClient.getInstance().options.playerListKey&&BetterLitematicaClient.wheelSharesPlayerListHold());

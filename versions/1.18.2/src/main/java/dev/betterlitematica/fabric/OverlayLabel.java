@@ -5,7 +5,6 @@ import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.text.Text;
 
-/** Read-only name with full-width hover scrolling; never acts as a button or keyboard focus target. */
 final class OverlayLabel extends ClickableWidget {
     public int getX(){return x;} public int getY(){return y;} public void setX(int value){x=value;} public void setY(int value){y=value;}
 

@@ -1,6 +1,5 @@
 package dev.betterlitematica.fabric;
 
-/** Small geometric HUD marks, independent of font coverage and Minecraft glyph scaling. */
 final class HudIcons {
     private HudIcons() {}
     private static void line(IndependentUi ui,double x1,double y1,double x2,double y2,int color){

@@ -6,7 +6,6 @@ import net.minecraft.state.property.Properties;
 import net.minecraft.registry.Registries;
 import java.util.*;
 
-/** Placement prediction is the authority; unsupported target states are never reported as placed. */
 final class PrinterRules {
     private PrinterRules(){}
     static boolean forbiddenPrint(BlockState state){return state.isOf(Blocks.PLAYER_HEAD)||state.isOf(Blocks.PLAYER_WALL_HEAD);}
@@ -31,6 +30,7 @@ final class PrinterRules {
     static boolean adjustable(BlockState actual,BlockState wanted,PrinterSettings s){
         actual=DiagonalStateCompatibility.canonical(actual);wanted=DiagonalStateCompatibility.canonical(wanted);
         if(actual.equals(wanted)||actual.isAir())return false;
+        if(s.autoBreakIce&&actual.isOf(Blocks.ICE)&&PrinterIcePolicy.waterSource(wanted))return true;
         if(actual.getBlock()!=wanted.getBlock())return s.stripLogs&&isUnstripped(actual,wanted)||actual.isOf(Blocks.FLOWER_POT)&&wanted.getBlock() instanceof FlowerPotBlock||actual.isOf(Blocks.DIRT)&&wanted.isOf(Blocks.FARMLAND);
         if(wanted.contains(Properties.WATERLOGGED)&&actual.get(Properties.WATERLOGGED)!=wanted.get(Properties.WATERLOGGED))return true;
         if(wanted.contains(Properties.SLAB_TYPE)&&wanted.get(Properties.SLAB_TYPE)==SlabType.DOUBLE)return true;
@@ -47,7 +47,7 @@ final class PrinterRules {
         return s.composter&&wanted.isOf(Blocks.COMPOSTER)&&actual.get(ComposterBlock.LEVEL)<wanted.get(ComposterBlock.LEVEL);
     }
     static boolean manualOpen(BlockState state){return DoorBlock.canOpenByHand(state)||state.getBlock() instanceof TrapdoorBlock&&!state.isOf(Blocks.IRON_TRAPDOOR)||state.getBlock() instanceof FenceGateBlock;}
-    /** Redstone controls iron trapdoors. Keep verifier mismatches, but do not demolish a usable placement. */
+
     static boolean redstoneOnlyDifference(BlockState actual,BlockState wanted,boolean accurateOpen){
         if(!actual.isOf(Blocks.IRON_TRAPDOOR)||!wanted.isOf(Blocks.IRON_TRAPDOOR))return false;
         var normalized=actual.with(Properties.POWERED,wanted.get(Properties.POWERED));
@@ -58,13 +58,13 @@ final class PrinterRules {
         String target=Registries.BLOCK.getId(wanted.getBlock()).toString(),source=Registries.BLOCK.getId(actual.getBlock()).toString();
         int colon=target.indexOf(':');return target.substring(colon+1).startsWith("stripped_")&&source.equals(target.substring(0,colon+1)+target.substring(colon+10));
     }
-    /** Only world-derived connection shape is tolerant; material, facing, half and fluid remain checked. */
+
     static boolean constructionMatches(BlockState actual,BlockState wanted){
         if(!sameBlock(actual,wanted))return false;
         actual=DiagonalStateCompatibility.canonical(actual);wanted=DiagonalStateCompatibility.canonical(wanted);
         return constructionState(actual,wanted).equals(wanted);
     }
-    /** Shared world comparison for rendering, nearby highlights and the full verifier. */
+
     static dev.betterlitematica.core.Comparison comparison(boolean loaded,BlockState actual,BlockState wanted){
         if(!loaded||actual==null||wanted==null)return dev.betterlitematica.core.Comparison.UNKNOWN;
         if(constructionMatches(actual,wanted)||wanted.isAir()&&actual.isAir())return dev.betterlitematica.core.Comparison.MATCH;
@@ -94,10 +94,10 @@ final class PrinterRules {
         predicted=DiagonalStateCompatibility.canonical(predicted);wanted=DiagonalStateCompatibility.canonical(wanted);
         BlockState normalized=constructionState(predicted,wanted);
         if(manualOpen(wanted))normalized=normalized.with(Properties.OPEN,wanted.get(Properties.OPEN));
-        // A server without OPEN placement support can still place the iron trapdoor's geometry.
+
         if(wanted.isOf(Blocks.IRON_TRAPDOOR))normalized=normalized.with(Properties.OPEN,wanted.get(Properties.OPEN)).with(Properties.POWERED,wanted.get(Properties.POWERED));
         if(wanted.isOf(Blocks.LEVER))normalized=normalized.with(Properties.POWERED,wanted.get(Properties.POWERED));
-        // A subsequent use action completes only these explicit, monotonic multi-step states.
+
         if(wanted.contains(Properties.WATERLOGGED))normalized=normalized.with(Properties.WATERLOGGED,wanted.get(Properties.WATERLOGGED));
         if(wanted.contains(Properties.SLAB_TYPE)&&wanted.get(Properties.SLAB_TYPE)==SlabType.DOUBLE)normalized=normalized.with(Properties.SLAB_TYPE,SlabType.DOUBLE);
         if(wanted.isOf(Blocks.SNOW)&&predicted.get(SnowBlock.LAYERS)<=wanted.get(SnowBlock.LAYERS))normalized=normalized.with(SnowBlock.LAYERS,wanted.get(SnowBlock.LAYERS));

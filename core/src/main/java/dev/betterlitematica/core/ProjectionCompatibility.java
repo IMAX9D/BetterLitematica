@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** Source provenance, retained independently of display text and the resolved block palette. */
 public record ProjectionCompatibility(int formatVersion,int sourceDataVersion,int gameDataVersion,int skippedBlockTypes) {
     public static final ProjectionCompatibility NONE=new ProjectionCompatibility(0,0,0,0);
     public ProjectionCompatibility {

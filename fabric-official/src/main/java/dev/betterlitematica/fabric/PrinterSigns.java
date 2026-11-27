@@ -6,10 +6,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 
-/** Client-thread ownership of sign editor requests caused by our own placement packets.
- * Pausing stops new placements, but an already-sent placement still completes its text
- * transaction. Session changes and explicit manual interaction revoke that ownership.
- */
 final class PrinterSigns {
     private static final int MAX_PENDING=128;
     private static final long TIMEOUT=10_000_000_000L;
@@ -49,8 +45,7 @@ final class PrinterSigns {
         sync();var intent=pending.remove(sign.getBlockPos().asLong());
         if(intent==null||client.player==null||client.level==null||client.getConnection()==null)return false;
         if(sign.getBlockState().getBlock()!=intent.target().state().getBlock())return false;
-        // Respond only to the side the server opened. Creating and closing a vanilla
-        // editor instead would send its old lines from removed(), overwriting our text.
+
         var lines=intent.target().lines(front);
         client.getConnection().send(VersionGameplay.signUpdate(sign.getBlockPos(),front,lines));
         submitted++;return true;

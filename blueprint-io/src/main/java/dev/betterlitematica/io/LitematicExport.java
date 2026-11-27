@@ -3,7 +3,6 @@ package dev.betterlitematica.io;
 import dev.betterlitematica.core.*;
 import java.util.*;
 
-/** Complete captured-region envelope. Call after ownership has moved from the capture task to IO. */
 public final class LitematicExport {
     public record Capture(Region region, List<BlockStateSpec> palette, int[] blocks,
                           List<Map<String,Object>> blockEntities, List<Map<String,Object>> entities,

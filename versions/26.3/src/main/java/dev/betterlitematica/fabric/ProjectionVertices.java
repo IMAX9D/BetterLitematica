@@ -1,7 +1,7 @@
 package dev.betterlitematica.fabric;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import java.util.Arrays;
-/** Bounded CPU capture. Attribute setters complete the latest vertex in place. */
+
 final class ProjectionVertices implements VertexConsumer {
  private static final int STRIDE=9,MAX=16384;
  private float[] data=new float[STRIDE*256];private int size;
@@ -14,7 +14,7 @@ final class ProjectionVertices implements VertexConsumer {
  @Override public VertexConsumer setUv(float u,float v){int at=(size-1)*STRIDE;data[at+3]=u;data[at+4]=v;return this;}
  @Override public VertexConsumer setUv1(int u,int v){return this;}
  @Override public VertexConsumer setUv2(int u,int v){return this;}
-@Override public VertexConsumer setUv3(float u,float v){return this;} // Projection uses the base UV channel; UV3 is vanilla glint-specific.
+@Override public VertexConsumer setUv3(float u,float v){return this;}
  @Override public VertexConsumer setNormal(float x,float y,float z){return this;}
  @Override public VertexConsumer setLineWidth(float width){return this;}
 }

@@ -4,7 +4,6 @@ import dev.betterlitematica.core.*;
 import java.util.*;
 import java.util.function.Function;
 
-/** Client-tick view: stable placement order, live source cells and bounded section lookups. */
 final class PrinterProjectionView implements Function<Vec3i,ProjectionController.PrinterSample> {
     private static final int MAX_SECTIONS=64,MAX_PARTS=256;
     private static final ProjectionController.PrinterSample UNKNOWN=new ProjectionController.PrinterSample(true,null);
@@ -15,6 +14,9 @@ final class PrinterProjectionView implements Function<Vec3i,ProjectionController
     private final ProjectionScene scene;
     private final boolean unboundedPending;
     private final Map<Vec3i,Section> sections=new LinkedHashMap<>();
+    private int lastX,lastY,lastZ;
+    private Section lastSection;
+    private ProjectionController.PrinterSample lastKnown;
     PrinterProjectionView(List<ProjectionController.PrinterSource> sources){
         var ready=new ArrayList<ProjectionRenderer1201>();var pending=new ArrayList<PlacementLayout>();boolean unknown=false;
         for(var source:sources){if(!source.placement().enabled())continue;
@@ -26,20 +28,23 @@ final class PrinterProjectionView implements Function<Vec3i,ProjectionController
     }
     @Override public ProjectionController.PrinterSample apply(Vec3i world){
         if(unboundedPending)return UNKNOWN;
-        var key=new Vec3i(world.x()>>4,world.y()>>4,world.z()>>4);var section=sections.get(key);
-        if(section==null){
-            // This is a lookup cache, not source availability. A fast sweep may
-            // cross more than 64 sections in one tick; evict an old lookup and
-            // still sample the new section instead of inventing unknown blocks.
-            if(sections.size()==MAX_SECTIONS)sections.remove(sections.keySet().iterator().next());
-            section=section(key);sections.put(key,section);
+        int x=world.x()>>4,y=world.y()>>4,z=world.z()>>4;
+        Section section=lastSection;
+        if(section==null||x!=lastX||y!=lastY||z!=lastZ){
+            var key=new Vec3i(x,y,z);
+            section=sections.get(key);
+
+            if(section==null){
+                if(sections.size()==MAX_SECTIONS)sections.remove(sections.keySet().iterator().next());
+                section=section(key);sections.put(key,section);
+            }
+            lastSection=section;lastX=x;lastY=y;lastZ=z;
         }
         if(section.overflow())return UNKNOWN;
         for(var part:section.pending())if(part.contains(world))return UNKNOWN;
         var cell=scene.sample(section.ready(),world);
         if(cell==null){
-            // A discarded source cell is excluded even from ALL/SELECTION fill and fluid modes.
-            // Returning ordinary OUTSIDE here would allow those modes to act on it.
+
             for(var part:section.ready()){
                 var r=part.renderer();if(r.metadata().compatibility().skippedBlockTypes()==0||!part.region().contains(world))continue;
                 var local=part.region().local(world);int id=r.sampleRaw(part.region().section(local),part.region().cell(local));
@@ -47,12 +52,17 @@ final class PrinterProjectionView implements Function<Vec3i,ProjectionController
             }
             return OUTSIDE;
         }
-        var renderer=cell.renderer();return cell.unknown()||renderer.resolver(cell.region().index()).unresolved(cell.id())?UNKNOWN:new ProjectionController.PrinterSample(true,renderer.resolve(cell.region().index(),cell.id()));
+        if(cell.unknown())return UNKNOWN;
+        var resolver=cell.renderer().resolver(cell.region().index());
+        if(resolver.unresolved(cell.id()))return UNKNOWN;
+        var state=resolver.resolve(cell.id());
+        if(lastKnown==null||lastKnown.state()!=state)lastKnown=new ProjectionController.PrinterSample(true,state);
+        return lastKnown;
     }
     private Section section(Vec3i key){
         var min=new Vec3i(key.x()<<4,key.y()<<4,key.z()<<4);var box=new PlacementBounds(min,min.add(new Vec3i(15,15,15)));
         var readyParts=new ArrayList<ProjectionScene.Part>();var pendingParts=new ArrayList<PlacementLayout.Part>();
-        // Source count is unrestricted; only local query results and cached sections are bounded.
+
         for(var renderer:ready){for(var part:renderer.layout().overlapping(box)){if(readyParts.size()+pendingParts.size()==MAX_PARTS)return new Section(List.of(),List.of(),true);readyParts.add(new ProjectionScene.Part(renderer,part));}}
         for(var layout:pending){for(var part:layout.overlapping(box)){if(readyParts.size()+pendingParts.size()==MAX_PARTS)return new Section(List.of(),List.of(),true);pendingParts.add(part);}}
         return new Section(List.copyOf(readyParts),List.copyOf(pendingParts),false);

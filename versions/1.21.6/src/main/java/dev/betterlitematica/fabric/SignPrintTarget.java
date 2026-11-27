@@ -9,7 +9,6 @@ import net.minecraft.text.Text;
 import net.minecraft.util.DyeColor;
 import net.minecraft.util.math.BlockPos;
 
-/** Detached sign text. Only literal content and visual sign properties enter creative items. */
 record SignPrintTarget(BlockState state,List<String> front,List<String> back,NbtCompound itemData) {
     SignPrintTarget {front=List.copyOf(front);back=List.copyOf(back);itemData=itemData.copy();}
     @Override public NbtCompound itemData(){return itemData.copy();}
@@ -36,8 +35,7 @@ record SignPrintTarget(BlockState state,List<String> front,List<String> back,Nbt
     String[] lines(boolean frontSide){return (frontSide?front:back).toArray(String[]::new);}
     boolean nonDefault(){
         if(itemData.getBoolean("is_waxed",false)||front.stream().anyMatch(s->!s.isEmpty())||back.stream().anyMatch(s->!s.isEmpty()))return true;
-        // Even a redundant filtered_messages key changes the newly placed entity's
-        // encoded NBT, so vanilla treats the payload as applied and skips the editor.
+
         for(String key:List.of("front_text","back_text")){var side=itemData.getCompoundOrEmpty(key);if(side.contains("filtered_messages")||!side.getString("color","").equals("black")||side.getBoolean("has_glowing_text",false))return true;}
         return false;
     }
@@ -48,7 +46,7 @@ record SignPrintTarget(BlockState state,List<String> front,List<String> back,Nbt
             var filtered=side.contains("filtered_messages")?NbtAccess.list(side,"filtered_messages",NbtElement.STRING_TYPE):null;
             for(int i=0;i<4;i++){
                 if(!actual.getMessage(i,false).getString().equals(expected.get(i)))return false;
-                // SignText.CODEC replaces empty filtered messages with their raw line.
+
                 String filteredLine=filtered==null?expected.get(i):plain(filtered.getString(i,""));
                 if(filteredLine.isEmpty())filteredLine=expected.get(i);
                 if(!actual.getMessage(i,true).getString().equals(filteredLine))return false;

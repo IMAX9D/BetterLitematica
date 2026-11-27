@@ -6,7 +6,7 @@ final class DisplayScreen extends MenuScreen {
     private static void toggle(MenuScreen page,SettingId id,String name,boolean value,int column,int row,Runnable change,Runnable save ){page.setting(id,page.button(name+"："+(value?"开":"关"),column,2,row,()->{change.run();save.run();},true,value));}
     @Override protected void buildMenu(){buildControls(this,controller,0,()->client.setScreen(new LayerScreen(this,controller)),()->{controller.saveOptions();refresh();});}
     static void buildControls(MenuScreen page,ProjectionController controller,int row,Runnable layers,Runnable save){var s=controller.options().display;
-        // Interface first, then what is drawn in the world, then block information; no spacer rows.
+
         page.setting(SettingId.DISPLAY_THEME,page.button("界面主题："+UiTheme.Palette.parse(s.uiTheme).label,0,2,row,()->{var next=UiTheme.Palette.parse(s.uiTheme).next();s.uiTheme=next.name();UiTheme.apply(next);save.run();},true,false));
         page.setting(SettingId.DISPLAY_ERROR_STYLE,page.button("错误样式："+switch(s.errorStyle){case OUTLINE->"轮廓";case FILLED->"填充";case BOTH->"轮廓与填充";},1,2,row,()->{s.errorStyle=PrinterSettings.HighlightStyle.values()[(s.errorStyle.ordinal()+1)%3];save.run();}));
         toggle(page,SettingId.DISPLAY_PROJECTION,"投影方块",s.projection,0,row+1,()->s.projection=!s.projection,save);page.setting(SettingId.DISPLAY_LAYERS,page.button("分层",1,2,row+1,layers));

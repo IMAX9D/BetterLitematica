@@ -9,7 +9,6 @@ import net.minecraft.world.World;
 import java.util.List;
 import java.util.function.Predicate;
 
-/** Older game capabilities, retaining bounded query results and item data. */
 final class LegacyGame {
     static ItemStack light(ItemStack stack,int level){stack.getOrCreateSubNbt("BlockStateTag").putString("level",Integer.toString(level));return stack;}
     static <T extends Entity> void collect(World world,TypeFilter<Entity,T> type,Box box,Predicate<T> filter,List<T> result,int limit){

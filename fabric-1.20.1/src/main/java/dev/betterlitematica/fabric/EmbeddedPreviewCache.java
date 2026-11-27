@@ -7,7 +7,6 @@ import java.io.*;
 import java.util.*;
 import java.util.zip.*;
 
-/** Optional render data in Metadata; the standard litematic regions and version are untouched. */
 final class EmbeddedPreviewCache {
     private static final String FIELD="BetterLitematicaPreview",ORBIT="Orbit";
     private static final int MAX_BYTES=20<<20;
@@ -32,7 +31,7 @@ final class EmbeddedPreviewCache {
                 }
             }
         }catch(InterruptedIOException cancelled){throw cancelled;}
-        catch(IOException|IllegalArgumentException|ArithmeticException malformed){/* Discard only the optional model. */}
+        catch(IOException|IllegalArgumentException|ArithmeticException malformed){ }
         cancel.check();return new Cached(images,model);
     }
 
@@ -40,7 +39,6 @@ final class EmbeddedPreviewCache {
         return model!=null&&model.digest().equals(digest)&&(images==null||model.size().equals(images.size())&&model.blocks()==images.blocks());
     }
 
-    /** Publish metadata only after encoding and validation finish, including cancellation checks. */
     static void write(Map<String,Object> root,Cached cached,boolean preserveEmptyThumbnail,Cancellation cancel)throws IOException{
         Objects.requireNonNull(cached);Objects.requireNonNull(cached.model());cancel.check();
         var copy=new LinkedHashMap<>(root);SchematicPreview.embed(copy,cached.images(),cancel);

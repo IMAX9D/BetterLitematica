@@ -12,7 +12,6 @@ import net.minecraft.world.ticks.TickPriority;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-/** Creative-only integrated-server operation. No client world writes and no authorization bypass. */
 final class CreativePasteTask {
     private final ServerLevel world;private final UUID player;private final SchematicDocument document;
     private final PlacementLayout layout;private final PlacementLayout.Source cells;private final LayerRange layer;private final ReplaceRule rule;
@@ -60,7 +59,7 @@ final class CreativePasteTask {
                 if(context.targets==null){
                     context.targets=chunks.ready(context.bounds);
                     if(context.targets==null){waiting=true;work.retryAt=ticks+1;queue.defer(work);continue;}
-                    // This read and marking happen atomically on the server thread. ALL still clears occupied destinations.
+
                     if(rule==ReplaceRule.ALL&&context.empty()){
                         int cursor=0;
                         while(cursor<4096){int next=p.nonAir().next(work.key,cursor);work.done.set(cursor,next);cursor=next+1;}
@@ -79,7 +78,7 @@ final class CreativePasteTask {
                     if(resolver.unresolvedState(id)){work.done.set(i);processed++;skippedUnknown++;continue;}
                     var expected=resolver.resolve(id);var actual=chunk.getBlockState(pos);
                     if(rule.permits(expected.isAir(),actual.isAir())&&!expected.is(net.minecraft.world.level.block.Blocks.STRUCTURE_VOID)){
-                        // Validate detached payload before replacing a block or clearing its inventory.
+
                         CompoundTag tag=null;
                         if(nbt&&p.blockEntities().containsKey(index)){
                             tag=(CompoundTag)NbtBridge.game(p.blockEntities().get(index));
@@ -96,8 +95,7 @@ final class CreativePasteTask {
                         }
                         if(tag!=null){
                             var be=world.getBlockEntity(pos);if(be!=null){tag.putInt("x",pos.getX());tag.putInt("y",pos.getY());tag.putInt("z",pos.getZ());ItemDataBridge.loadBlockEntity(be,tag,world.registryAccess());
-                                // BlockEntity.markDirty also probes comparator neighbors and can synchronously load far chunks.
-                                // Bulk writes retain source states; persist the owned chunk and send the block-entity update directly.
+
                                 chunk.markUnsaved();world.sendBlockUpdated(pos,expected,expected,Block.UPDATE_CLIENTS);}
                         }
                     }
@@ -125,7 +123,7 @@ final class CreativePasteTask {
     }
     private String skippedStatus(){return skippedUnknown==0?"":" · 跳过未知 "+skippedUnknown+" 格";}
     static CompoundTag replacementInventory(net.minecraft.world.level.block.state.BlockState actual,net.minecraft.world.level.block.state.BlockState expected,net.minecraft.world.level.block.entity.BlockEntity entity){
-        // Property-only edits retain the existing container; changing its block type can scatter items.
+
         return actual.getBlock()==expected.getBlock()?null:CreativeFillTask.emptyInventory(entity);
     }
     private int admit(SectionKey key){

@@ -8,7 +8,6 @@ import net.minecraft.client.util.BufferAllocator;
 import java.util.LinkedHashMap;
 import java.util.function.Consumer;
 
-/** Executes vanilla model, item, text and custom commands into the existing bounded CPU mesh capture. */
 final class ProjectionCommandCapture implements AutoCloseable {
     private final BufferAllocator allocator=new BufferAllocator(256);
     private final OrderedRenderCommandQueueImpl queue=new OrderedRenderCommandQueueImpl();
@@ -30,8 +29,7 @@ final class ProjectionCommandCapture implements AutoCloseable {
         var manager=MinecraftClient.getInstance().getBlockEntityRenderDispatcher();
         net.minecraft.client.render.block.entity.BlockEntityRenderer renderer=manager.get(entity);
         if(renderer==null)return;
-        // Static projection capture has its own visibility/range. The live-world dispatcher
-        // returns null beyond its BER distance and must not decide whether this mesh exists.
+
         var state=renderer.createRenderState();var camera=camera();
         renderer.updateRenderState(entity,state,0,camera.pos,null);
         state.lightmapCoordinates=LightmapTextureManager.MAX_LIGHT_COORDINATE;
@@ -42,8 +40,7 @@ final class ProjectionCommandCapture implements AutoCloseable {
         this.target=target;queue.clear();
         try{
             submit.accept(queue);
-            // World particle passes render directly to the live framebuffer and cannot enter a
-            // static schematic mesh. Refuse that command rather than accidentally painting the world.
+
             for(var batch:queue.getBatchingQueues().values())if(!batch.getLayeredCustomCommands().isEmpty())throw new IllegalArgumentException("动态粒子不能用作静态投影模型");
             if(dispatcher==null){var client=MinecraftClient.getInstance();dispatcher=new RenderDispatcher(queue,client.getBlockRenderManager(),consumers,client.getAtlasManager(),outlines,consumers,client.textRenderer);}
             dispatcher.render();

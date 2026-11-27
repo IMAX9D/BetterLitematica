@@ -8,7 +8,6 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Identifier;
 
-/** Matrix-stack GUI backend with bounded batches for antialiased rounded shapes. */
 final class LegacyGuiContext {
     private final MatrixStack matrices;
     private BufferBuilder batch;

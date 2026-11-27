@@ -9,7 +9,6 @@ import java.util.*;
 import java.util.function.*;
 import org.lwjgl.PointerBuffer;
 
-/** Splits the existing solid pass only at depth snapshot boundaries, keeping all vanilla draws and bindings. */
 public final class EntityDepthPass implements RenderPass,RenderPass.UniformUploader {
     private static EntityDepthPass active;
     private final CommandEncoder encoder;

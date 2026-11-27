@@ -5,7 +5,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
-/** Live ARGB preview and keyboard-accessible picker entry. */
 final class ColorSwatch extends UiButton {
     private final Supplier<String> value;
     private final UiMotion motion=new UiMotion();

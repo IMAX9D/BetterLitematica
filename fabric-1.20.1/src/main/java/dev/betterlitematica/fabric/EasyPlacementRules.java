@@ -4,14 +4,13 @@ import net.minecraft.block.enums.SlabType;
 import net.minecraft.state.property.Properties;
 import net.minecraft.util.math.*;
 
-/** Only states obtainable by a normal use action are accepted. */
 final class EasyPlacementRules {
     static Vec3d hitPoint(BlockPos pos,Direction side,double height){
         return new Vec3d(pos.getX()+0.5+side.getOffsetX()*0.5,
             pos.getY()+(side==Direction.UP?1:side==Direction.DOWN?0:height),
             pos.getZ()+0.5+side.getOffsetZ()*0.5);
     }
-    /** Closest point on the same legal face, for ordinary blocks without hit-height semantics. */
+
     static Vec3d nearestHitPoint(BlockPos pos,Direction side,Vec3d eye){
         double x=clamp(eye.x,pos.getX()),y=clamp(eye.y,pos.getY()),z=clamp(eye.z,pos.getZ());
         return switch(side){

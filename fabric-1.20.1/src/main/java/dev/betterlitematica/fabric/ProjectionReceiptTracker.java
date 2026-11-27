@@ -3,7 +3,7 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.BlockView;
-/** Packet-scoped deduplication: high-rate placement must not repeat the normal world-change work. */
+
 public final class ProjectionReceiptTracker {
     private static final LongOpenHashSet observed=new LongOpenHashSet(4096);
     private static boolean active;

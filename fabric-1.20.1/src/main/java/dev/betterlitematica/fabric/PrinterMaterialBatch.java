@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Disk-backed source candidates; all world checks and Minecraft interactions stay on the client thread. */
 final class PrinterMaterialBatch implements AutoCloseable {
     private record Input(LoadCoordinator.Loaded lease,SchematicEdits.Snapshot edits,PlacementLayout layout,int[] materials){}
     private record Ref(PrinterMaterialIndex index,PrinterMaterialIndex.Slice slice,Vec3i origin,PlacementTransform transform){}
@@ -29,18 +28,20 @@ final class PrinterMaterialBatch implements AutoCloseable {
         final ArrayBlockingQueue<long[]> pages=new ArrayBlockingQueue<>(4);
         volatile boolean cancelled,done;volatile String error="";
     }
-    private record Receipt(int expected,int before,int tick){}
+    private record Receipt(int expected,int before,int tick,int material){}
     private final ExecutorService io=Executors.newSingleThreadExecutor(r->{var t=new Thread(r,"betterlitematica-material-cache");t.setDaemon(true);return t;});
     private Session session;private Pass pass;private Vec3i anchor;private double radius;
     private long[] page;private int offset,order,active=Integer.MIN_VALUE,drainedAt=-1,notBefore;
     private long passProgress,cycleProgress;private boolean complete;
     private final LinkedHashMap<Long,Receipt> receipts=new LinkedHashMap<>();
     private final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<long[]> credited=new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
-
+    private final it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap confirmedUnits=new it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap();
     static boolean enabled(PrinterSettings s){return s.materialBatch&&s.print&&!s.fill&&!s.fluid&&!s.bedrock&&!s.breakExtra&&s.printScope==PrinterSettings.Scope.PROJECTION;}
-    static int key(BlockState state,PrinterSettings settings){return state.getBlock() instanceof FluidBlock?net.minecraft.registry.Registries.ITEM.getRawId(state.isOf(Blocks.LAVA)?net.minecraft.item.Items.LAVA_BUCKET:settings.iceWater?net.minecraft.item.Items.ICE:net.minecraft.item.Items.WATER_BUCKET):PrinterActions.materialKey(state);}
+    static int key(BlockState state,PrinterSettings settings){return state.getBlock() instanceof FluidBlock?net.minecraft.registry.Registries.ITEM.getRawId(state.isOf(Blocks.LAVA)?net.minecraft.item.Items.LAVA_BUCKET:settings.waterToIce&&PrinterIcePolicy.waterSource(state)?net.minecraft.item.Items.ICE:net.minecraft.item.Items.WATER_BUCKET):PrinterActions.materialKey(state);}
     boolean pending(){return !complete;}
     int material(){return active;}
+    long confirmedUnits(int material){return confirmedUnits.get(material);}
+    long remaining(){var c=session==null?null:session.catalog;return c==null?0:c.counts.getOrDefault(active,0L);}
     String status(){return session!=null&&!session.error.isEmpty()?"材料缓存失败，请检查磁盘空间":session==null||session.catalog==null?"正在建立材料缓存":"正在读取材料队列";}
     void ensure(List<ProjectionController.PrinterSource> sources,Vec3i center,double reach,LayerRange layer,PrinterActions actions,PrinterSettings settings,int tick){
         if(session!=null&&anchor!=null&&Math.abs(center.x()-anchor.x())<=8&&Math.abs(center.y()-anchor.y())<=8&&Math.abs(center.z()-anchor.z())<=8&&reach==radius)return;
@@ -81,7 +82,7 @@ final class PrinterMaterialBatch implements AutoCloseable {
             finally{if(catalog!=null)catalog.close();for(var input:inputs)try{input.lease().close();}catch(IOException ignored){}}
         });
     }
-    /** Returns quickly; disk reads and coordinate conversion are bounded asynchronous pages. */
+
     boolean ready(int tick){
         if(session!=null&&!session.error.isEmpty()||pass!=null&&!pass.error.isEmpty())throw new IllegalStateException("材料缓存读取失败，请检查磁盘空间");
         if(session==null||session.catalog==null||tick<notBefore)return false;
@@ -116,27 +117,26 @@ final class PrinterMaterialBatch implements AutoCloseable {
         while(!owner.cancelled&&!pass.cancelled){if(pass.pages.offer(data,100,TimeUnit.MILLISECONDS))return true;}return false;
     }
     boolean exhausted(){return pass!=null&&pass.done&&pass.error.isEmpty()&&(page==null||offset>=page.length)&&pass.pages.isEmpty();}
-    /** Only advance after discovery, placement and actual inventory transactions have drained. */
+
     void drained(int tick){
         if(!exhausted())return;if(drainedAt<0)drainedAt=tick;
         expire(tick);if(!receipts.isEmpty()&&tick-drainedAt<20)return;
         receipts.clear();pass=null;page=null;
-        if(passProgress==0)order++; // A productive material gets another pass for newly available support.
+        if(passProgress==0)order++;
     }
-    void dispatched(PrinterQueue.Job job,int tick){
+    void dispatched(PrinterQueue.Job job,int tick,int material){
         if(session==null||pass==null)return;expire(tick);receipts.remove(job.position());
         if(receipts.size()>=65536)receipts.remove(receipts.keySet().iterator().next());
-        receipts.put(job.position(),new Receipt(job.expected(),job.observed(),tick));
+        receipts.put(job.position(),new Receipt(job.expected(),job.observed(),tick,material));
     }
     void confirmed(BlockPos pos,BlockState state,int tick){
         long key=pos.asLong();var receipt=receipts.get(key);if(receipt==null)return;
         if(tick-receipt.tick()>40){receipts.remove(key);return;}
-        // An unchanged/intermediate notification is not the placement acknowledgement.
+
         if(Block.getRawIdFromState(state)!=receipt.before()&&PrinterRules.constructionMatches(state,Block.getStateFromRawId(receipt.expected()))){
             receipts.remove(key);
-            // A plant repeatedly removed by server rules is still retryable, but
-            // cannot restart every material pass by confirming the same position.
-            if(firstConfirmation(pos)){passProgress++;cycleProgress++;}
+
+            if(firstConfirmation(pos)){passProgress++;cycleProgress++;if(receipt.material()>=0)confirmedUnits.addTo(receipt.material(),1);}
         }
     }
     private boolean firstConfirmation(BlockPos pos){
@@ -150,7 +150,7 @@ final class PrinterMaterialBatch implements AutoCloseable {
     void reset(){
         Session old=session;if(old!=null)old.cancelled=true;if(pass!=null)pass.cancelled=true;
         if(old!=null)io.execute(()->{if(old.catalog!=null)old.catalog.close();});
-        session=null;pass=null;page=null;anchor=null;active=Integer.MIN_VALUE;order=0;offset=0;complete=false;cycleProgress=passProgress=0;receipts.clear();credited.clear();
+        session=null;pass=null;page=null;anchor=null;active=Integer.MIN_VALUE;order=0;offset=0;complete=false;cycleProgress=passProgress=0;receipts.clear();credited.clear();confirmedUnits.clear();
     }
     public void close(){reset();io.shutdown();}
 }

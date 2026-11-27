@@ -6,7 +6,6 @@ import java.nio.file.Path;
 import java.nio.file.Files;
 import java.util.*;
 
-/** Source document for editing/pasting. Auxiliary data is read from the source, never from BPC. */
 public record SchematicDocument(int dataVersion, List<Part> parts) {
     public record Part(Region region, List<BlockStateSpec> palette, PackedBits blocks,
                        Map<Integer,Map<String,Object>> blockEntities, List<Map<String,Object>> entities,
@@ -18,7 +17,7 @@ public record SchematicDocument(int dataVersion, List<Part> parts) {
         Map<String,Object> root=NbtReader.read(path,SchematicImporter.SOURCE_LIMITS,cancel);
         return takeSource(root,cancel);
     }
-    /** Transfers this private parsed tree; callers must not mutate its packed arrays afterwards. */
+
     static SchematicDocument takeSource(Map<String,Object> root,Cancellation cancel)throws IOException{
         root=SourceVersions.litematic(SchematicFormats.canonical(root,cancel),cancel);
         int version=NbtReader.integer(root,"Version");SourceVersions.requireLitematicVersion(version);int dataVersion=NbtReader.integer(root,"MinecraftDataVersion");
@@ -32,8 +31,7 @@ public record SchematicDocument(int dataVersion, List<Part> parts) {
             if(!(tag.get("BlockStatePalette") instanceof List<?> list)||list.isEmpty()||list.size()>65536)throw new IOException("Invalid palette");
             List<BlockStateSpec> palette=new ArrayList<>();for(Object value:list){cancel.check();palette.add(SourceVersions.readState(NbtReader.compound(value,"State"),dataVersion).state());}
             if(!(tag.get("BlockStates") instanceof long[] words))throw new IOException("Missing states");
-            // The parsed root is private to this read and is never published. Retain its
-            // packed array directly instead of duplicating hundreds of MiB for large sources.
+
             PackedBits blocks=PackedBits.takeOwnership(Math.max(2,32-Integer.numberOfLeadingZeros(palette.size()-1)),Math.toIntExact(region.volume()),words);
             boolean[] air=new boolean[palette.size()];for(int i=0;i<air.length;i++)air[i]=palette.get(i).isAir()||palette.get(i).equals(SourceVersions.SKIPPED);
             var nonAir=SourceBlockIndex.build(blocks,size,air,cancel);

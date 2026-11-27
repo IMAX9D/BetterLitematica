@@ -5,7 +5,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 
-/** Virtual grid: only the rows intersecting the viewport are painted. */
 final class MaterialGrid extends UiButton {
     private static final int COLUMNS=5,ROW=72,GAP=6;
     private List<PlacementAnalysis.Material> rows=List.of();
@@ -47,7 +46,7 @@ final class MaterialGrid extends UiButton {
                 ui.item(icons.get(index),x+6,y+6,20);
                 ui.text(icons.get(index).getHoverName().getString(),x+31,y+9,cardWidth-36,UiTheme.TEXT);
                 long missing=Math.max(0,material.total()-material.available());
-                // Progress rail: how much of this material is already on hand.
+
                 double progress=material.total()<=0?1:Math.min(1,material.available()/(double)material.total()),rail=y+32;
                 ui.roundRect(x+6,rail,x+cardWidth-6,rail+2,1,UiTheme.TRACK);
                 if(progress>0)ui.roundRect(x+6,rail,x+6+(cardWidth-12)*progress,rail+2,1,missing>0?UiTheme.WARNING:UiTheme.SUCCESS);

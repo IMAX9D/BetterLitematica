@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import dev.betterlitematica.core.*;
 import java.util.NoSuchElementException;
 
-/** Persistent ordered construction plus bounded, source-aware section rechecks. */
 final class PrinterMovementScan {
     private final PrinterScan sweep;
     private final double radius;
@@ -17,8 +16,11 @@ final class PrinterMovementScan {
     private Overlap repair;
     private int turn;
     PrinterMovementScan(Vec3i center,double radius,PrinterRange.Shape shape,String order,boolean x,boolean y,boolean z){
+        this(center,radius,shape,order,x,y,z,null);
+    }
+    PrinterMovementScan(Vec3i center,double radius,PrinterRange.Shape shape,String order,boolean x,boolean y,boolean z,PlacementBounds bounds){
         this.center=this.anchor=center;this.radius=radius;this.shape=shape;this.order=order;reverse=new boolean[]{x,y,z};
-        sweep=new PrinterScan(center,radius,shape,order,x,y,z);
+        sweep=new PrinterScan(center,radius,shape,order,x,y,z,bounds);
     }
     double radius(){return radius;}
     void domain(java.util.function.Predicate<PlacementBounds> relevant){this.relevant=java.util.Objects.requireNonNull(relevant);}
@@ -26,7 +28,7 @@ final class PrinterMovementScan {
     void beginTick(Vec3i next,long tick){
         if(!next.equals(center)){center=next;movedAt=tick;}
         sweep.beginTick(next,tick);
-        // Small eye-position jitter must not repeatedly rescan almost the entire sphere.
+
         if(movedAt!=Long.MIN_VALUE&&tick-movedAt>=10&&distance(anchor,center)>=Math.max(2,radius*.1)){
             repair=new Overlap(anchor,center);anchor=center;movedAt=Long.MIN_VALUE;nextRecheck=tick+200;
         }else if((repair==null||!repair.hasNext())&&tick>=nextRecheck){

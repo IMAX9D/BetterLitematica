@@ -7,14 +7,13 @@ import java.security.*;
 import java.util.*;
 import java.util.zip.CRC32;
 
-/** Complete-source, bounded voxel thumbnails. No world, renderer cache or game API. */
 public final class SchematicPreview {
     public static final int VERSION=2,SIDE=256;
     private static final int LOD=160,CONFIG_LOD=128,MAX_PALETTE=131072;
     public static final int DETAIL_LOD=320,MAX_DETAIL_CELLS=8_000_000;
     private static final String FIELD="BetterLitematicaPreview";
     private SchematicPreview(){}
-    /** ARGB views: front (+Z), side (+X), top (+Y), isometric (+X,+Y,+Z). */
+
     public record Images(int side,List<int[]> views,Vec3i size,long blocks){
         public Images{
             if(side!=SIDE||views==null||views.size()!=4||size==null||size.x()<1||size.y()<1||size.z()<1||blocks<0||blocks>SchematicImporter.MAX_CELLS)throw new IllegalArgumentException("Invalid preview images");
@@ -22,7 +21,7 @@ public final class SchematicPreview {
         }
         @Override public List<int[]> views(){return views.stream().map(int[]::clone).toList();}
     }
-    /** Owns a bounded int grid (160^3 base, <=8M fine) and palette, never source packed arrays. */
+
     public static final class Geometry{
         private int resolution=LOD;
         private List<RegionGrid> regions=List.of();
@@ -31,8 +30,7 @@ public final class SchematicPreview {
         public List<BlockStateSpec> palette(){return palette;}public Vec3i size(){return size;}public long blocks(){return blocks;}public String digest(){return digest;}
         private int at(int x,int y,int z){return x<0||y<0||z<0||x>=nx||y>=ny||z>=nz?0:grid[x+nx*(z+nz*y)];}
     }
-    /** Reusable immutable render data: bounded full cells/surface indices and a legacy 64³ drag grid.
-     * Angles and raster scratch belong to each render call, so concurrent reads are safe. */
+
     public static final class OrbitModel{
         private final Geometry full,drag;private final int[] colors,surfaces,fullSurfaces;private final int[] low,high;
         private OrbitModel(Geometry full,Geometry drag,int[] colors,int[] surfaces,int[] fullSurfaces,int[] low,int[] high){this.full=full;this.drag=drag;this.colors=colors;this.surfaces=surfaces;this.fullSurfaces=fullSurfaces;this.low=low;this.high=high;}
@@ -43,7 +41,6 @@ public final class SchematicPreview {
     private static final PlacementTransform IDENTITY=new PlacementTransform(Vec3i.ZERO,0,false,false);
     private record Parsed(List<Part> parts,List<BlockStateSpec> palette,Vec3i min,Vec3i size,String digest){}
 
-    /** Geometry identity excludes optional metadata and does not allocate a decoded voxel grid. */
     public static String geometryDigest(Map<String,Object> root,Cancellation cancel)throws IOException{return parse(root,cancel,false).digest();}
 
     public static Geometry readGeometry(Map<String,Object> root,Cancellation cancel)throws IOException{
@@ -61,7 +58,7 @@ public final class SchematicPreview {
         int[] grid=new int[Math.multiplyExact(nx,Math.multiplyExact(ny,nz))];long blocks=0;
         for(var part:parsed.parts()){
             var r=part.region();int sx=r.size().x(),sz=r.size().z(),index=0;
-            // Every source cell participates. Later non-air wins at overlaps; air never erases a region.
+
             for(int y=0;y<r.size().y();y++){
                 int gy=Math.min(ny-1,(int)(((long)r.min().y()+y-parsed.min().y())/cell));
                 for(int z=0;z<sz;z++){
@@ -76,7 +73,7 @@ public final class SchematicPreview {
         }
         cancel.check();var geometry=new Geometry(parsed.palette(),grid,nx,ny,nz,size,blocks,parsed.digest());geometry.resolution=lod;return geometry;
     }
-    /** Geometry-only overrides: locking never changes pixels or persisted cache identity. */
+
     public static Map<String,RegionPlacement> geometryOverrides(Map<String,RegionPlacement> values){
         if(values.size()>BlueprintMetadata.MAX_REGIONS)throw new IllegalArgumentException("Preview region limit");var copy=new TreeMap<String,RegionPlacement>();
         for(var entry:values.entrySet()){String name=entry.getKey();var v=Objects.requireNonNull(entry.getValue());if(name.isBlank()||name.length()>256)throw new IllegalArgumentException("Invalid preview region");copy.put(name,new RegionPlacement(v.position(),v.quarterTurns(),v.mirrorX(),v.mirrorZ(),v.enabled(),false));}return Collections.unmodifiableMap(copy);
@@ -88,16 +85,14 @@ public final class SchematicPreview {
     public static Geometry readGeometry(Map<String,Object> root,Map<String,RegionPlacement> values,Cancellation cancel)throws IOException{
         return readGeometry(root,values,LOD,cancel);
     }
-    /** Fine geometry is regenerated from source, never upsampled from the thumbnail grid. */
+
     public static Geometry readGeometry(Map<String,Object> root,Map<String,RegionPlacement> values,int lod,Cancellation cancel)throws IOException{
         if(lod!=LOD&&lod!=DETAIL_LOD)throw new IllegalArgumentException("Invalid preview detail level");
         int configuredLod=lod==LOD?CONFIG_LOD:lod;
         var overrides=geometryOverrides(values);if(overrides.isEmpty())return readGeometry(root,lod,cancel);var parsed=parse(root,cancel,true);
         boolean changed=false;for(var p:parsed.parts()){var original=RegionPlacement.original(p.region());var selected=overrides.getOrDefault(p.region().name(),original);if(!selected.equals(original))changed=true;}
         if(!changed)return readGeometry(root,lod,cancel);
-        // One common shrink factor keeps the SUM of retained region grids within 160^3 cells,
-        // including overlapping regions. Configured grids and their single prepared pose
-        // each use <=128^3 cells (combined <=16 MiB). Packed source arrays are not retained.
+
         double factor=1;for(var part:parsed.parts())if(overrides.getOrDefault(part.region().name(),RegionPlacement.original(part.region())).enabled())factor=Math.max(factor,Math.max(part.region().size().x(),Math.max(part.region().size().y(),part.region().size().z()))/(double)configuredLod);
         while(true){long count=0;for(var p:parsed.parts())if(overrides.getOrDefault(p.region().name(),RegionPlacement.original(p.region())).enabled()){var size=p.region().size();count+=(long)Math.ceil(size.x()/factor)*(long)Math.ceil(size.y()/factor)*(long)Math.ceil(size.z()/factor);}if(count<=(lod==LOD?CONFIG_LOD*CONFIG_LOD*CONFIG_LOD:MAX_DETAIL_CELLS))break;factor*=1.05;cancel.check();}
         var parts=new ArrayList<RegionGrid>();long blocks=0;
@@ -120,14 +115,14 @@ public final class SchematicPreview {
             var size=max.subtract(min);double cell=cellSize(size,lod);int nx=(int)Math.ceil(size.x()/cell),ny=(int)Math.ceil(size.y()/cell),nz=(int)Math.ceil(size.z()/cell);int[] grid=new int[nx*ny*nz];
             for(int partIndex=0;partIndex<parts.size();partIndex++){var part=parts.get(partIndex);var g=part.geometry();var r=part.region();var t=transforms.get(partIndex);var bx=t.apply(new Vec3i(1,0,0)).subtract(t.origin());var bz=t.apply(new Vec3i(0,0,1)).subtract(t.origin());
                 for(int i=0;i<g.grid.length;i++){if((i&4095)==0)cancel.check();int id=g.grid[i];if(id==0)continue;int x=i%g.nx,z=i/g.nx%g.nz,y=i/(g.nx*g.nz);
-                    // Transform cell centres about block centres; mirrors must not shift a block by one.
+
                     double px=r.min().x()+x*r.size().x()/(double)g.nx,py=r.min().y()+y*r.size().y()/(double)g.ny,pz=r.min().z()+z*r.size().z()/(double)g.nz;
                     double wx=bx.x()*px+bz.x()*pz+t.origin().x(),wz=bx.z()*px+bz.z()*pz+t.origin().z();int gx=Math.max(0,Math.min(nx-1,(int)((wx-min.x())/cell))),gy=Math.max(0,Math.min(ny-1,(int)((py+t.origin().y()-min.y())/cell))),gz=Math.max(0,Math.min(nz-1,(int)((wz-min.z())/cell)));grid[gx+nx*(gz+nz*gy)]=id;
                 }
             }return new Geometry(palette,grid,nx,ny,nz,size,blocks,digest);
         }catch(ArithmeticException|IllegalArgumentException invalid){throw new IOException("Preview transform exceeds coordinate range",invalid);}
     }
-    /** Returns render-only prepared data. World translation deliberately has no visual effect. */
+
     public static OrbitModel posedOrbitModel(OrbitModel model,PlacementTransform pose,Cancellation cancel)throws IOException{
         var linear=new PlacementTransform(Vec3i.ZERO,pose.quarterTurns(),pose.mirrorX(),pose.mirrorZ());cancel.check();if(linear.equals(IDENTITY)&&model.full.regions.isEmpty())return model;
         int lod=model.full.resolution;
@@ -172,7 +167,6 @@ public final class SchematicPreview {
     private static void string(DataOutputStream out,String text)throws IOException{byte[] bytes=text.getBytes(StandardCharsets.UTF_8);if(bytes.length>262144)throw new IOException("Preview text exceeds limit");out.writeInt(bytes.length);out.write(bytes);}
     private static void vector(DataOutputStream out,Vec3i v)throws IOException{out.writeInt(v.x());out.writeInt(v.y());out.writeInt(v.z());}
 
-    /** Rasterizes exposed LOD voxel faces with directional and height shading, transparent background. */
     public static Images render(Geometry geometry,int[] colors,Cancellation cancel)throws IOException{
         Objects.requireNonNull(geometry);if(colors==null||colors.length!=geometry.palette().size())throw new IllegalArgumentException("Preview palette/color mismatch");cancel.check();
         int[] low={geometry.nx,geometry.ny,geometry.nz},high={0,0,0};boolean any=false;
@@ -199,15 +193,13 @@ public final class SchematicPreview {
     public static OrbitModel createOrbitModel(Geometry geometry,int[] colors,Cancellation cancel)throws IOException{
         Objects.requireNonNull(geometry);if(colors==null||colors.length!=geometry.palette.size())throw new IllegalArgumentException("Preview palette/color mismatch");cancel.check();
         if(!geometry.regions.isEmpty()){
-            // The configured base keeps only separate source grids. The per-Orbit worker owns
-            // one prepared pose; retaining an additional identity grid here doubles memory.
+
             var base=new Geometry(geometry.palette,new int[0],geometry.nx,geometry.ny,geometry.nz,geometry.size,geometry.blocks,geometry.digest);base.regions=geometry.regions;
             base.resolution=geometry.resolution;
             return new OrbitModel(base,base,colors.clone(),new int[0],new int[0],new int[3],new int[]{1,1,1});
         }
         int[] low={geometry.nx,geometry.ny,geometry.nz},high={0,0,0};
-        // One packed index/mask per exposed cell, bounded by the grid budget (<=32 MiB fine).
-        // Camera frames traverse visible surfaces instead of rescanning millions of interior cells.
+
         int[] fullFaces=new int[geometry.grid.length];int fullCount=0;
         for(int i=0;i<geometry.grid.length;i++){
             if((i&8191)==0)cancel.check();int id=geometry.grid[i];if(id==0)continue;int x=i%geometry.nx,z=i/geometry.nx%geometry.nz,y=i/(geometry.nx*geometry.nz);
@@ -225,14 +217,13 @@ public final class SchematicPreview {
         for(int i=0;i<coarse.length;i++){if((i&8191)==0)cancel.check();if(coarse[i]==0)continue;int x=i%nx,z=i/nx%nz,y=i/(nx*nz),mask=faceMask(drag,x,y,z);if(mask!=0)exposed[count++]=(i<<6)|mask;}
         cancel.check();return new OrbitModel(geometry,drag,colors.clone(),Arrays.copyOf(exposed,count),Arrays.copyOf(fullFaces,fullCount),low,high);
     }
-    /** yaw=0 faces +Z, yaw=PI/2 faces +X; positive pitch looks from above.
-     * Framing uses one fixed bounding sphere, so rotating never auto-zooms the model. */
+
     public static int[] renderOrbit(OrbitModel model,double yaw,double pitch,boolean dragging,Cancellation cancel)throws IOException{
         Objects.requireNonNull(model);if(!Double.isFinite(yaw)||!Double.isFinite(pitch))throw new IllegalArgumentException("Invalid preview angle");cancel.check();
         if(!model.full.regions.isEmpty())return renderOrbit(posedOrbitModel(model,IDENTITY,cancel),yaw,pitch,dragging,cancel);
         Geometry g=dragging?model.drag:model.full;return renderOrbit(model,g,new Raster(model,g,yaw,pitch),yaw,pitch,dragging,cancel);
     }
-    /** Fixed source-space framing across detail levels; pan is a fraction of the visible viewport. */
+
     public static int[] renderOrbit(OrbitModel model,OrbitModel framing,double yaw,double pitch,double zoom,double panX,double panY,int side,boolean dragging,Cancellation cancel)throws IOException{
         validateCamera(yaw,pitch,zoom,panX,panY,side);cancel.check();
         if(!model.full.regions.isEmpty())model=posedOrbitModel(model,IDENTITY,cancel);
@@ -257,7 +248,7 @@ public final class SchematicPreview {
         if(mask==0)return;int x=index%g.nx,z=index/g.nx%g.nz,y=index/(g.nx*g.nz),color=colors[g.grid[index]-1];
         for(int face=0;face<6;face++)if((mask&(1<<face))!=0){double brightness=switch(face){case 0->.80;case 1->1;case 2->.90;case 3->.72;case 4->.64;default->.84;};raster.face(x,y,z,face,shade(color,brightness));}
     }
-    /** Raw bounded payload; outer cache owns source identity, compression, checksum and publication. */
+
     public static void writeOrbitModel(OrbitModel model,DataOutput out,Cancellation cancel)throws IOException{
         Objects.requireNonNull(model);cancel.check();if(!model.full.regions.isEmpty()){writeConfigured(model,out,cancel);return;}var g=model.full;out.writeInt(VERSION);out.writeInt(g.nx);out.writeInt(g.ny);out.writeInt(g.nz);out.writeInt(g.size.x());out.writeInt(g.size.y());out.writeInt(g.size.z());out.writeLong(g.blocks);out.writeUTF(g.digest);out.writeInt(model.colors.length);
         for(int i=0;i<model.colors.length;i++){if((i&1023)==0)cancel.check();out.writeInt(model.colors[i]);}
@@ -279,7 +270,7 @@ public final class SchematicPreview {
         if(occupied>blocks||occupied==0&&blocks!=0)throw new IOException("Invalid orbit occupancy");
         var geometry=new Geometry(Collections.nCopies(count,BlockStateSpec.AIR),grid,nx,ny,nz,size,blocks,digest);geometry.resolution=limit;return createOrbitModel(geometry,colors,cancel);
     }
-    // Configured payload is render-only too: palette entries are colour indices, never export data.
+
     private static void writeConfigured(OrbitModel model,DataOutput out,Cancellation cancel)throws IOException{
         out.writeInt(-VERSION);out.writeUTF(model.full.digest);out.writeInt(model.colors.length);for(int c:model.colors)out.writeInt(c);out.writeInt(model.full.regions.size());
         for(var part:model.full.regions){cancel.check();var r=part.region();out.writeUTF(r.name());writeVector(out,r.min());writeVector(out,r.size());writeVector(out,r.anchor());var setting=part.placement();writeVector(out,setting.position());out.writeInt(setting.quarterTurns());out.writeBoolean(setting.mirrorX());out.writeBoolean(setting.mirrorZ());var g=part.geometry();out.writeInt(g.nx);out.writeInt(g.ny);out.writeInt(g.nz);out.writeLong(g.blocks);for(int i=0;i<g.grid.length;i++){if((i&2047)==0)cancel.check();out.writeInt(g.grid[i]);}}
@@ -341,7 +332,6 @@ public final class SchematicPreview {
         }
     }
 
-    /** Only our geometry-verified four-view envelope is trusted, never an unverified legacy screenshot. */
     public static Images embedded(Map<String,Object> root,Cancellation cancel)throws IOException{
         cancel.check();try{
             var target=metadataRoot(root);if(!(target.get("Metadata") instanceof Map<?,?>))return null;var metadata=NbtReader.compound(target.get("Metadata"),"Metadata");if(!metadata.containsKey(FIELD))return null;var saved=NbtReader.compound(metadata.get(FIELD),FIELD);
@@ -351,7 +341,7 @@ public final class SchematicPreview {
             var size=SchematicDocument.vector(saved.get("Size"));long blocks=number(saved,"Blocks");Images result=new Images(NbtReader.integer(saved,"Side"),views,size,blocks);if(number(saved,"CRC")!=checksum(result))return null;return result;
         }catch(InterruptedIOException cancelled){throw cancelled;}catch(IOException|IllegalArgumentException malformed){return null;}
     }
-    /** Mutates metadata in this in-memory tree only. Caller chooses a new output file. */
+
     public static void embed(Map<String,Object> root,Images images,Cancellation cancel)throws IOException{
         Objects.requireNonNull(images);var parsed=parse(root,cancel,false);if(!parsed.size().equals(images.size()))throw new IOException("Preview/source size mismatch");
         var saved=new LinkedHashMap<String,Object>();saved.put("Version",VERSION);saved.put("Geometry",parsed.digest());saved.put("Side",images.side());saved.put("Size",LitematicExport.vector(images.size()));saved.put("Blocks",images.blocks());saved.put("Views",images.views());saved.put("CRC",checksum(images));

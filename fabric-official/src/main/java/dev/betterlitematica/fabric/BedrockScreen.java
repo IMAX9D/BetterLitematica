@@ -9,7 +9,7 @@ import net.minecraft.world.phys.HitResult;
 import java.util.*;
 import java.util.function.*;
 import java.util.regex.Pattern;
-/** One compact settings surface for direct targets, printer requests and dimension-scoped regions. */
+
 final class BedrockScreen extends MenuScreen {
     private final long epoch;
     private BedrockSettings draft;
@@ -119,7 +119,7 @@ final class BedrockScreen extends MenuScreen {
         long count=persistent?controller.bedrock().settings().regions.size():controller.bedrock().regions().stream().filter(region->!region.persistent()).count();
         if(count+boxes.size()>BedrockSettings.MAX_REGIONS)throw new IllegalStateException("区域数量已达上限");
         int index=0;String world=controller.worldKey(),dimension=minecraft.level.dimension().identifier().toString();
-        // Validate every box before configure can cancel work; this loop has no controller side effects.
+
         for(var box:boxes)new BedrockSettings.Region(new UUID(0,++index),"选区 "+index,world,dimension,box.first(),box.second(),persistent);
     }
     private static String dimension(String value){return switch(value){case "minecraft:overworld"->"主世界";case "minecraft:the_nether"->"下界";case "minecraft:the_end"->"末地";default->value;};}

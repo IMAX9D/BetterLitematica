@@ -3,7 +3,7 @@ import dev.betterlitematica.core.*;
 import dev.betterlitematica.io.BlueprintCache;
 import java.io.*;
 import java.util.*;
-/** Built once off-thread, queried in blueprint coordinates. No whole-blueprint scan per frame. */
+
 public final class SpatialIndex {
     private record Bucket(int region,int x,int y,int z){}
     private record Candidate(SectionKey key,double distance){}
@@ -19,7 +19,7 @@ public final class SpatialIndex {
     public List<SectionKey> nearest(Vec3i camera,int radius,int limit,PlacementLayout layout){
         return nearest(camera,radius,limit,layout,List.of());
     }
-    /** additions contain only sections absent from the immutable source index. */
+
     public List<SectionKey> nearest(Vec3i camera,int radius,int limit,PlacementLayout layout,Collection<SectionKey> additions){
         if(radius<1||radius>512||limit<1||limit>32768)throw new IllegalArgumentException("Query outside supported budget");
         PriorityQueue<Candidate> best=new PriorityQueue<>(Comparator.comparingDouble(Candidate::distance).reversed());

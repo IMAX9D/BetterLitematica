@@ -5,7 +5,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.*;
 import net.minecraft.nbt.NbtElement;
 
-/** Bounded inventory and enabled shulker-source stock snapshot, refreshed on client ticks. */
 final class MaterialStock {
     private final MinecraftClient client;
     private final Map<Item,Long> counts=new HashMap<>();

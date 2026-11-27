@@ -10,7 +10,7 @@ import net.minecraft.world.level.block.entity.SignText;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket;
 import java.util.List;
-/** Small gameplay API boundary; each version keeps vanilla item and interaction semantics. */
+
 final class VersionGameplay {
     static void swingUse(LocalPlayer player,InteractionHand hand,InteractionResult result){if(result instanceof InteractionResult.Success success&&success.swingSource()==InteractionResult.SwingSource.PREDICTED)player.swing(hand,player.getItemInHand(hand).getInteractAnimation(),false);}
     static void swingBreak(LocalPlayer player,InteractionHand hand){player.swing(hand,player.getItemInHand(hand).getAttackAnimation(),false);player.connection.send(net.minecraft.network.protocol.game.ServerboundPunchPacket.INSTANCE);}

@@ -18,7 +18,6 @@ import net.minecraft.sound.*;
 import net.minecraft.world.event.GameEvent;
 import java.util.*;
 
-/** Detached read-only rendering world. It never exposes the real world's chunks or entities. */
 final class ProjectionWorld extends World {
     private final ClientWorld base;private BlockRenderView view;private java.util.function.Function<BlockPos,BlockEntity> blockEntities=p->null;
     private final net.minecraft.scoreboard.Scoreboard scoreboard=new net.minecraft.scoreboard.Scoreboard();

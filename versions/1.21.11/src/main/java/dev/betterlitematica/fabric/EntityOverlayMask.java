@@ -4,7 +4,6 @@ import com.mojang.blaze3d.systems.*;
 import com.mojang.blaze3d.textures.*;
 import net.minecraft.client.MinecraftClient;
 
-/** GPU depth snapshots isolate entity pixels without hiding terrain overlays. */
 final class EntityOverlayMask {
     private static GpuTexture before,after;
     private static GpuTextureView beforeView,afterView;

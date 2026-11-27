@@ -5,7 +5,6 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
-/** Immutable source snapshots plus placement settings. Versions never overwrite the original blueprint. */
 public final class ProjectVersions {
     public record Version(String id,String name){}
     private ProjectVersions(){}

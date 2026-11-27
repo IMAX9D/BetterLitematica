@@ -2,7 +2,6 @@ package dev.betterlitematica.fabric;
 
 import dev.betterlitematica.runtime.OutlineFont;
 
-/** Layout-relative font sizing, rasterized once at its final physical pixel size. */
 final class UiTypography {
     private UiTypography(){}
     static int bodyPixels(double scale,OutlineFont font){return pixels(scale,9.5,14,font);}

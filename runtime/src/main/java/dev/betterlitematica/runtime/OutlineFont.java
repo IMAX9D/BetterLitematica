@@ -10,7 +10,6 @@ import java.util.LinkedHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
-/** No Minecraft font or window APIs. Produces antialiased glyphs at the final integer pixel size. */
 public final class OutlineFont {
     public static final int MAX_TEXT=2048,MAX_WIDTH=8192,MAX_PIXELS=524288;
     private static final FontRenderContext CONTEXT=new FontRenderContext(null,true,true);
@@ -28,12 +27,12 @@ public final class OutlineFont {
         String family=selectSystemFamily(available,name->new Font(name,Font.PLAIN,20).canDisplayUpTo(COVERAGE)<0);
         return new OutlineFont(new Font(family,Font.PLAIN,20));
     }
-    /** Match real installed names first: new Font(unknownName, ...) silently substitutes Dialog. */
+
     public static String selectSystemFamily(String[] available,Predicate<String> supports){
         Map<String,String> installed=new LinkedHashMap<>();
         for(String name:available)installed.putIfAbsent(name.toLowerCase(Locale.ROOT),name);
         for(String preferred:PREFERRED){String name=installed.get(preferred.toLowerCase(Locale.ROOT));if(name!=null&&supports.test(name))return name;}
-        // Java's logical font uses platform font fallback where available.
+
         if(supports.test(Font.DIALOG))return Font.DIALOG;
         for(String name:installed.values())if(supports.test(name))return name;
         return Font.DIALOG;

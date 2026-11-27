@@ -5,7 +5,6 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NumericTag;
 import net.minecraft.nbt.Tag;
 
-/** Explicit type checks preserve the schematic format's typed NBT contracts. */
 final class NbtAccess {
     private NbtAccess() {}
     static boolean contains(CompoundTag compound,String key,int type) {

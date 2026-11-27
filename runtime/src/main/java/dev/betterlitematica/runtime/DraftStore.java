@@ -7,7 +7,6 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.zip.CRC32;
 
-/** Complete bounded recovery image, independent of the placement settings commit. */
 public final class DraftStore {
     private static final int MAGIC=0x424c4452,VERSION=1;
     public static final int MAX_BYTES=64*1024*1024;

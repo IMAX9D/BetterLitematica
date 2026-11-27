@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import net.minecraft.nbt.*;
 import java.util.*;
 
-/** Type-preserving bridge at the version adapter boundary. */
 final class NbtBridge {
     private NbtBridge() {}
     static final class Budget {

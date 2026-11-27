@@ -5,7 +5,6 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
-/** File metadata read without allocating source block arrays; edits always produce a separate file. */
 public record SchematicFileInfo(String name,String author,String description,int dataVersion,long blocks,long volume,int regions,int[] preview) {
     public SchematicFileInfo {preview=preview.clone();}
     @Override public int[] preview(){return preview.clone();}
@@ -27,7 +26,7 @@ public record SchematicFileInfo(String name,String author,String description,int
     public static void export(Path source,Path output,String format,String name,String author,String description,int[] preview,Cancellation cancel)throws IOException{
         NbtWriter.writeNew(output,prepareExport(source,format,name,author,description,preview,cancel),cancel);
     }
-    /** Private export tree, ready for optional metadata attachments before atomic publication. */
+
     public static Map<String,Object> prepareExport(Path source,String format,String name,String author,String description,int[] preview,Cancellation cancel)throws IOException{
         if(name==null||name.isBlank()||name.length()>120||author==null||author.length()>120||description==null||description.length()>2048)throw new IOException("元信息长度无效");
         if(!Set.of("litematic","schem","nbt").contains(format))throw new IOException("无效输出格式");

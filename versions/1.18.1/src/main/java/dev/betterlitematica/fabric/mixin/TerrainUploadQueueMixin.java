@@ -16,14 +16,14 @@ import org.spongepowered.asm.mixin.injection.callback.*;
 public abstract class TerrainUploadQueueMixin implements TerrainUploadOwner {
     @Unique private final TerrainUploadQueue betterlitematica$uploads=new TerrainUploadQueue();
     @Unique private ExecutorService betterlitematica$workers;
-    // This point is after Object.<init>, so the handler may safely store our executor on this instance.
+
     @ModifyVariable(method="<init>",at=@At(value="INVOKE",target="Lcom/google/common/collect/Queues;newPriorityQueue()Ljava/util/PriorityQueue;"),argsOnly=true)
     private Executor betterlitematica$dedicatedWorkers(Executor original){
         betterlitematica$workers=TerrainWorkers.create();return betterlitematica$workers;
     }
     @WrapOperation(method="<init>",at=@At(value="INVOKE",target="Ljava/lang/Runtime;availableProcessors()I"))
     private int betterlitematica$builderCount(Runtime runtime,Operation<Integer> original){
-        // One spare builder lets uploads and workers overlap without allocating one per logical CPU.
+
         return TerrainWorkers.parallelism()+1;
     }
     @Override public TerrainUploadQueue betterlitematica$uploads(){return betterlitematica$uploads;}
@@ -37,8 +37,7 @@ public abstract class TerrainUploadQueueMixin implements TerrainUploadOwner {
     private void betterlitematica$stop(CallbackInfo ci){betterlitematica$uploads.stop();}
     @Inject(method="stop",at=@At("RETURN"))
     private void betterlitematica$stopWorkers(CallbackInfo ci){
-        // Running jobs finish and release their buffers into the closed upload queue. Never interrupt
-        // a model renderer midway through native writes; the pool's threads cannot keep the JVM alive.
+
         if(betterlitematica$workers!=null)betterlitematica$workers.shutdown();
     }
 }

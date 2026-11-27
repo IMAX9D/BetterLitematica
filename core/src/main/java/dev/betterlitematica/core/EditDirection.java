@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** Face-center follows the normal; outer face quarters select an in-plane direction. */
 public final class EditDirection {
     private EditDirection(){}
     public static Vec3i choose(Vec3i face,double x,double y,double z,Vec3i heading,boolean place){

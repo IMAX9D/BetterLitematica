@@ -5,7 +5,7 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 import java.util.*;
 import java.util.function.Consumer;
-/** Virtual verifier rows with explicit ignore/restore actions. */
+
 final class VerificationList extends ButtonWidget {
     record Row(VerificationReport.Key key,long count,boolean ignored){}
     private static final int ROW=44;private List<Row> rows=List.of();private double scroll;private boolean dragging;private String emptyMessage="尚未校验";

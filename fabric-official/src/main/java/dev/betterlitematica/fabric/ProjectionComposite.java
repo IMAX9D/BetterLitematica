@@ -3,7 +3,7 @@ import com.mojang.blaze3d.pipeline.*;
 import com.mojang.blaze3d.systems.RenderSystem;
 
 import net.minecraft.client.Minecraft;
-/** All placements share one nearest-surface image; opacity is applied once per pixel. */
+
 final class ProjectionComposite implements AutoCloseable {
  private static ProjectionComposite open;
  private RenderTarget target;private ProjectionGpuMesh quad;private Minecraft client;private boolean started;

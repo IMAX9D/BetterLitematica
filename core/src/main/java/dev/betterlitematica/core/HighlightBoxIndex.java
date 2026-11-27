@@ -2,18 +2,12 @@ package dev.betterlitematica.core;
 
 import java.util.*;
 
-/**
- * Immutable spatial index for highlight cuboids. Boxes are bucketed by the 16³ cell of their minimum corner
- * and stored bucket-contiguously as flat int arrays, so a frame visits only nearby, visible buckets and never
- * allocates or sorts the whole ledger. A bucket's bounds are the union of its boxes, so bucket tests are exact
- * supersets of their members.
- */
 public final class HighlightBoxIndex {
-    /** Coordinates are world-space with exclusive maxima (a cell at x spans [x, x+1)). */
+
     public interface BoundsTest {
-        /** {@link #OUTSIDE}, {@link #INTERSECTS} or {@link #INSIDE}; called once per candidate bucket. */
+
         int test(double minX,double minY,double minZ,double maxX,double maxY,double maxZ);
-        /** Per-box visibility inside a partially visible bucket; implementations may make this cheaper than {@link #test}. */
+
         default boolean intersects(double minX,double minY,double minZ,double maxX,double maxY,double maxZ){return test(minX,minY,minZ,maxX,maxY,maxZ)!=OUTSIDE;}
     }
     public interface Visitor { void visit(int slot,double distanceSquared); }
@@ -26,7 +20,6 @@ public final class HighlightBoxIndex {
 
     private HighlightBoxIndex(HighlightCuboids.Box[] boxes,int[] coords,int[] source,int[] start,int[] bounds){this.boxes=boxes;this.coords=coords;this.source=source;this.start=start;this.bounds=bounds;}
 
-    /** Two-pass counting sort: O(n) time, no boxing, one primitive hash table sized to the bucket count. */
     public static HighlightBoxIndex build(Collection<HighlightCuboids.Box> input){
         int n=input.size();var source=input.toArray(new HighlightCuboids.Box[0]);
         int capacity=Integer.highestOneBit(Math.max(4,n*2-1))<<1;long[] keys=new long[capacity];int[] ids=new int[capacity];Arrays.fill(ids,-1);
@@ -53,14 +46,13 @@ public final class HighlightBoxIndex {
     public int size(){return boxes.length;}
     public int buckets(){return start.length-1;}
     public HighlightCuboids.Box box(int slot){return boxes[slot];}
-    /** Position of the slot's box in the list the index was built from. */
+
     public int sourceIndex(int slot){return source[slot];}
     public int minX(int slot){return coords[slot*6];}public int minY(int slot){return coords[slot*6+1];}public int minZ(int slot){return coords[slot*6+2];}
-    /** Inclusive cell maxima; draw extents are these plus one. */
+
     public int maxX(int slot){return coords[slot*6+3];}public int maxY(int slot){return coords[slot*6+4];}public int maxZ(int slot){return coords[slot*6+5];}
     public long bytes(){return 64L+boxes.length*(8L+28L)+start.length*4L+bounds.length*4L;}
 
-    /** Squared distance from a point to a box of whole cells, the same metric the overlays sort by. */
     public static double distanceSquared(double px,double py,double pz,int x0,int y0,int z0,int x1,int y1,int z1){
         double x=Math.max(x0-px,Math.max(0,px-x1-1)),y=Math.max(y0-py,Math.max(0,py-y1-1)),z=Math.max(z0-pz,Math.max(0,pz-z1-1));return x*x+y*y+z*z;
     }
@@ -69,11 +61,6 @@ public final class HighlightBoxIndex {
     private int bucketTest(int b,BoundsTest test){int o=b*6;return test.test(bounds[o],bounds[o+1],bounds[o+2],bounds[o+3]+1.0,bounds[o+4]+1.0,bounds[o+5]+1.0);}
     private boolean slotVisible(int slot,BoundsTest test){int c=slot*6;return test.intersects(coords[c],coords[c+1],coords[c+2],coords[c+3]+1.0,coords[c+4]+1.0,coords[c+5]+1.0);}
 
-    /**
-     * Visits every box within range whose bounds pass {@code test}, bucket by bucket from near to far. Buckets
-     * outside range or view are skipped whole; buckets entirely inside the view skip per-box tests.
-     * Not thread-safe: reuses scratch arrays.
-     */
     public void forEach(double px,double py,double pz,double maxDistanceSquared,BoundsTest test,Visitor visitor){
         int candidates=candidateBuckets(px,py,pz,maxDistanceSquared);
         for(int i=0;i<candidates;i++){
@@ -82,12 +69,6 @@ public final class HighlightBoxIndex {
         }
     }
 
-    /**
-     * The {@code limit} nearest visible boxes within range, nearest first, ties in source-list order: exactly the
-     * prefix a stable distance sort of the whole list followed by the same filters would produce. Buckets are visited by their lower-bound distance and the search stops as soon as
-     * no unvisited bucket can beat the current {@code limit}-th candidate. Not thread-safe: reuses scratch arrays.
-     * @return number of slots written to {@code out}
-     */
     public int nearest(double px,double py,double pz,double maxDistanceSquared,int limit,BoundsTest test,int[] out){
         if(limit<=0||boxes.length==0)return 0;limit=Math.min(limit,Math.min(out.length,boxes.length));
         int candidates=candidateBuckets(px,py,pz,maxDistanceSquared);
@@ -103,19 +84,19 @@ public final class HighlightBoxIndex {
                 if(size<limit){heap[size]=s;heapDistance[size]=d;siftUp(size++);}else{heap[0]=s;heapDistance[0]=d;siftDown(0,size);}
             }
         }
-        // Heap sort in place: repeatedly move the farthest to the end, leaving nearest first.
+
         for(int end=size-1;end>0;end--){swap(0,end);siftDown(0,end);}
         for(int i=0;i<size;i++)out[i]=(int)heap[i];
         return size;
     }
-    /** Buckets within range, ordered by their lower-bound distance, in {@code bucketKey}/{@code bucketOrder}. */
+
     private int candidateBuckets(double px,double py,double pz,double maxDistanceSquared){
         int buckets=buckets(),candidates=0;
         if(bucketKey.length<buckets){bucketKey=new double[buckets];bucketOrder=new int[buckets];}
         for(int b=0;b<buckets;b++){double d=bucketDistance(b,px,py,pz);if(d<=maxDistanceSquared){bucketKey[candidates]=d;bucketOrder[candidates++]=b;}}
         sortBuckets(candidates);return candidates;
     }
-    /** Total order (distance, source index); the heap root is the greatest, i.e. the first to be displaced. */
+
     private static boolean before(double d,int s,double otherD,int otherS){return d<otherD||d==otherD&&s<otherS;}
     private boolean less(int a,int b){return before(heapDistance[a],source[(int)heap[a]],heapDistance[b],source[(int)heap[b]]);}
     private void siftUp(int i){while(i>0){int parent=(i-1)>>1;if(!less(parent,i))break;swap(i,parent);i=parent;}}
@@ -126,7 +107,7 @@ public final class HighlightBoxIndex {
             if(largest==i)return;swap(i,largest);i=largest;}
     }
     private void swap(int a,int b){long h=heap[a];heap[a]=heap[b];heap[b]=h;double d=heapDistance[a];heapDistance[a]=heapDistance[b];heapDistance[b]=d;}
-    /** Primitive merge sort of candidate buckets by lower bound; buckets are few compared to boxes. Reuses scratch. */
+
     private void sortBuckets(int n){
         if(n<2)return;if(mergeKey.length<n){mergeKey=new double[n];mergeOrder=new int[n];}
         sortRange(0,n,mergeKey,mergeOrder);

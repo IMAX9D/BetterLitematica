@@ -6,7 +6,6 @@ import net.minecraft.registry.Registries;
 import java.io.IOException;
 import java.util.*;
 
-/** Detached NBT and frozen block registries only. Never receives an active world or client. */
 final class CommandPlans {
     record EntityPlan(String line,List<Vec3i> required){EntityPlan{required=List.copyOf(required);}}
     record Prepared(Map<Long,List<String>> blocks,List<List<EntityPlan>> entities,Set<String> commands,Set<Long> skippedBlocks,long skippedEntities){}

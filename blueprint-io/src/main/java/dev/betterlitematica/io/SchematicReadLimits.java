@@ -4,7 +4,6 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.Properties;
 
-/** Source-file budgets only. Generic NBT and retained metadata keep their existing limits. */
 public final class SchematicReadLimits {
     public static final int DEFAULT_PERCENT=60;
     private static final System.Logger LOG=System.getLogger("BetterLitematica.SourceLoader");
@@ -16,7 +15,7 @@ public final class SchematicReadLimits {
     public static long bytesForHeap(long heap,int percent){
         if(heap<1)throw new IllegalArgumentException("Invalid heap size");
         if(percent<1||percent>90)throw new IllegalArgumentException("Invalid source memory percentage");
-        // Divide before multiplying so even extreme heap values cannot overflow.
+
         return Math.max(1,(heap/100)*percent+(heap%100)*percent/100);
     }
     private static int loadPercent(){
@@ -36,7 +35,7 @@ public final class SchematicReadLimits {
         return DEFAULT_PERCENT;
     }
     private static Path configPath()throws Exception{
-        // Explicit override is useful for standalone importers and tests; never guess their working directory.
+
         String override=System.getProperty("betterlitematica.sourceConfig");
         if(override!=null&&!override.isBlank())return Path.of(override);
         Class<?> loader;

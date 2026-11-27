@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import dev.betterlitematica.runtime.StatusBadgeArt;
 import dev.betterlitematica.runtime.UiGlyphArt;
 
-/** Bounded presentation snapshots; ordinary status uses symbols, not instructional sentences. */
 final class StatusHud {
     private long epoch=Long.MIN_VALUE,nextSnapshot;
     private String detail="",badgeLabel="打印中",blockedReason="";
@@ -28,7 +27,6 @@ final class StatusHud {
         selectedPage=Math.floorMod(selectedPage+(amount>0?-1:1),pageCount);return true;
     }
     static boolean missingStatus(PrinterReason status){return status.missing();}
-
 
     private void snapshot(ProjectionController controller){
         long now=System.nanoTime();var printer=controller.printer();
@@ -59,7 +57,7 @@ final class StatusHud {
     void draw(IndependentUi ui,ProjectionController controller,HudLayout layout,double toolTop){
         snapshot(controller);
         double x=layout.left(),y=layout.top(),line=Math.max(12,ui.lineHeight()),row=Math.max(18,line+2),maxWidth=layout.statusWidth();
-        // Read the switches every frame; only the explanatory detail below uses the 5 Hz snapshot.
+
         boolean projectionBadge=controller.hasProjection();var currentState=controller.printer().state();
         boolean printerBadge=controller.options().printer.hud&&(projectionBadge||currentState!=PrinterEngine.State.STOPPED);
         if(motionEpoch!=controller.sessionEpoch()){
@@ -141,9 +139,8 @@ final class StatusHud {
         ui.unclip();
     }
 
-    /** One continuous surface; only the right edge moves, with no rescaled icons or text rasters. */
     static void drawPrinterBadge(IndependentUi ui,double x,double y,double diameter,double expansion){drawPrinterBadge(ui,x,y,diameter,expansion,false);}
-    /** Paused keeps the collapsed circle but tints the printer amber, so it never reads as switched off. */
+
     static void drawPrinterBadge(IndependentUi ui,double x,double y,double diameter,double expansion,boolean paused){
         drawPrinterBadge(ui,x,y,diameter,expansion,paused,"打印中");
     }

@@ -1,6 +1,6 @@
 package dev.betterlitematica.fabric;
 import net.minecraft.client.gui.screen.Screen;
-/** A persistent explanation remains available after the one-time chat notice. */
+
 final class CompatibilityScreen extends MenuScreen {
     CompatibilityScreen(Screen parent,ProjectionController controller){super("模组共存","",parent,controller,true);}
     @Override protected void buildMenu(){

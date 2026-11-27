@@ -1,6 +1,6 @@
 package dev.betterlitematica.core;
 import java.util.*;
-/** Short-lived interaction feedback, deliberately separate from verification results. */
+
 public final class ActionHighlights {
     public enum Kind {PLACE,ADJUST,BREAK,FAILED}
     public record Mark(long position,Kind kind,long started,long expires){}

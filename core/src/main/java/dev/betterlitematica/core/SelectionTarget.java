@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** Analytic selection picking; work is bounded by the 128-box selection limit. */
 public record SelectionTarget(Part part,String name,double distance) {
     public enum Part {BOX,FIRST,SECOND,ORIGIN}
     public static SelectionTarget ray(AreaSelection selection,double x,double y,double z,double dx,double dy,double dz,double reach){

@@ -8,15 +8,13 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.*;
 import net.minecraft.network.chat.Component;
 
-/** Keep widget coordinates and editor policy independent of native input event records. */
 final class UiEvents {
     static final KeyEvent NONE=new KeyEvent(0,0,0);
     private UiEvents() {}
     static MouseButtonEvent mouse(double x,double y,int button){return new MouseButtonEvent(x,y,new MouseButtonInfo(NativeInput.nativeMouse(button),0));}
     static KeyEvent key(int key,int keycode,int modifiers){
         int nativeKey=NativeInput.nativeKey(key);
-        // Keep SDL's layout-aware shortcut key. Recomputing it with Caps Lock changes
-        // 'a' to 'A', breaking the editor's select/copy/paste/cut shortcuts.
+
         int logical=keycode>0?keycode:org.lwjgl.sdl.SDLKeyboard.SDL_GetKeyFromScancode(nativeKey,(short)0,false);
         return new KeyEvent(nativeKey,logical,modifiers);
     }
@@ -55,8 +53,7 @@ abstract class UiWidget extends AbstractWidget {
         boolean capturing=capturesInput();
         if(capturing==nativeTextInput)return;
         nativeTextInput=capturing;
-        // SDL emits character/IME events only while a text editor owns native input.
-        // Use Minecraft's owner tracking so leaving this widget cannot disable another editor.
+
         Minecraft.getInstance().onTextInputFocusChange(this,capturing);
     }
     protected abstract void renderWidget(GuiGraphicsExtractor graphics,int x,int y,float delta);

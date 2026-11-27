@@ -6,7 +6,6 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-/** Stable, explicitly mounted roots. Source identities remain relative in saved placements. */
 public final class SchematicFolders {
     private static final String PREFIX="@folder/";
     public record Folder(String id,String name,Path path) {
@@ -24,7 +23,7 @@ public final class SchematicFolders {
     private boolean writable;
     private volatile String problem="";
     public SchematicFolders(Path local,Path settings){this.local=local.toAbsolutePath().normalize();this.settings=settings;}
-    /** Run on the ordered settings worker before any mutations. Invalid settings are preserved. */
+
     public synchronized void load()throws IOException {
         writable=false;
         try{loadChecked();problem="";}
@@ -33,10 +32,10 @@ public final class SchematicFolders {
             throw new IOException(problem,failure);
         }
     }
-    /** A failed external configuration must not prevent browsing the instance's own files. */
+
     public void loadSafely(){try{load();}catch(IOException ignored){}}
     public String problem(){return problem;}
-    /** Explicit UI recovery: retain the original bytes before replacing any directory links. */
+
     public synchronized void resetPreservingOriginal()throws IOException {
         if(Files.exists(settings))Files.copy(settings,settings.resolveSibling(settings.getFileName()+".backup-"+UUID.randomUUID()));
         save(List.of());mounted=List.of();writable=true;problem="";
@@ -84,7 +83,7 @@ public final class SchematicFolders {
         if(Files.isSameFile(local,path))return folders().get(0);
         for(var existing:mounted)if(existing.path().equals(path)||Files.exists(existing.path())&&Files.isSameFile(existing.path(),path))return existing;
         if(mounted.size()>=64)throw new IOException("最多挂载 64 个文件夹");
-        // Canonical path identity also reconnects saved placements after removing/readding this mount.
+
         String identity=path.toString();if(File.separatorChar=='\\')identity=identity.toLowerCase(Locale.ROOT);
         var folder=folder(UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8)).toString(),path);
         var next=new ArrayList<>(mounted);next.add(folder);save(next);mounted=List.copyOf(next);return folder;

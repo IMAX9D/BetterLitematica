@@ -7,7 +7,6 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import org.joml.Matrix4f;
 
-/** Shared projection vertex pages through the game GPU API. */
 final class ProjectionPages {
     static final int STRIDE=24,ARENA_XZ=256,ARENA_Y=128;
     private static final int MIN_PAGE=4096,MAX_PAGE=262144;
@@ -33,7 +32,7 @@ final class ProjectionPages {
         Slice(Page page,int first,int vertices){this.page=page;this.first=first;this.vertices=vertices;}
         void free(){
             if(freed)return;freed=true;
-            // Reuse waits for all previously submitted draws, including deferred extraction commands.
+
             RenderSystem.queueFencedTask(()->{
                 page.ranges.release(first,vertices);page.slices--;page.arena.live-=vertices;
                 if(page.slices==0){page.delete();page.arena.pages.remove(page);if(page.arena.pages.isEmpty())arenas.remove(page.arena.origin);}

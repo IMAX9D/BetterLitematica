@@ -5,7 +5,6 @@ import java.io.*;
 import java.nio.file.Path;
 import java.util.*;
 
-/** Edits the original lossless NBT tree, never the preview cache. Exports are always new files. */
 public final class LitematicEdit {
     public record Result(long changed, long removedBlockEntities, long removedTicks) {}
     public record Prepared(Map<String,Object> root,Result result) {}
@@ -14,7 +13,7 @@ public final class LitematicEdit {
                                  boolean matchBlockType, Vec3i onlyPosition, Cancellation cancel) throws IOException {
         var prepared=prepare(source,from,to,matchBlockType,onlyPosition,cancel);NbtWriter.writeNew(output,prepared.root(),cancel);return prepared.result();
     }
-    /** Prepare a private replacement tree so callers can attach render metadata before publication. */
+
     public static Prepared prepare(Path source,BlockStateSpec from,BlockStateSpec to,boolean matchBlockType,Vec3i onlyPosition,Cancellation cancel)throws IOException{
         Map<String,Object> root=SourceVersions.litematic(SchematicFormats.canonical(NbtReader.read(source,SchematicImporter.SOURCE_LIMITS,cancel),cancel),cancel);
         int version=NbtReader.integer(root,"Version");SourceVersions.requireLitematicVersion(version);int dataVersion=NbtReader.integer(root,"MinecraftDataVersion");
@@ -37,7 +36,7 @@ public final class LitematicEdit {
             int cell=-1;
             if(onlyPosition!=null){long x=(long)onlyPosition.x()-min.x(),y=(long)onlyPosition.y()-min.y(),z=(long)onlyPosition.z()-min.z();if(x>=0&&y>=0&&z>=0&&x<sx&&y<sy&&z<sz)cell=(int)(x+z*sx+y*sx*sz);}
             long changedHere=0;
-            // Whole-file replacement changes palette entries, not hundreds of millions of packed cells.
+
             for(int i=0;i<volume;i++){
                 if((i&8191)==0)cancel.check();int id=get(words,oldBits,i);if(id>=palette.size())throw new IOException("Palette index out of range");
                 boolean modify=changedPalette[id]&&(onlyPosition==null||i==cell);
@@ -65,7 +64,7 @@ public final class LitematicEdit {
                     if(target<0){if(palette.size()==65536)throw new IOException("调色板已满");target=palette.size();paletteTags.add(replacement);}
                     int bits=Math.max(2,32-Integer.numberOfLeadingZeros(paletteTags.size()-1));
                     if(bits!=oldBits){long[] expanded=new long[PackedBits.wordCount(bits,volume)];for(int i=0;i<volume;i++){if((i&8191)==0)cancel.check();set(expanded,bits,i,get(words,oldBits,i));}words=expanded;}
-                    // This mutable NBT tree owns its array exclusively; no PackedBits object aliases it.
+
                     set(words,bits,cell,target);tag.put("BlockStates",words);
                 }
                 tag.put("BlockStatePalette",paletteTags);
@@ -76,7 +75,7 @@ public final class LitematicEdit {
         metadata.put("TimeModified",System.currentTimeMillis());metadata.put("TotalBlocks",Math.toIntExact(totalBlocks));metadata.put("TotalVolume",Math.toIntExact(totalVolume));root.put("Metadata",metadata);
         cancel.check();return new Prepared(root,new Result(changed,removedEntities,removedTicks));
     }
-    /** Vanilla fluid identities are independent of level, facing and other ordinary properties. */
+
     private static String fluid(BlockStateSpec state)throws IOException{
         if("true".equals(state.properties().get("waterlogged")))return "water";
         return switch(state.name()){

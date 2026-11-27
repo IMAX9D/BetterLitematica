@@ -3,7 +3,6 @@ package dev.betterlitematica.core;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Source-cell ownership and bounded draw ranges, independent of vertex positions. */
 public final class QuadVisibility {
     public static final int CELLS=4096,MAX_VERTICES=16384;
     private QuadVisibility(){}
@@ -27,7 +26,7 @@ public final class QuadVisibility {
     public static final class Builder {
         private final short[] owners=new short[MAX_VERTICES/4];
         private int vertices;
-        /** -1 denotes explicitly unowned vertices; a mixed-owner quad also becomes -1. */
+
         public void append(int cell,int vertexCount){
             if(cell!=-1)cell(cell);
             if(vertexCount<0||vertexCount>MAX_VERTICES-vertices)throw new IllegalArgumentException("Quad ownership vertex budget exceeded");
@@ -37,7 +36,7 @@ public final class QuadVisibility {
                 vertices+=n;remaining-=n;
             }
         }
-        /** Returns an independent snapshot; callers cannot mutate this builder's state. */
+
         public short[] build(int expectedVertices){
             if(expectedVertices!=vertices||(vertices&3)!=0)throw new IllegalArgumentException("Quad ownership does not match complete vertices");
             return Arrays.copyOf(owners,vertices/4);
@@ -57,7 +56,7 @@ public final class QuadVisibility {
         public int rangeCount(Mask mask){
             return rangeCount(mask,null,false);
         }
-        /** Two disjoint color groups share the existing range storage and never duplicate a quad. */
+
         public int rangeCount(Mask mask,Mask tint,boolean tinted){
             Objects.requireNonNull(mask);long tintRevision=tint==null?0:tint.revision();
             if(cachedMask!=mask||cachedRevision!=mask.revision()||cachedTint!=tint||cachedTintRevision!=tintRevision){
@@ -83,7 +82,7 @@ public final class QuadVisibility {
         private void index(int index){if(index<0||index>=count)throw new IndexOutOfBoundsException(index);}
         public int firstQuad(int index){index(index);return ranges[(offset+index)*2];}
         public int quadCount(int index){index(index);return ranges[(offset+index)*2+1];}
-        /** Includes both owned arrays, their headers and conservative object overhead. */
+
         public long memoryEstimate(){return 128L+owners.length*2L+ranges.length*4L;}
     }
 }

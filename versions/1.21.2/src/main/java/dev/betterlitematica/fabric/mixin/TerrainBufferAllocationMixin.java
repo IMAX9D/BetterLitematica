@@ -6,7 +6,6 @@ import net.minecraft.client.gl.*;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-/** Only our fully overridden terrain handle omits the native per-section GPU wrapper. */
 @Mixin(VertexBuffer.class)
 public abstract class TerrainBufferAllocationMixin {
     @WrapOperation(method="<init>",at=@At(value="NEW",target="(Lnet/minecraft/client/gl/GlBufferTarget;Lnet/minecraft/client/gl/GlUsage;I)Lnet/minecraft/client/gl/GpuBuffer;"))

@@ -1,7 +1,7 @@
 package dev.betterlitematica.fabric;
 import net.minecraft.client.gl.VertexBuffer;
 import net.minecraft.client.render.BufferRenderer;
-/** Pre-1.19 buffers require their VAO and vertex attributes to be selected explicitly. */
+
 final class LegacyVertices {
  private static VertexBuffer active;
  static void bind(VertexBuffer buffer){

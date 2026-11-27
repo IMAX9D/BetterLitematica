@@ -5,6 +5,7 @@ import dev.betterlitematica.fabric.TerrainDataUpdates;
 import dev.betterlitematica.fabric.TerrainExpandedBounds;
 
 import dev.betterlitematica.fabric.TerrainRebuildUpdates;
+import dev.betterlitematica.fabric.TerrainSectionChanges;
 import net.minecraft.client.render.chunk.ChunkBuilder;
 import net.minecraft.util.math.Box;
 import java.util.concurrent.atomic.AtomicReference;
@@ -15,7 +16,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.objectweb.asm.Opcodes;
 @Mixin(ChunkBuilder.BuiltChunk.class)
-public abstract class TerrainDataClearMixin implements TerrainExpandedBounds {
+public abstract class TerrainDataClearMixin implements TerrainExpandedBounds,TerrainSectionChanges.Owner {
+    @Unique private volatile TerrainSectionChanges betterlitematica$changes;
+    @Override public void betterlitematica$watch(TerrainSectionChanges changes){betterlitematica$changes=changes;}
+    @Override public void betterlitematica$sectionChanged(){
+        var changes=betterlitematica$changes;
+        if(changes!=null)changes.mark(((ChunkBuilder.BuiltChunk)(Object)this).index);
+    }
     @Unique private Box betterlitematica$boundsSource,betterlitematica$expandedBounds;
     @Override public Box betterlitematica$expandedBounds(Box original){
         if(betterlitematica$boundsSource!=original){
@@ -25,12 +32,12 @@ public abstract class TerrainDataClearMixin implements TerrainExpandedBounds {
         return betterlitematica$expandedBounds;
     }
     @WrapOperation(method={"clear","setData"},at=@At(value="INVOKE",target="Ljava/util/concurrent/atomic/AtomicReference;set(Ljava/lang/Object;)V"))
-    private void betterlitematica$clearCategory(AtomicReference<?> reference,Object value,Operation<Void> original){TerrainDataUpdates.publish(reference,value,original);}
+    private void betterlitematica$clearCategory(AtomicReference<?> reference,Object value,Operation<Void> original){TerrainDataUpdates.publish((ChunkBuilder.BuiltChunk)(Object)this,reference,value,original);}
     @WrapOperation(method="scheduleRebuild(Z)V",at=@At(value="FIELD",target="Lnet/minecraft/client/render/chunk/ChunkBuilder$BuiltChunk;needsRebuild:Z",opcode=Opcodes.PUTFIELD))
     private void betterlitematica$newDirty(ChunkBuilder.BuiltChunk chunk,boolean value,Operation<Void> original){
         boolean added=value&&!chunk.needsRebuild();original.call(chunk,value);
-        if(added)TerrainRebuildUpdates.becameDirty();
+        if(added)TerrainRebuildUpdates.becameDirty(this);
     }
     @Inject(method="clear",at=@At("RETURN"))
-    private void betterlitematica$clearedDirty(CallbackInfo ci){TerrainRebuildUpdates.becameDirty();}
+    private void betterlitematica$clearedDirty(CallbackInfo ci){TerrainRebuildUpdates.becameDirty(this);}
 }

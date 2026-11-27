@@ -23,7 +23,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.TagValueInput;
 import java.util.List;
 
-/** Registry-aware item and block data. Legacy item tags retain every supported component during migration. */
 final class ItemDataBridge {
     private ItemDataBridge(){}
     private static final class Defaults {static final HolderLookup.Provider REGISTRIES=VersionGameplay.defaultRegistries();}

@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-/** Shared source budget for initial and detailed previews; auxiliary payloads are streamed past. */
 public final class PreviewSourceReader {
     public static final NbtReader.Limits LIMITS = SchematicImporter.SOURCE_LIMITS;
     public static final long MAX_BYTES = LIMITS.maxUncompressedBytes();

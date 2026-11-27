@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** An isolated preview camera. Pan is measured in whole viewport widths, right/down positive. */
 public record PreviewCamera(double yaw,double pitch,double zoom,double panX,double panY) {
     public static final double MIN_ZOOM=.5,MAX_ZOOM=16,MAX_PAN=16;
     public static final double MAX_PITCH=Math.PI/2-.03;
@@ -17,7 +16,7 @@ public record PreviewCamera(double yaw,double pitch,double zoom,double panX,doub
         finite(dx,dy,viewportWidth);
         return new PreviewCamera(yaw,pitch,zoom,clamp(panX+dx/viewportWidth,-MAX_PAN,MAX_PAN),clamp(panY+dy/viewportWidth,-MAX_PAN,MAX_PAN));
     }
-    /** Anchor coordinates are relative to the viewport center, normalized by the full width. */
+
     public PreviewCamera scroll(double amount,double anchorX,double anchorY){
         if(!Double.isFinite(amount)||!Double.isFinite(anchorX)||!Double.isFinite(anchorY))throw new IllegalArgumentException("Invalid preview zoom");
         double next=clamp(zoom*Math.pow(1.18,clamp(amount,-64,64)),MIN_ZOOM,MAX_ZOOM);

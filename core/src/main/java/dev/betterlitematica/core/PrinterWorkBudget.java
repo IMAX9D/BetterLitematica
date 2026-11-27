@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** One shared tick deadline for scanning and interaction; zero action limit never means an unbounded loop. */
 public final class PrinterWorkBudget {
     private final long deadline;
     private int pages,attempts;

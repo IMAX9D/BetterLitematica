@@ -1,5 +1,5 @@
 package dev.betterlitematica.core;
-/** No world chunk loaded -> UNKNOWN, never air. This is a primitive, not a whole-world verifier. */
+
 public enum Comparison {
     MATCH, MISSING, EXTRA, WRONG_BLOCK, WRONG_STATE, UNKNOWN;
     public static Comparison compare(BlockStateSpec expected,BlockStateSpec actual,boolean worldLoaded){

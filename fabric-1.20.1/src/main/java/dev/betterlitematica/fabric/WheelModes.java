@@ -1,6 +1,5 @@
 package dev.betterlitematica.fabric;
 
-/** Independent preferences. Choosing a mode never starts the worker. */
 enum WheelModes {
     PRINT("打印"),MINE("挖掘"),DRAIN("排流体"),FILL("填充"),BEDROCK("破基岩");
     private final String label;

@@ -7,13 +7,13 @@ final class ProjectionShaders {
  private static ShaderProgram surface,composite,overlayLines,overlayFaces;
  static ShaderProgram surface(){return surface;}
  static ShaderProgram composite(){return composite;}
- // Programs are shared between layers, so every supplier states its own near fade at draw time.
+
  static final float NEAR_CLEAR=1f,NEAR_FULL=3f,NEAR_MIN=.18f;
  static ShaderProgram overlayLines(){return near(EntityOverlayMask.bind(overlayLines),false);}
  static ShaderProgram overlayFaces(){return near(EntityOverlayMask.bind(overlayFaces),false);}
  static ShaderProgram nearLines(){return near(EntityOverlayMask.bind(overlayLines),true);}
  static ShaderProgram nearFaces(){return near(EntityOverlayMask.bind(overlayFaces),true);}
- /** Depth-tested highlights rely on depth for occlusion; the entity mask would hide lines drawn in front of mobs. */
+
  static ShaderProgram nearLinesDepthTested(){return near(unmasked(overlayLines),true);}
  static ShaderProgram nearFacesDepthTested(){return near(unmasked(overlayFaces),true);}
  private static ShaderProgram unmasked(ShaderProgram shader){shader.getUniformOrDefault("EntityMaskEnabled").set(0);return shader;}

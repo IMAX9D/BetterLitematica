@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** Pure world-space geometry for an axis handle. No camera, world or input ownership. */
 public final class AxisGizmoMath {
     private static final double PARALLEL_SIN_SQUARED=1e-8;
     private AxisGizmoMath(){}
@@ -22,8 +21,6 @@ public final class AxisGizmoMath {
     private static Point perpendicular(Point p,int axis){return switch(axis){case 0->new Point(0,p.y,p.z);case 1->new Point(p.x,0,p.z);default->new Point(p.x,p.y,0);};}
     private static boolean valid(Point eye,Point origin,int axis){return axis>=0&&axis<3&&eye!=null&&origin!=null&&eye.finite()&&origin.finite();}
 
-    /** First distance along a normalized forward ray into the capsule from 0.2*length to length.
-     * Inside returns zero; invalid geometry and misses return NaN. Radius includes both end caps. */
     public static double hit(Point eye,Point direction,Point origin,int axis,double length,double radius){
         if(!valid(eye,origin,axis)||!Double.isFinite(length)||!Double.isFinite(radius)||length<=0||radius<=0)return Double.NaN;
         Point d=normalized(direction),q=eye.subtract(origin);if(d==null||!q.finite())return Double.NaN;
@@ -55,9 +52,7 @@ public final class AxisGizmoMath {
         }
         return Double.isFinite(best)?best:Double.NaN;
     }
-    /** Axis coordinate of the closest pair between the infinite axis and forward ray.
-     * Nearly parallel directions (sin² <= 1e-8) are deliberately unstable and return NaN.
-     * If the unconstrained ray point is behind the eye, uses the eye's axis projection. */
+
     public static double parameter(Point eye,Point direction,Point origin,int axis){
         if(!valid(eye,origin,axis))return Double.NaN;
         Point d=normalized(direction),q=eye.subtract(origin);if(d==null||!q.finite())return Double.NaN;
@@ -66,8 +61,7 @@ public final class AxisGizmoMath {
         double value=q.component(axis)+ray*d.component(axis);
         return Double.isFinite(value)?value:Double.NaN;
     }
-    /** Keep the previous grid value through its inclusive +/-0.6 cell band.
-     * Outside it, round to nearest integer, with half-cell ties away from zero. */
+
     public static int snapped(double delta,int previous){
         if(!Double.isFinite(delta)||delta<Integer.MIN_VALUE||delta>Integer.MAX_VALUE)throw new IllegalArgumentException("Axis offset out of range");
         if(delta>=(double)previous-.6&&delta<=(double)previous+.6)return previous;

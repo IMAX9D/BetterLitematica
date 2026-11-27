@@ -13,7 +13,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.material.MapColor;
 
-/** One bounded preview worker. Registry colors are sampled in small main-thread slices. */
 final class FilePreviews implements AutoCloseable {
     private final PreviewCache cache;
     private final OrbitPreviewCache orbitCache;
@@ -92,7 +91,6 @@ final class FilePreviews implements AutoCloseable {
         try{cache.write(key,images,cancel);}catch(InterruptedIOException e){throw e;}catch(IOException e){BetterLitematicaClient.LOGGER.warn("Preview could not be cached",e);}
     }
 
-    /** Captured root is private to this save. It is never a live game object or an existing file. */
     CompletableFuture<SchematicPreview.Images> attach(Map<String,Object> root,Cancellation owner){
         return attach(root,null,false,owner);
     }
@@ -157,7 +155,7 @@ final class FilePreviews implements AutoCloseable {
         if(closed||orbits.size()>=2)throw new IllegalStateException("预览已关闭或繁忙");
         var orbit=new Orbit(Objects.requireNonNull(preview.model()),preview.source());orbits.add(orbit);return orbit;
     }
-    /** One latest-angle slot and one completed-frame slot; rapid input never queues old angles. */
+
     final class Orbit implements AutoCloseable {
         private SchematicPreview.OrbitModel model;private SchematicPreview.OrbitModel posed;private PlacementTransform preparedTransform;
         private final DetailSource source;
@@ -184,8 +182,7 @@ final class FilePreviews implements AutoCloseable {
         }
         private synchronized void prepareDetail(){
             if(source==null||detail!=null||detailWork!=null||released)return;
-            // At most two live panels, each with one fine grid (<=8M cells). The shared IO worker
-            // builds only one at a time; camera gestures never queue scans or retain source arrays.
+
             detailWork=submit(cancel->{
                 Path path=source.reference().read();unchanged(path,source.stamp());
                 if(!source.sha().equals(SchematicImporter.sha256(path,cancel)))throw new IOException("投影文件已改变，请重新选择");
@@ -214,8 +211,7 @@ final class FilePreviews implements AutoCloseable {
                     Cancellation cancel=()->released||closed||Thread.currentThread().isInterrupted()||(!angle.dragging()&&angle.sequence()!=sequences.get());var base=model;if(base==null)return;
                     if(!angle.transform().equals(preparedTransform)){posed=null;preparedTransform=null;var prepared=SchematicPreview.posedOrbitModel(base,angle.transform(),cancel);cancel.check();posed=prepared;preparedTransform=angle.transform();}
                     var renderModel=posed;var fine=detail;
-                    // Navigation keeps the best resident geometry. Lower raster resolution during
-                    // gestures is cheap; replacing leaves/buildings with the 64-cell drag grid is not.
+
                     boolean detailed=fine!=null&&angle.camera();
                     if(detailed){if(!angle.transform().equals(detailTransform)){posedDetail=null;detailTransform=null;posedDetail=SchematicPreview.posedOrbitModel(fine,angle.transform(),cancel);detailTransform=angle.transform();}renderModel=posedDetail;}
                     var pixels=angle.camera()?SchematicPreview.renderOrbit(renderModel,posed,angle.yaw(),angle.pitch(),angle.zoom(),angle.panX(),angle.panY(),angle.side(),false,cancel):SchematicPreview.renderOrbit(posed,angle.yaw(),angle.pitch(),angle.dragging(),cancel);

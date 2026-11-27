@@ -5,7 +5,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.network.chat.Component;
 
-/** Native pointer/keyboard model, independent physical-pixel painting. */
 final class OverlayOpacitySlider extends UiSlider {
     private final DoubleConsumer changed;
     private final UiMotion motion=new UiMotion();

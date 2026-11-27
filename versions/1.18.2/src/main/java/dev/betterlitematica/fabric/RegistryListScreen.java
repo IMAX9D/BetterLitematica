@@ -3,7 +3,7 @@ import java.util.*;
 import java.util.function.Consumer;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.util.registry.Registry;
-/** A local selection draft; caller's settings are updated only by Save. */
+
 final class RegistryListScreen extends MenuScreen {
     enum Kind {BLOCK,ITEM,FLUID}
     private final List<OverlayList.Row> candidates;private final Set<String> selected;

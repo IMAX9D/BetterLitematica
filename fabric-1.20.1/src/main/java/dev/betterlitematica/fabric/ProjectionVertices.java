@@ -3,7 +3,6 @@ package dev.betterlitematica.fabric;
 import net.minecraft.client.render.VertexConsumer;
 import java.util.Arrays;
 
-/** Small reusable capture buffer. Model callbacks cannot grow a section without limit. */
 final class ProjectionVertices implements VertexConsumer {
     private static final int STRIDE=9,MAX=16384;
     private float[] data=new float[STRIDE*256];private int size;private double x,y,z;private float u,v,r=1,g=1,b=1,a=1;private boolean fixed;

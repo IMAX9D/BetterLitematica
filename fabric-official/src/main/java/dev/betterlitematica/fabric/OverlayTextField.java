@@ -3,7 +3,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-/** Vanilla editing/clipboard model only; all measurement, painting and pointer selection use our outline font. */
+
 final class OverlayTextField extends UiTextField {
     private int anchor,start;private boolean pointerSelecting;private final boolean search;private String placeholder="";
     private java.util.function.Predicate<String> filter=value->true;
@@ -45,7 +45,7 @@ final class OverlayTextField extends UiTextField {
             if(isFocused()&&(System.nanoTime()/500_000_000L)%2==0){double x=textX()+ui.measure(text.substring(start,cursor));ui.rect(x,getY()+3,x+0.7,getY()+getHeight()-3,UiTheme.FOCUS);}
         }finally{ui.unclip();}
     }
-    /** Geometry follows the same logical canvas and semantic theme tint as the input. */
+
     private static void searchIcon(IndependentUi ui,double x,double y,int color){
         ui.sector(x+4,y+4,2.8,3.6,0,Math.PI*2,color);
         for(int i=0;i<=6;i++){double offset=6.5+i*.5;ui.roundRect(x+offset-.45,y+offset-.45,x+offset+.45,y+offset+.45,.45,color);}

@@ -6,7 +6,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.Direction;
 import java.util.*;
 
-/** Bottom-left tool status, independent of the top-left construction/material cards. */
 final class ToolHud {
     private record Block(ItemStack icon,String text,boolean air) {}
     private final Map<String,Block> blocks=new HashMap<>();
@@ -52,7 +51,7 @@ final class ToolHud {
             width=Math.max(width,14+labelWidth+ui.measure(text)+3+(block==null?0:23));
         }
         width=Math.min(248,Math.min(width,(layout.right()-layout.left())*.46));
-        // The card now shares the bottom edge with vanilla's hotbar, including its offhand slot.
+
         double besideHotbar=hotbarSpace(client,layout);
         if(besideHotbar>=110)width=Math.min(width,besideHotbar);
         double x=layout.toolLeft(),y=top,line=ui.lineHeight(),rowY=y+25;

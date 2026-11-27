@@ -6,17 +6,13 @@ import net.minecraft.client.gl.*;
 import net.minecraft.client.render.*;
 import org.joml.Matrix4f;
 
-/**
- * All placements share one nearest-surface image; opacity is applied exactly once per pixel. The image is prepared
- * by the first projection draw of a frame, so a frame that draws nothing skips the clear, depth copy and blend.
- */
 final class ProjectionComposite implements AutoCloseable {
-    // Render thread only: the composite that a draw between begin and finish should prepare.
+
     private static ProjectionComposite open;
     private Framebuffer target;
     private VertexBuffer quad;private int previousTexture;private MinecraftClient client;private boolean started;
     void begin(MinecraftClient client){this.client=client;started=false;open=this;}
-    /** Called before any projection geometry is drawn in this frame. */
+
     static void activate(){var composite=open;if(composite!=null&&!composite.started)composite.start();}
     private void start(){
         started=true;previousTexture=RenderSystem.getShaderTexture(0);Framebuffer main=client.getFramebuffer();

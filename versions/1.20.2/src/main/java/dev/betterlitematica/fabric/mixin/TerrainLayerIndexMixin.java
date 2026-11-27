@@ -13,7 +13,6 @@ import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Categorize the visibility traversal's compact output while preserving its per-layer order. */
 @Mixin(WorldRenderer.class)
 public abstract class TerrainLayerIndexMixin implements TerrainRenderLists {
     @Shadow @Final private ObjectArrayList<?> field_45616;
@@ -30,15 +29,14 @@ public abstract class TerrainLayerIndexMixin implements TerrainRenderLists {
 
     @Inject(method="render",at=@At("HEAD"))
     private void betterlitematica$beginTerrain(CallbackInfo ci){
-        // Never retain a category decision across frames, including third-party in-place data edits.
+
         betterlitematica$indexed=false;
         betterlitematica$frame++;
     }
 
     @Redirect(method="updateChunks",at=@At(value="FIELD",target="Lnet/minecraft/client/render/WorldRenderer;field_45616:Lit/unimi/dsi/fastutil/objects/ObjectArrayList;",opcode=Opcodes.GETFIELD),require=0)
     private ObjectArrayList<?> betterlitematica$chunksToRebuild(WorldRenderer renderer){
-        // Vanilla allocates a ChunkSectionPos before checking needsRebuild. Keep its original rebuild/light/order
-        // rules, but don't send unchanged sections through that allocation-heavy loop.
+
         betterlitematica$dirty.clear();Object[] values=field_45616.elements();
         for(int i=0,size=field_45616.size();i<size;i++){
             Object info=values[i];
@@ -50,15 +48,12 @@ public abstract class TerrainLayerIndexMixin implements TerrainRenderLists {
     @Redirect(method="renderLayer",at=@At(value="FIELD",target="Lnet/minecraft/client/render/WorldRenderer;field_45616:Lit/unimi/dsi/fastutil/objects/ObjectArrayList;",opcode=Opcodes.GETFIELD),require=0)
     private ObjectArrayList<?> betterlitematica$drawableTerrain(WorldRenderer renderer){
         long revision=TerrainDataUpdates.revision();
-        // Exact identity/data checks once per frame, not once per layer plus the entity pass.
-        // TerrainTraversal replaces the list through setupTerrain, which invalidates us explicitly.
+
         if(revision!=betterlitematica$dataRevision||field_45616.size()!=betterlitematica$sourceSize
                 ||betterlitematica$checkedFrame!=betterlitematica$frame&&!betterlitematica$sameSource())betterlitematica$indexed=false;
         if(!betterlitematica$indexed){
             betterlitematica$terrain.clear();betterlitematica$blockEntities.clear();
-            // Preserve the original order, including its reversal for translucent rendering. Record the
-            // revision from BEFORE this scan: a concurrent publication must invalidate the next use.
-            // Actual layer/entity rendering still reads the current data from every retained section.
+
             Object[] values=field_45616.elements();int size=field_45616.size();
             boolean holes=false;
             if(betterlitematica$source.length<size){
@@ -75,7 +70,7 @@ public abstract class TerrainLayerIndexMixin implements TerrainRenderLists {
                 holes|=data==ChunkBuilder.ChunkData.EMPTY;
                 betterlitematica$source[i]=info;betterlitematica$data[i]=data;
                 if(!data.isEmpty())betterlitematica$terrain.add(info);
-                // A block-entity-only section must survive even if it has no terrain vertices.
+
                 if(!data.getBlockEntities().isEmpty())betterlitematica$blockEntities.add(info);
             }
             betterlitematica$indexed=true;

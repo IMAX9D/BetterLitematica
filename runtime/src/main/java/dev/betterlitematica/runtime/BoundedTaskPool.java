@@ -5,7 +5,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.*;
 
-/** Bounds queued work, running work and results awaiting consumption together. Cancellation never invents a free slot. */
 public final class BoundedTaskPool implements AutoCloseable {
     private final ThreadPoolExecutor executor;
     private final Semaphore slots;
@@ -33,7 +32,7 @@ public final class BoundedTaskPool implements AutoCloseable {
         public boolean cancelled(){return cancelled;}
         public long started(){return started;}
         public synchronized Throwable failure(){return failure;}
-        /** Ownership transfers to the consumer. Close the ticket after that result has been released. */
+
         public synchronized T take(){if(!done||cancelled)return null;T value=result;result=null;return value;}
         private void release(){if(released.compareAndSet(false,true)){tickets.remove(this);slots.release();}}
         @Override public void close(){

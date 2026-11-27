@@ -14,7 +14,6 @@ import net.minecraft.world.tick.OrderedTick;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-/** Owning-world-thread capture. Unavailable chunks remain pending; workers only receive detached data. */
 final class WorldCapture {
     private static final class Part {
         final Region region;final int[] blocks;final LinkedHashMap<BlockStateSpec,Integer> palette=new LinkedHashMap<>();
@@ -67,7 +66,7 @@ final class WorldCapture {
                 if(work.cursor==4096&&!work.finished()){work.cursor=0;work.retryAt=ticks+20;}
                 if(work.retryAt<=ticks)queue.resume(work);else queue.defer(work);
             }
-            // Cycle across parts and chunks. One missing chunk cannot block all other extras.
+
             if(queue.finished()){
                 if(extras!=null&&!WorldChunks.loaded(world,extras.chunkX,extras.chunkZ))extras=null;
                 int attempts=256;while(extras==null&&extrasRemaining>0&&attempts-->0&&System.nanoTime()<deadline){var part=parts.get(extraPart);extraPart=(extraPart+1)%parts.size();int index=part.extraCursor++;if(part.extraCursor>=part.chunks())part.extraCursor=0;if(part.extrasDone.get(index))continue;int chunkX=part.firstX+index%part.chunksX,chunkZ=part.firstZ+index/part.chunksX;if(WorldChunks.loaded(world,chunkX,chunkZ))extras=new Extras(part,index);}

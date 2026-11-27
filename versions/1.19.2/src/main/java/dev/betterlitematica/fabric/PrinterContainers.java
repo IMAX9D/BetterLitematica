@@ -14,7 +14,7 @@ import net.minecraft.util.math.*;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.*;
 import java.util.function.Predicate;
-/** One owned vanilla container session; source discovery never scans a whole schematic. */
+
 final class PrinterContainers {
     private static final int MAX_QUEUED=512,MAX_CACHE=256,MAX_BYTES=8*1024*1024;
     private record Key(long pos,boolean joined){}
@@ -62,7 +62,7 @@ final class PrinterContainers {
         double configured=controller.options().printer.range,reach=client.interactionManager.getReachDistance();if(configured>0)reach=Math.min(reach,configured);
         return PrinterReach.distanceSquared(client.player.getEyePos(),pos)<=reach*reach;
     }
-    /** Called after ready block work, so opening a container never steals the initial printing burst. */
+
     boolean startNext(int tick){
         this.tick=tick;if(active()||queue.isEmpty()||client.currentScreen!=null||client.player==null
             ||client.player.currentScreenHandler!=client.player.playerScreenHandler||!client.player.playerScreenHandler.getCursorStack().isEmpty())return false;
@@ -95,7 +95,7 @@ final class PrinterContainers {
         owned=opened.getScreenHandler();screen=opened;
         if(owned.slots.size()!=target.items().size()+36){reason=PrinterReason.of(PrinterReason.Id.CONTAINER_BLOCKED,"不支持的容器槽位");forget();return;}
         serverSlots=new ArrayList<>(Collections.nCopies(owned.slots.size(),ItemStack.EMPTY));slotReceipts=new long[owned.slots.size()];serverCursor=ItemStack.EMPTY;
-        // The server handler remains open. Client-side removal only closes its detached UI inventory.
+
         if(returnScreen!=null)cancelled=true;
         client.setScreen(cancelled?returnScreen:null);
     }
@@ -119,7 +119,7 @@ final class PrinterContainers {
             if(slotReceipts[i]<=batch.since()||!ItemStack.areEqual(serverSlots.get(i),batch.plan().after().get(i)))return;
         acknowledged=true;rememberSatisfied(batch.plan().after());
     }
-    /** Services already-sent inventory work even after pause; never starts new clicks while paused. */
+
     boolean tick(int tick,boolean mayWork){
         this.tick=tick;if(!active())return false;
         if(client.world!=world||client.getNetworkHandler()!=connection||client.player==null){forget();return false;}
@@ -181,8 +181,7 @@ final class PrinterContainers {
                 owned.onSlotClick(click.slot(),click.button(),click.action(),client.player);
                 var changed=new Int2ObjectOpenHashMap<ItemStack>();boolean confirm=n>=plan.clicks().size()-2;
                 if(!confirm)for(int i=0;i<owned.slots.size();i++)if(!ItemStack.areEqual(before.get(i),owned.getSlot(i).getStack()))changed.put(i,owned.getSlot(i).getStack().copy());
-                // Omit predictions for the last two real clicks: vanilla returns authoritative slots,
-                // then a full inventory when the previous update advances the server revision.
+
                 client.getNetworkHandler().sendPacket(new ClickSlotC2SPacket(owned.syncId,revision,click.slot(),click.button(),click.action(),confirm?ItemStack.EMPTY:owned.getCursorStack().copy(),changed));clickCount++;
             }
             if(!owned.getCursorStack().isEmpty())throw new IllegalStateException("容器操作留下了光标物品");

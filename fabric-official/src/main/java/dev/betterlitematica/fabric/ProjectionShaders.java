@@ -4,7 +4,7 @@ import com.mojang.blaze3d.platform.CompareOp;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.vertex.*;
 import net.minecraft.resources.Identifier;
-/** Explicit immutable pipelines: no global OpenGL state and no backend assumptions. */
+
 final class ProjectionShaders {
  static Identifier id(String path){return Identifier.fromNamespaceAndPath("betterlitematica",path);}
  static final RenderPipeline SURFACE=base("surface","projection","projection_surface",DefaultVertexFormat.POSITION_TEX_COLOR,VertexFormat.Mode.QUADS).withSampler("Sampler0").withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL,true,-1,-1)).build();

@@ -1,5 +1,5 @@
 package dev.betterlitematica.fabric;
-/** Stable identities shared by controls, help, dependencies and search navigation. */
+
 enum SettingId {
     LAYER_MODE,
     LAYER_AXIS,
@@ -54,7 +54,8 @@ enum SettingId {
     PRINTER_FLOWING,
     PRINTER_SKIP_WATERLOGGED,
     PRINTER_FORCE_SNEAK,
-    PRINTER_ICE_WATER,
+    PRINTER_WATER_TO_ICE,
+    PRINTER_AUTO_BREAK_ICE,
     PRINTER_CORAL,
     PRINTER_SAFE_OBSERVER,
     PRINTER_CONTAINER_FILL,

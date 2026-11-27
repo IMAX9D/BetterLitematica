@@ -1,7 +1,7 @@
 package dev.betterlitematica.runtime;
 import java.util.*;
 import java.util.function.*;
-/** Single-owner cache with an explicit logical-byte budget. Eviction also owns resource release. */
+
 public final class WeightedLru<K,V> implements AutoCloseable {
     private final long capacity;private final int maxEntries;private long used;
     private final LinkedHashMap<K,V> map=new LinkedHashMap<>(16,0.75f,true);
@@ -9,7 +9,7 @@ public final class WeightedLru<K,V> implements AutoCloseable {
     public WeightedLru(long capacity,ToLongFunction<V> weight,Consumer<V> release){this(capacity,Integer.MAX_VALUE,weight,release);}
     public WeightedLru(long capacity,int maxEntries,ToLongFunction<V> weight,Consumer<V> release){if(capacity<1||maxEntries<1)throw new IllegalArgumentException();this.capacity=capacity;this.maxEntries=maxEntries;this.weight=weight;this.release=release;}
     public V get(K key){return map.get(key);}
-    /** Values must not mutate cache membership during this visit. */
+
     public void forEach(BiConsumer<K,V> consumer){map.forEach(consumer);}
     public boolean contains(K key){return map.containsKey(key);}
     public boolean canPutProtecting(long size,Set<K> protectedKeys){
@@ -20,7 +20,7 @@ public final class WeightedLru<K,V> implements AutoCloseable {
         return false;
     }
     public boolean canPutWithoutEviction(long size){return size>0&&size<=capacity-used&&map.size()<maxEntries;}
-    /** A replacement reuses its entry slot; reserve its complete size before releasing the old value. */
+
     public boolean canReplaceProtecting(K key,long size,Set<K> protectedKeys){
         var previous=map.get(key);if(previous==null)return canPutProtecting(size,protectedKeys);
         if(size<=0||size>capacity)return false;long free=capacity-used+weight.applyAsLong(previous);
@@ -31,13 +31,13 @@ public final class WeightedLru<K,V> implements AutoCloseable {
     public boolean canReplaceWithoutEviction(K key,long size){
         var previous=map.get(key);return previous==null?canPutWithoutEviction(size):size>0&&size<=capacity-used+weight.applyAsLong(previous);
     }
-    /** Admission without evicting another visible mesh. Caller owns rejected values. */
+
     public boolean tryPutWithoutEviction(K key,V value){
         long size=weight.applyAsLong(value);if(size<=0)throw new IllegalArgumentException("Cache weight must be positive");
         if(map.containsKey(key)||size>capacity-used||map.size()>=maxEntries)return false;
         map.put(key,value);used+=size;return true;
     }
-    /** Evict only cold/unprotected entries under actual pressure. Rejected values remain caller-owned. */
+
     public boolean tryPutProtecting(K key,V value,Set<K> protectedKeys){
         long size=weight.applyAsLong(value);if(size<=0)throw new IllegalArgumentException("Cache weight must be positive");
         if(map.containsKey(key)||size>capacity)return false;

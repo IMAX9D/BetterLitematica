@@ -9,7 +9,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Observe before Fabric releases its retained bytes; keep every other handler intact. */
 @Mixin(value=ClientCommonNetworkHandler.class,priority=1100)
 abstract class CarpetPayloadMixin {
     @Inject(method="onCustomPayload(Lnet/minecraft/network/packet/s2c/common/CustomPayloadS2CPacket;)V",at=@At("HEAD"))

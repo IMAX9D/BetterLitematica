@@ -10,7 +10,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.SignBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** Detached sign text. Only literal content and visual sign properties enter creative items. */
 record SignPrintTarget(BlockState state,List<String> front,List<String> back,CompoundTag itemData) {
     SignPrintTarget {front=List.copyOf(front);back=List.copyOf(back);itemData=itemData.copy();}
     @Override public CompoundTag itemData(){return itemData.copy();}
@@ -37,8 +36,7 @@ record SignPrintTarget(BlockState state,List<String> front,List<String> back,Com
     String[] lines(boolean frontSide){return (frontSide?front:back).toArray(String[]::new);}
     boolean nonDefault(){
         if(itemData.getBooleanOr("is_waxed",false)||front.stream().anyMatch(s->!s.isEmpty())||back.stream().anyMatch(s->!s.isEmpty()))return true;
-        // Even a redundant filtered_messages key changes the newly placed entity's
-        // encoded NBT, so vanilla treats the payload as applied and skips the editor.
+
         for(String key:List.of("front_text","back_text")){var side=itemData.getCompoundOrEmpty(key);if(side.contains("filtered_messages")||!side.getStringOr("color","").equals("black")||side.getBooleanOr("has_glowing_text",false))return true;}
         return false;
     }
@@ -49,7 +47,7 @@ record SignPrintTarget(BlockState state,List<String> front,List<String> back,Com
             var filtered=side.contains("filtered_messages")?side.getListOrEmpty("filtered_messages"):null;
             for(int i=0;i<4;i++){
                 if(!VersionGameplay.signLine(actual,i,false).equals(expected.get(i)))return false;
-                // SignText.CODEC replaces empty filtered messages with their raw line.
+
                 String filteredLine=filtered==null?expected.get(i):plain(filtered.get(i));
                 if(filteredLine.isEmpty())filteredLine=expected.get(i);
                 if(!VersionGameplay.signLine(actual,i,true).equals(filteredLine))return false;

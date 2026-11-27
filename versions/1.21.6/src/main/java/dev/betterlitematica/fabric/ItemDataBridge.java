@@ -20,7 +20,6 @@ import net.minecraft.util.collection.DefaultedList;
 import net.minecraft.util.math.BlockPos;
 import java.util.List;
 
-/** Component-aware item serialization. Legacy tags are migrated, never discarded or treated as empty. */
 final class ItemDataBridge {
     private ItemDataBridge(){}
     private static final class Defaults {static final RegistryWrapper.WrapperLookup REGISTRIES=BuiltinRegistries.createWrapperLookup();}

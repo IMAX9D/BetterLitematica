@@ -10,7 +10,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import java.util.*;
 import java.util.concurrent.*;
-/** Client-thread snapshots and interactions, bounded pure-data discovery workers. */
+
 final class PrinterEngine implements AutoCloseable {
     enum State { STOPPED,RUNNING,PAUSED }
     private record Context(ClientLevel world,List<ProjectionController.PrinterSource> sources,LayerRange layer,AreaSelection selection,long revision) {}
@@ -20,15 +20,18 @@ final class PrinterEngine implements AutoCloseable {
     private final PrinterSigns signs;
     private final NearbyBuildHud nearby;
     private final PrinterQueue queue=new PrinterQueue(4096);
+    private final PrinterDiscovery.Buffer discovery=new PrinterDiscovery.Buffer();
     private final PrinterMaterialBatch materialBatch=new PrinterMaterialBatch();
-    private boolean materialBatchEnabled(){return PrinterMaterialBatch.enabled(settings());}
+    boolean materialBatchEnabled(){return PrinterMaterialBatch.enabled(settings());}
+    boolean materialBatchPending(){return materialBatchEnabled()&&materialBatch.pending();}
+    long materialBatchConfirmed(int material){return materialBatch.confirmedUnits(material);}
     private final ArrayDeque<CompletableFuture<PrinterDiscovery.Result>> searches=new ArrayDeque<>();
     private final PrinterPacing pacing=new PrinterPacing();
     private final ShortageTracker<Item> missing=new ShortageTracker<>(128);
     private int feedbackTick;
     record Missing(Item item,int required){}
     private int materialNeed(Item item){
-        if(item==net.minecraft.world.item.Items.ICE&&settings().iceWater){for(var entry:nearby.snapshot().entries())if(entry.block()==Blocks.WATER)return entry.count();return 0;}
+        if(item==net.minecraft.world.item.Items.ICE&&settings().waterToIce){int total=nearby.materialNeeds().getOrDefault(item,0);for(var entry:nearby.snapshot().entries())if(entry.block()==Blocks.WATER)total+=entry.count();return total;}
         return nearby.materialNeeds().getOrDefault(item,0);
     }
     List<Missing> missingMaterials(){return missing.items().stream().map(item->new Missing(item,materialNeed(item))).toList();}
@@ -154,7 +157,7 @@ final class PrinterEngine implements AutoCloseable {
                 if(waiting==null&&queue.size()==0&&!actions.hasIceWork()){collect();if(queue.size()==0&&!snapshot(budget,true))break;}
                 if(consume(budget))break;
             }
-            // Spend the shared deadline on ready work first; prefetch only spare/blocked time.
+
             if(waiting!=null||queue.size()<512||!pacing.canRun(false))snapshot(budget,false);
             if(!budget.hasTime(System.nanoTime()))actions.diagnostics.budgetStops++;
             if(ticks%20==0)pacing.expire();
@@ -183,19 +186,35 @@ final class PrinterEngine implements AutoCloseable {
         boolean inSelection=false;for(var box:controller.selection().boxes()){var a=box.first();var b=box.second();if(pos.x()>=Math.min(a.x(),b.x())&&pos.x()<=Math.max(a.x(),b.x())&&pos.y()>=Math.min(a.y(),b.y())&&pos.y()<=Math.max(a.y(),b.y())&&pos.z()>=Math.min(a.z(),b.z())&&pos.z()<=Math.max(a.z(),b.z())){inSelection=true;break;}}
         return inSelection&&(scope!=PrinterSettings.Scope.BELOW||pos.y()<client.player.getY())&&(scope!=PrinterSettings.Scope.ABOVE||pos.y()>client.player.getY());
     }
-    /** Keep a bounded near-term material window ready while network operations own the inventory. */
+
     private void prefetchWhileWaiting(){
         if(!running()||client.player.isSpectator()||client.player.isDeadOrDying()||controller.worldWriteBusy()||queue.size()>=512)return;
         var budget=new PrinterWorkBudget(System.nanoTime(),2);pool();sampler=controller.printerSampler();updateCenter();collect();
         while(queue.size()<512&&budget.hasTime(System.nanoTime())&&snapshot(budget,true)){}
     }
     private Vec3i eyeCenter(){var eye=client.player.getEyePosition();return new Vec3i((int)Math.round(eye.x),(int)Math.round(eye.y),(int)Math.round(eye.z));}
+    private PlacementBounds scanBounds(List<ProjectionController.PrinterSource> sources,LayerRange layer){
+        PlacementBounds envelope=null;
+        for(var source:sources){
+            if(source.renderer()==null)return null;
+            var bounds=source.renderer().layout().enabledBounds();
+            if(bounds!=null)envelope=envelope==null?bounds:PlacementLayout.union(envelope,bounds);
+        }
+        if(envelope==null)return null;
+        var min=envelope.min();var max=envelope.max();
+        int[] lo={min.x(),min.y(),min.z()},hi={max.x(),max.y(),max.z()};
+        int axis=layer.axis().ordinal();
+        lo[axis]=Math.max(lo[axis],layer.min());
+        hi[axis]=Math.min(hi[axis],layer.max());
+        return lo[axis]>hi[axis]?null:new PlacementBounds(new Vec3i(lo[0],lo[1],lo[2]),new Vec3i(hi[0],hi[1],hi[2]));
+    }
     private void updateCenter(){
         center=eyeCenter();var s=settings();double radius=s.shape==PrinterRange.Shape.SPHERE?PrinterReach.candidateRadius(range(s)):range(s);
         if(scan==null||scan.radius()!=radius){
-            scan=new PrinterMovementScan(center,radius,s.shape,s.order,s.reverseX,s.reverseY,s.reverseZ);completedRounds=0;
-            if(!s.fill&&!s.fluid&&!s.bedrock&&s.printScope==PrinterSettings.Scope.PROJECTION){
-                var sources=controller.printerSources();var layer=controller.layerRange();
+            boolean projectionOnly=!s.fill&&!s.fluid&&!s.bedrock&&s.printScope==PrinterSettings.Scope.PROJECTION;
+            var sources=controller.printerSources();var layer=controller.layerRange();
+            scan=new PrinterMovementScan(center,radius,s.shape,s.order,s.reverseX,s.reverseY,s.reverseZ,projectionOnly?scanBounds(sources,layer):null);completedRounds=0;
+            if(projectionOnly){
                 scan.domain(box->{
                     int axis=layer.axis().ordinal();int min=axis==0?box.min().x():axis==1?box.min().y():box.min().z(),max=axis==0?box.max().x():axis==1?box.max().y():box.max().z();
                     if(max<layer.min()||min>layer.max())return false;
@@ -226,7 +245,11 @@ final class PrinterEngine implements AutoCloseable {
                 return false;
             }
         }else if(!scan.hasNext())return false;
-        long[] positions=new long[512];int[] expected=new int[512],actual=new int[512],flags=new int[512],scopes=new int[512],fill=new int[512];int n=0,visited=0;long started=System.nanoTime();
+        long[] positions=discovery.positions;
+        int[] expected=discovery.expected,actual=discovery.actual,flags=discovery.flags,scopes=discovery.scopes,fill=discovery.fill;
+        int n=0,visited=0,lastChunkX=Integer.MIN_VALUE,lastChunkZ=Integer.MIN_VALUE;
+        boolean chunkLoaded=false;
+        long started=System.nanoTime();
         var eye=client.player.getEyePosition();double rangeSquared=range(s)*range(s);
         int fillId=PrinterRules.forbiddenPrint(fillState)?-1:Block.getId(fillState);
         boolean accurateOpen=AccuratePlacement.resolve(client,controller.options().accurate)==AccuratePlacement.Mode.V3;
@@ -236,22 +259,25 @@ final class PrinterEngine implements AutoCloseable {
             if((s.print||mining(s))&&scope(at,s.printScope,in)&&in)scope|=1;if(s.fill&&scope(at,s.fillScope,in))scope|=2;if(s.fluid&&scope(at,s.fluidScope,in))scope|=4;if(s.bedrock&&scope(at,s.bedrockScope,in))scope|=8;
             if(scope==0)continue;int i=n++;positions[i]=pos.asLong();scopes[i]=scope;fill[i]=fillId;
             boolean needsProjection=(scope&1)!=0||((scope&8)!=0&&s.bedrockScope==PrinterSettings.Scope.PROJECTION);
-            if(!WorldChunks.loaded(client.level,pos)||needsProjection&&sample!=null&&in&&sample.state()==null){flags[i]=0;continue;}
+            int chunkX=at.x()>>4,chunkZ=at.z()>>4;
+            if(chunkX!=lastChunkX||chunkZ!=lastChunkZ){
+                chunkLoaded=WorldChunks.loaded(client.level,chunkX,chunkZ);
+                lastChunkX=chunkX;lastChunkZ=chunkZ;
+            }
+            if(!chunkLoaded||needsProjection&&sample!=null&&in&&sample.state()==null){flags[i]=0;continue;}
             BlockState current=client.level.getBlockState(pos),wanted=in&&sample.state()!=null?sample.state():Blocks.AIR.defaultBlockState();
-            // Source overlap is resolved by the normal sampler; an older source cannot schedule the winner in the wrong material pass.
+
             if(batching&&PrinterMaterialBatch.key(wanted,s)!=materialBatch.material()){n--;continue;}
             if(s.containerFill&&s.print&&(scope&1)!=0&&!PrinterRules.forbiddenPrint(wanted)&&!PrinterRules.filtered(wanted,s.skip)
                 &&!(s.skipWaterlogged&&wanted.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED)&&wanted.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED)))containers.observe(pos,wanted,current,ticks);
             boolean matches=PrinterRules.constructionMatches(current,wanted);
-            // Matching dynamic properties must not produce a state-break job; keep the actual observation intact.
-            actual[i]=Block.getId(current);expected[i]=matches?actual[i]:Block.getId(wanted);
             if((s.print||mining(s))&&!s.fill&&!s.fluid&&!s.bedrock&&matches){
-                // Completed cached cells need no discovery job. Keep their real
-                // world comparison, but reserve the 512 candidate slots for work.
-                if(batching){n--;if((scope&1)!=0){roundCompared++;roundMatched++;}}
-                else flags[i]=PrinterDiscovery.KNOWN;
+
+                n--;
+                if((scope&1)!=0){roundCompared++;roundMatched++;}
                 continue;
             }
+            actual[i]=Block.getId(current);expected[i]=matches?actual[i]:Block.getId(wanted);
             int f=PrinterDiscovery.KNOWN;if(wanted.isAir())f|=PrinterDiscovery.WANTED_AIR;if(current.isAir())f|=PrinterDiscovery.ACTUAL_AIR;
             if(current.isAir()||current.canBeReplaced()&&s.replace&&PrinterRules.filtered(current,s.replaceable))f|=PrinterDiscovery.REPLACEABLE;
             if(PrinterRules.sameBlock(current,wanted))f|=PrinterDiscovery.SAME_BLOCK;
@@ -264,10 +290,12 @@ final class PrinterEngine implements AutoCloseable {
             flags[i]=f;
         }
         if(n==0){finishRound();if(waiting==null&&queue.size()==0&&searches.isEmpty())status=idleReason(s);return true;}
-        var page=new PrinterDiscovery.Page(generation,Arrays.copyOf(positions,n),Arrays.copyOf(expected,n),Arrays.copyOf(actual,n),Arrays.copyOf(flags,n),Arrays.copyOf(scopes,n),Arrays.copyOf(fill,n));
         var policy=new PrinterDiscovery.Policy(s.print,s.fill,s.fluid,s.bedrock,s.breakWrong,s.breakExtra,s.breakState,s.flowing);
-        if(urgent){accept(PrinterDiscovery.search(page,policy));finishRound();}
-        else searches.add(CompletableFuture.supplyAsync(()->PrinterDiscovery.search(page,policy),workers));
+        if(urgent){accept(discovery.searchNow(generation,n,policy));finishRound();}
+        else {
+            var page=discovery.freeze(generation,n);
+            searches.add(CompletableFuture.supplyAsync(()->PrinterDiscovery.search(page,policy),workers));
+        }
         return true;
     }
     private boolean valid(PrinterQueue.Job job){
@@ -275,7 +303,7 @@ final class PrinterEngine implements AutoCloseable {
         var s=settings();if(!withinRange(pos,s))return false;
         if(!WorldChunks.loaded(client.level,pos)||client.level.isOutsideBuildHeight(pos)||!client.level.getWorldBorder().isWithinBounds(pos))return false;
         if(Block.getId(client.level.getBlockState(pos))!=job.observed()&&!actions.owns(job))return false;
-        if(actions.ownsIce(job))return true; // Generation/layer/settings changes already cancel the owned batch.
+        if(actions.ownsIce(job))return true;
         var sample=sampler.apply(at);if(sample==null)return false;boolean in=sample.inside();
         return switch(job.kind()){
             case BREAK->mining(s)&&scope(at,s.printScope,in)&&sample!=null&&sample.state()!=null&&Block.getId(sample.state())==job.expected();
@@ -287,17 +315,18 @@ final class PrinterEngine implements AutoCloseable {
     }
     List<PrinterQueue.Job> iceCandidates(PrinterQueue.Job first,int limit){
         var result=new ArrayList<PrinterQueue.Job>();result.add(first);var s=settings();
-        for(var job:queue.snapshot(BuiltInRegistries.ITEM.getId(net.minecraft.world.item.Items.ICE),128)){
-            if(result.size()>=limit)break;if(job.position()==first.position()||job.kind()!=PrinterQueue.Kind.PLACE||pacing.cooling(job.position())||!valid(job))continue;
+        var candidates=new ArrayList<PrinterQueue.Job>(queue.snapshot(BuiltInRegistries.ITEM.getId(net.minecraft.world.item.Items.ICE),128));candidates.addAll(queue.snapshot(-1,128));
+        for(var job:candidates){
+            if(result.size()>=limit)break;if(job.position()==first.position()||(job.kind()!=PrinterQueue.Kind.PLACE&&job.kind()!=PrinterQueue.Kind.ADJUST)||pacing.cooling(job.position())||!valid(job))continue;
             var pos=BlockPos.of(job.position());if(actions.iceTarget(client.level.getBlockState(pos),Block.stateById(job.expected()),s))result.add(job);
         }return result;
     }
-    /** True means an owned wait/quota/time boundary; false lets the caller refill an empty queue. */
+
     private void deferred(PrinterQueue.Job job,PrinterReason reason,boolean material){status=reason;deferredJob=job;deferredReason=reason;deferredMissing=material;deferredUntil=ticks+20;}
     private PrinterReason idleReason(PrinterSettings settings){
         if(!PrinterReach.intersectsBuildHeight(client.player.getEyePosition(),range(settings),settings.shape,client.level.getMinY(),client.level.getMaxY()))return PrinterReason.of(PrinterReason.Id.BUILD_HEIGHT,"超出建造高度");
         if(lastUnknown>0)return PrinterReason.of(PrinterReason.Id.LOADING,"等待加载");
-        // A briefly empty queue must not erase a measured cause while that same job awaits retry.
+
         if(progressPercent()!=100&&deferredJob!=null&&ticks<=deferredUntil&&(!deferredMissing||!missing.isEmpty())&&valid(deferredJob))return deferredReason;
         deferredJob=null;deferredReason=PrinterReason.NONE;
         return missing.isEmpty()?PrinterReason.of(PrinterReason.Id.NO_WORK,"等待可施工位置"):PrinterReason.of(PrinterReason.Id.MISSING,"等待材料");
@@ -314,7 +343,7 @@ final class PrinterEngine implements AutoCloseable {
             if(s.safeObserver&&Block.stateById(job.expected()).is(Blocks.OBSERVER)&&!PrinterRules.observerReady(BlockPos.of(job.position()),p->{var sample=sampler.apply(new Vec3i(p.getX(),p.getY(),p.getZ()));return sample==null?null:sample.inside()?sample.state():Blocks.AIR.defaultBlockState();},p->WorldChunks.loaded(client.level,p)?client.level.getBlockState(p):null)){deferred(job,PrinterReason.of(PrinterReason.Id.OBSERVER,"等待侦测器前方完成"),false);pacing.defer(job.position(),1);continue;}
             boolean breaking=actions.needsBreak(job);if(!pacing.canDispatch(job.position(),breaking)){if(resuming||actions.owns(job)){waiting=job;break;}queue.offer(job,actions.material(job,s));continue;}
             var outcome=actions.execute(job,s,ticks);actions.diagnostics.outcome(outcome,actions.dispatched());
-            if(actions.dispatched()){if(materialBatchEnabled())materialBatch.dispatched(job,ticks);pacing.dispatched(job.position(),actions.breakDispatched());if(outcome==PrinterActions.Outcome.SENT||outcome==PrinterActions.Outcome.WAIT)operations++;}
+            if(actions.dispatched()){if(materialBatchEnabled())materialBatch.dispatched(job,ticks,actions.material(job,s));pacing.dispatched(job.position(),actions.breakDispatched());if(outcome==PrinterActions.Outcome.SENT||outcome==PrinterActions.Outcome.WAIT)operations++;}
             if(s.highlights&&(actions.dispatched()||outcome==PrinterActions.Outcome.UNSUPPORTED)){var kind=outcome==PrinterActions.Outcome.UNSUPPORTED?ActionHighlights.Kind.FAILED:switch(job.kind()){case BREAK,BEDROCK->ActionHighlights.Kind.BREAK;case ADJUST->ActionHighlights.Kind.ADJUST;default->ActionHighlights.Kind.PLACE;};highlights.add(job.position(),kind,System.nanoTime(),HighlightFades.duration(kind,s.highlightMillis*1_000_000L));}
             if(outcome==PrinterActions.Outcome.WAIT){waiting=job;status=actions.typedReason();break;}
             if(outcome==PrinterActions.Outcome.SENT){retryWindow.forget(job.position());deferredJob=null;status=PrinterReason.RUNNING;}

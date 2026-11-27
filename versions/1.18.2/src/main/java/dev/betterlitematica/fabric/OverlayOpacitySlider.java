@@ -5,7 +5,6 @@ import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.text.Text;
 import java.util.function.DoubleConsumer;
 
-/** Native pointer/keyboard model, independent physical-pixel painting. */
 final class OverlayOpacitySlider extends SliderWidget {
     public int getX(){return x;} public int getY(){return y;} public void setX(int value){x=value;} public void setY(int value){y=value;}
 

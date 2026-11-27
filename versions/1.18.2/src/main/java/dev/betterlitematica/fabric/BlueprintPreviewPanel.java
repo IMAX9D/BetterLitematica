@@ -11,7 +11,6 @@ import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
-/** Shared camera and pointer capture for the browser and placement preview. */
 final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseable {
     public int getX(){return x;} public int getY(){return y;} public void setX(int value){x=value;} public void setY(int value){y=value;}
 
@@ -43,7 +42,7 @@ final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseab
     void images(FilePreviews.Preview preview){
         var value=preview.images();int side=value.side();var views=value.views();
         if(side!=256||views.size()!=4||views.stream().anyMatch(p->p==null||p.length!=side*side))throw new IllegalArgumentException("无效预览图");
-        // The static thumbnail atlas never changes while interacting with the separate orbit image.
+
         int combinedSide=side*2;int[] pixels=new int[combinedSide*combinedSide];
         for(int i=0;i<4;i++)for(int y=0;y<side;y++)System.arraycopy(views.get(i),y*side,pixels,((i/2)*side+y)*combinedSide+(i%2)*side,side);
         close();
@@ -80,7 +79,7 @@ final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseab
     private int imageLeft(){return getX()+(width-imageSize()-(gallery?GAP+thumbnailSize():0))/2;}
     private int imageTop(){return getY()+(gallery?24:Math.max(0,(height-imageSize())/2));}
     private boolean orbitHit(double x,double y){int left=imageLeft(),top=imageTop(),size=imageSize();return visible&&active&&orbit!=null&&x>=left&&x<left+size&&y>=top&&y<top+size;}
-    /** A reset chip appears in the corner once the view leaves its default framing; double-click remains a shortcut. */
+
     private static final int RESET=18;
     private boolean resetShown(){return orbit!=null&&!camera.equals(PreviewCamera.DEFAULT);}
     private boolean resetHit(double x,double y){int rx=imageLeft()+imageSize()-INSET-RESET-4,ry=imageTop()+INSET+4;return resetShown()&&orbitHit(x,y)&&x>=rx&&x<rx+RESET&&y>=ry&&y<ry+RESET;}
@@ -144,8 +143,7 @@ final class BlueprintPreviewPanel extends ClickableWidget implements AutoCloseab
         var ui=IndependentUi.INSTANCE;ui.roundRect(x,y,x+size,y+size,UiTheme.CARD_RADIUS,UiTheme.SUNKEN);
         if(orbitImage!=null&&orbitImage.ready()){
             double content=size-INSET*2,ratio=1,offsetX=0,offsetY=0;
-            // Pan/zoom are affine in this orthographic view. Reproject the last good image on the
-            // GPU for immediate pointer response while the worker fills newly exposed areas.
+
             if(displayedCamera!=null&&camera.yaw()==displayedCamera.yaw()&&camera.pitch()==displayedCamera.pitch()){
                 ratio=camera.zoom()/displayedCamera.zoom();
                 offsetX=.5+camera.panX()-(.5+displayedCamera.panX())*ratio;

@@ -7,10 +7,6 @@ import java.nio.ByteBuffer;
 import java.security.*;
 import java.util.*;
 
-/** Immutable disk index of non-air source cells, grouped by section and palette state.
- * Only directory entries and the current section are resident. No total disk quota.
- * Never stores world observations or completion: those must be checked at placement time.
- */
 public final class PrinterMaterialIndex implements AutoCloseable {
     private static final int MAGIC=0x424d4931,VERSION=1,HEADER=16;
     public record Entry(long offset,int bytes){}
@@ -40,7 +36,7 @@ public final class PrinterMaterialIndex implements AutoCloseable {
     public static PrinterMaterialIndex prepare(Path directory,BlueprintCache source,SchematicEdits.Snapshot edits,Cancellation cancel)throws IOException{
         var metadata=edits==null?source.metadata():edits.metadata();Files.createDirectories(directory);
         var target=directory.resolve(fingerprint(metadata,edits)+".bmi");
-        if(Files.isRegularFile(target))try{return open(target,true);}catch(IOException corrupt){/* Rebuild derived data only. */}
+        if(Files.isRegularFile(target))try{return open(target,true);}catch(IOException corrupt){ }
         var temporary=Files.createTempFile(directory,"material-",".part");
         try{
             var keys=new TreeSet<SectionKey>(ORDER);keys.addAll(source.index().keySet());if(edits!=null)keys.addAll(edits.sections().keySet());
@@ -48,16 +44,33 @@ public final class PrinterMaterialIndex implements AutoCloseable {
             try(var out=new RandomAccessFile(temporary.toFile(),"rw")){
                 out.writeInt(MAGIC);out.writeInt(VERSION);out.writeLong(0);
                 long[] sorted=new long[PackedSection.VOLUME];
-                for(var key:keys){cancel.check();var section=source.read(key);var region=metadata.regions().get(key.region());var origin=region.sectionOrigin(key);int count=0;
-                    for(int cell=0;cell<PackedSection.VOLUME;cell++){
-                        if(!region.contains(origin.add(new Vec3i(cell&15,cell>>>8,(cell>>>4)&15))))continue;
-                        var patch=edits==null?null:edits.patch(key,cell);int state=patch!=null?patch.state():section==null?0:section.globalId(cell);
-                        var spec=metadata.palette().get(state);if(spec.isAir()||spec.name().equals("minecraft:structure_void"))continue;
-                        sorted[count++]=((long)state<<32)|cell;
+                boolean[] printable=new boolean[metadata.palette().size()];
+                for(int i=0;i<printable.length;i++){
+                    var spec=metadata.palette().get(i);
+                    printable[i]=!spec.isAir()&&!spec.name().equals("minecraft:structure_void");
+                }
+                for(var key:keys){
+                    cancel.check();
+                    var section=source.read(key);
+                    var patches=edits==null?null:edits.sections().get(key);
+                    var size=metadata.regions().get(key.region()).size();
+                    int width=Math.min(16,size.x()-16*key.x()),height=Math.min(16,size.y()-16*key.y()),depth=Math.min(16,size.z()-16*key.z());
+                    int count=0;
+                    if(section!=null){
+                        for(int cell=section.nextNonZero(0);cell<PackedSection.VOLUME;cell=section.nextNonZero(cell+1)){
+                            if(!inBounds(cell,width,height,depth)||(patches!=null&&patches.containsKey(cell)))continue;
+                            int state=section.globalId(cell);
+                            if(printable[state])sorted[count++]=((long)state<<32)|cell;
+                        }
+                    }
+
+                    if(patches!=null)for(var entry:patches.entrySet()){
+                        int cell=entry.getKey(),state=entry.getValue().state();
+                        if(inBounds(cell,width,height,depth)&&printable[state])sorted[count++]=((long)state<<32)|cell;
                     }
                     if(count==0)continue;Arrays.sort(sorted,0,count);long offset=out.getFilePointer();
                     int groups=1;for(int i=1;i<count;i++)if(sorted[i]>>>32!=sorted[i-1]>>>32)groups++;
-                    // One native write per section, never a system call per coordinate.
+
                     var payload=ByteBuffer.allocate(4+8*groups+2*count);payload.putInt(groups);
                     for(int start=0;start<count;){int end=start+1,state=(int)(sorted[start]>>>32);while(end<count&&(int)(sorted[end]>>>32)==state)end++;
                         payload.putInt(state).putInt(end-start);for(int i=start;i<end;i++)payload.putShort((short)sorted[i]);start=end;
@@ -75,6 +88,9 @@ public final class PrinterMaterialIndex implements AutoCloseable {
             return open(target,false);
         }finally{Files.deleteIfExists(temporary);}
     }
+    private static boolean inBounds(int cell,int width,int height,int depth){
+        return (cell&15)<width&&(cell>>>8)<height&&((cell>>>4)&15)<depth;
+    }
     private static void writeKey(DataOutput out,SectionKey key)throws IOException{out.writeInt(key.region());out.writeInt(key.x());out.writeInt(key.y());out.writeInt(key.z());}
     private static PrinterMaterialIndex open(Path path,boolean hit)throws IOException{
         var in=new RandomAccessFile(path.toFile(),"r");try{
@@ -89,7 +105,7 @@ public final class PrinterMaterialIndex implements AutoCloseable {
             }if(previous!=table)throw new IOException("Material index payload");return new PrinterMaterialIndex(in,entries,hit);
         }catch(IOException|RuntimeException e){in.close();throw e;}
     }
-    /** Worker-only I/O; reads at most one 16-cube. */
+
     public List<Slice> slices(SectionKey key)throws IOException{
         var entry=directory.get(key);if(entry==null)return List.of();byte[] data=new byte[entry.bytes()];
         synchronized(file){file.seek(entry.offset());file.readFully(data);}

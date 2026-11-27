@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** One owned placement transaction. Only authoritative observations authorize the destructive step. */
 public final class IceWaterPlan {
     public enum Observation {ICE,WATER,AIR,OTHER}
     public enum Step {WAIT,BREAK,DONE,ABORT}

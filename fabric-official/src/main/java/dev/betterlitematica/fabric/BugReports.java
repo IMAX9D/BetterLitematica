@@ -5,13 +5,12 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 
-/** Capture only explicit, non-identifying runtime fields; never serialize the player's full configuration. */
 final class BugReports {
     private static BugReportClient service;
     private static boolean enteredWorld;
     private BugReports(){}
     static void register(Minecraft client,ProjectionController controller){
-        // Persist the launch boundary even if the player never opens the feedback form.
+
         service();net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register((handler,sender,mc)->enteredWorld=true);
         net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((mc,screen,width,height)->{
             if(screen instanceof net.minecraft.client.gui.screens.TitleScreen){

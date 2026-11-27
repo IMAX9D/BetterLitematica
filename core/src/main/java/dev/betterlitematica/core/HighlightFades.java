@@ -1,6 +1,5 @@
 package dev.betterlitematica.core;
 
-/** Stateless presentation curves; never change highlight membership or world observations. */
 public final class HighlightFades {
     private HighlightFades(){}
     public static long duration(ActionHighlights.Kind kind,long requested){return kind==ActionHighlights.Kind.PLACE?Math.min(requested,450_000_000L):requested;}
@@ -11,7 +10,7 @@ public final class HighlightFades {
     public static float missing(double distance,double range,double alignment){
         if(range<=0||distance>=range)return 0;
         double near=Math.min(2,range*.4),fade=1-smooth((distance-near)/(range-near));
-        // Gaze only adds emphasis. It cannot hide a cell when the player turns away.
+
         double focus=.65+.35*smooth((alignment-.85)/.13);
         return (float)(.66*fade*(fade+(1-fade)*focus));
     }

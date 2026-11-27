@@ -38,8 +38,7 @@ public abstract class TerrainSectionBufferMixin implements TerrainSectionOwner {
     }
     @Inject(method="rebuild",at=@At("HEAD"),cancellable=true)
     private void betterlitematica$buildOffThread(ChunkRendererRegionBuilder regions,CallbackInfo ci){
-        // Keep vanilla's immutable region snapshot/model adapters and priority queue. Even urgent
-        // block updates run on its bounded workers instead of meshing on the render thread.
+
         scheduleRebuild(field_20833,regions);ci.cancel();
     }
 }

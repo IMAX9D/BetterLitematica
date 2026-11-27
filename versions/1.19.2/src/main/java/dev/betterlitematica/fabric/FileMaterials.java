@@ -4,7 +4,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.*;
 import net.minecraft.util.registry.Registry;
 import java.util.*;
-/** Complete source histogram, independent of resident/rendered sections and the world. */
+
 final class FileMaterials {
     enum Sort {MISSING,TOTAL,AVAILABLE,NAME;String label(){return switch(this){case MISSING->"缺少";case TOTAL->"总量";case AVAILABLE->"拥有";case NAME->"名称";};}}
     private final long[] counts;

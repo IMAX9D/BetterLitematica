@@ -5,7 +5,6 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Dedicated serial checkpoints. Failed writes retain their latest image; reads never pass them. */
 public final class DraftWriter implements AutoCloseable {
     public interface Backend {
         void write(Path path,DraftStore.Draft value)throws IOException;
@@ -30,7 +29,7 @@ public final class DraftWriter implements AutoCloseable {
     private final ScheduledExecutorService worker=Executors.newSingleThreadScheduledExecutor(r->{var t=new Thread(r,"betterlitematica-drafts");t.setDaemon(true);return t;});
     private boolean scheduled,closing,closed;private long sequence;private Slot inFlight;private DraftStore.Draft inFlightValue;
     public DraftWriter(){this(16,FILES);}
-    /** Injectable storage permits deterministic failure/order tests without a game. */
+
     public DraftWriter(int maxPaths,Backend backend){if(maxPaths<1||maxPaths>16)throw new IllegalArgumentException("Draft path budget");this.maxPaths=maxPaths;this.backend=Objects.requireNonNull(backend);}
     private static Path path(Path path){return path.toAbsolutePath().normalize();}
     private Slot slot(Path path){
@@ -40,7 +39,7 @@ public final class DraftWriter implements AutoCloseable {
     }
     public synchronized long write(Path path,DraftStore.Draft draft){Objects.requireNonNull(draft);return request(path,draft);}
     public synchronized long clear(Path path){return request(path,null);}
-    /** Protect a path slot until its next accepted write/clear, or explicit release. */
+
     public synchronized boolean reserve(Path path){try{ensureOpen();slot(path).reserved=true;return true;}catch(IllegalStateException e){return false;}}
     public synchronized void release(Path path){var slot=slots.get(path(path));if(slot!=null)slot.reserved=false;}
     public synchronized boolean canWrite(Path path,DraftStore.Draft draft){
@@ -87,8 +86,7 @@ public final class DraftWriter implements AutoCloseable {
             if(barrier!=null){
                 Object result=null;Exception failure=blocked==null?null:new IOException(blocked);
                 if(failure==null)try{result=switch(barrier.kind){case FLUSH->null;case READ->backend.read(barrier.slot.path);case ARCHIVE->backend.archive(barrier.slot.path);};}catch(Exception e){failure=e;}
-                // Completion can wake another thread or run its callbacks inline. Publish it only
-                // after releasing this barrier's lease, so admission and accounting agree with it.
+
                 synchronized(this){inFlight=null;inFlightValue=null;}
                 if(failure==null)barrier.result.complete(result);else barrier.result.completeExceptionally(failure);
             }
@@ -100,7 +98,7 @@ public final class DraftWriter implements AutoCloseable {
                 for(var slot:slots.values())if(slot.requested>slot.persisted)wait=Math.min(wait,Math.max(0,slot.retryAt-now));if(wait!=Long.MAX_VALUE)kick(wait);}}
         }
     }
-    /** A failed shutdown is reported; pending images remain inspectable through status(). */
+
     @Override public void close()throws IOException{
         CompletableFuture<Void> flush;
         synchronized(this){if(closed)return;if(closing)throw new IOException("Draft shutdown already running");closing=true;flush=flushAll();}

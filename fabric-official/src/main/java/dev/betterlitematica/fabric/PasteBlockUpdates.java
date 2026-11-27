@@ -5,7 +5,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** Only the exact synchronous schematic write suppresses placement/removal callbacks. */
 public final class PasteBlockUpdates {
     private static final class Context { Level world; BlockPos pos; }
     private static final ThreadLocal<Context> ACTIVE=ThreadLocal.withInitial(Context::new);

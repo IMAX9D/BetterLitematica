@@ -1,6 +1,6 @@
 package dev.betterlitematica.fabric;
 import java.util.*;
-/** Every declared setting must have an explicit player-facing name and explanation. */
+
 final class SettingHelp {
     record Definition(String label,String description){}
     private static final Map<SettingId,Definition> HELP=new EnumMap<>(SettingId.class);
@@ -40,7 +40,8 @@ final class SettingHelp {
         put(SettingId.PRINTER_FLOWING,"清理流水","排流体时同时处理流动水或流动岩浆。");
         put(SettingId.PRINTER_SKIP_WATERLOGGED,"跳过含水方块","跳过投影中要求含水状态的方块。");
         put(SettingId.PRINTER_FORCE_SNEAK,"潜行放置","放置时使用潜行，避免打开容器等交互。");
-        put(SettingId.PRINTER_ICE_WATER,"破冰放水","允许放置并破坏冰以得到所需水源。");
+        put(SettingId.PRINTER_WATER_TO_ICE,"替水换为冰","在缺少投影水源的位置放置普通冰；关闭自动破冰时保留冰，已有水源不替换。");
+        put(SettingId.PRINTER_AUTO_BREAK_ICE,"自动破冰","破坏投影水源位置的普通冰以形成水源；不会破坏投影要求保留的冰。可单独开启。");
         put(SettingId.PRINTER_CORAL,"珊瑚替代","允许放置活珊瑚并等待其变成目标失活珊瑚。");
         put(SettingId.PRINTER_SAFE_OBSERVER,"侦测器顺序检查","等侦测器前方的目标完成后再放置侦测器。");
         put(SettingId.PRINTER_CONTAINER_FILL,"容器填充","按投影内容向箱子等容器中补入物品。");

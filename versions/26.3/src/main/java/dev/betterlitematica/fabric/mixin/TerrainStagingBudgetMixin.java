@@ -12,8 +12,6 @@ import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
 
-/** Partition the native pending batch; callbacks run only for resident entries. Restore deferred
- * entries in finally, and retain their staging bytes until the last deferred entry is consumed. */
 @Mixin(UberGpuBuffer.class)
 public abstract class TerrainStagingBudgetMixin {
     @Shadow @Final private Object2ObjectOpenHashMap<Object,UberGpuBuffer.StagedAllocationEntry<Object>> stagedAllocations;

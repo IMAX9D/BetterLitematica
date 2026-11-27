@@ -5,7 +5,6 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 import java.util.function.Supplier;
 
-/** Live ARGB preview and keyboard-accessible picker entry. */
 final class ColorSwatch extends ButtonWidget {
     private final Supplier<String> value;
     private final UiMotion motion=new UiMotion();

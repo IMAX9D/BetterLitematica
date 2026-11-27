@@ -3,7 +3,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
-/** Vanilla editing/clipboard model only; all measurement, painting and pointer selection use our outline font. */
+
 final class OverlayTextField extends TextFieldWidget {
     public int getX(){return x;} public int getY(){return y;} public void setX(int value){x=value;} public void setY(int value){y=value;}
     private int anchor,start;private boolean pointerSelecting;private final boolean search;private String placeholder="";
@@ -42,7 +42,7 @@ final class OverlayTextField extends TextFieldWidget {
             if(isFocused()&&(System.nanoTime()/500_000_000L)%2==0){double x=textX()+ui.measure(text.substring(start,cursor));ui.rect(x,getY()+3,x+0.7,getY()+getHeight()-3,UiTheme.FOCUS);}
         }finally{ui.unclip();}
     }
-    /** Geometry follows the same logical canvas and semantic theme tint as the input. */
+
     private static void searchIcon(IndependentUi ui,double x,double y,int color){
         ui.sector(x+4,y+4,2.8,3.6,0,Math.PI*2,color);
         for(int i=0;i<=6;i++){double offset=6.5+i*.5;ui.roundRect(x+offset-.45,y+offset-.45,x+offset+.45,y+offset+.45,.45,color);}

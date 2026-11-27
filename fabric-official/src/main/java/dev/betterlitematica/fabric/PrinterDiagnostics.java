@@ -2,7 +2,6 @@ package dev.betterlitematica.fabric;
 
 import java.util.Locale;
 
-/** Aggregated local log only; no per-block logging, UI text, world writes or unbounded history. */
 final class PrinterDiagnostics {
     long scanNanos,planNanos,equipNanos,sendNanos;
     int attempts,stale,budgetStops,discovered,unknown;

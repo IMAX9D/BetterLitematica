@@ -14,7 +14,7 @@ import net.minecraft.state.property.Properties;
 import net.minecraft.util.*;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.*;
-/** Independent V2/V3 wire codec. Local decoding is scoped to our own recorded use action. */
+
 public final class AccuratePlacement {
     public enum Mode {AUTO,SLAB,V2,V3,NONE;
         String label(){return switch(this){case AUTO->"自动";case SLAB->"半砖";case V2->"V2";case V3->"V3";case NONE->"原生";};}}
@@ -35,7 +35,7 @@ public final class AccuratePlacement {
         try{int type=data.readVarInt();if(type==69){data.readString(64);if(carpetConnection!=connection){carpetConnection=connection;carpetAccurate=false;
                 if(!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("carpet")){var reply=net.fabricmc.fabric.api.networking.v1.PacketByteBufs.create();reply.writeVarInt(420).writeString("BetterLitematica");connection.sendPacket(new net.minecraft.network.packet.c2s.play.CustomPayloadC2SPacket(CARPET,reply));}
             }}else if(type==1&&carpetConnection==connection){var tag=data.readNbt();Boolean enabled=carpetRule(tag);if(enabled!=null)carpetAccurate=enabled;}}
-        catch(RuntimeException ignored){/* An unknown protocol never enables encoded placement. */}
+        catch(RuntimeException ignored){ }
     }
     static Boolean carpetRule(net.minecraft.nbt.NbtCompound data){
         if(data==null||!data.contains("Rules",net.minecraft.nbt.NbtElement.COMPOUND_TYPE))return null;var rules=data.getCompound("Rules");if(rules.getSize()>4096)return null;
@@ -44,7 +44,7 @@ public final class AccuratePlacement {
     private static final ThreadLocal<Scope> active=new ThreadLocal<>();
     private record Key(UUID player,String dimension,long clicked,int side,Hand hand,int x,int y,int z){}
     private record Pending(MinecraftServer server,Scope scope,BlockHitResult physical){}
-    /** The same bounded store is exercised headlessly and used by both client and server threads. */
+
     static final class PendingSlots<K,V> {
         private record Entry<V>(V value,long deadline){}
         private final Map<K,Entry<V>> entries=new HashMap<>();
@@ -90,14 +90,13 @@ public final class AccuratePlacement {
             int shift=1;if(shape.facing!=null&&shape.facing!=Properties.VERTICAL_DIRECTION){packed=wanted.get(shape.facing).getId()<<shift;shift+=3;data=true;}
             for(Property property:shape.properties){var table=propertyValues(property);int width=table.bits();if(shift+width>22)throw new IllegalArgumentException("放置状态超出协议容量");packed|=table.values().indexOf(wanted.get(property))<<shift;shift+=width;data=true;}
         }
-        // Keep the encoded fraction strictly inside the target cell, including hits on its east face.
+
         double x=data?encodedX(target.getX(),hit.getBlockPos().getX(),p.x,packed):p.x;
         return new BlockHitResult(new Vec3d(x,y,p.z),hit.getSide(),hit.getBlockPos(),hit.isInsideBlock());
     }
     static double encodedX(int targetX,int clickedX,double physicalX,int packed){
         double x=targetX+Math.max(.001,Math.min(.999,physicalX-targetX))+2+packed;
-        // The packet stores a float relative to the clicked block, not a double world coordinate.
-        // At the largest supported payload a fraction near one can round into the next state.
+
         double received=clickedX+(double)(float)(x-clickedX);
         if(Math.floor(received-targetX)-2!=packed)x=targetX+2.5+packed;
         return x;
@@ -133,7 +132,7 @@ public final class AccuratePlacement {
         var finalState=state==null?null:StateResolver1201.itemState(state,context.getStack());
         return validatePlacement(item,adjusted,base,finalState);
     }
-    /** Vanilla's exact BlockItem already validated its unchanged getPlacementState result. */
+
     public static BlockState validatePlacement(BlockItem item,ItemPlacementContext context,BlockState base,BlockState modified){
         if(modified==null)return null;
         if(base==modified&&item.getClass()==BlockItem.class)return modified;

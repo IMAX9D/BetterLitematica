@@ -6,7 +6,6 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.util.Identifier;
 import java.util.*;
 
-/** Captures built-in entity/BER render output once into bounded textured meshes. */
 final class ProjectionModels implements VertexConsumerProvider {
     record Material(Identifier texture,boolean intensity){}
     private final Map<Material,ProjectionVertices> layers=new LinkedHashMap<>();

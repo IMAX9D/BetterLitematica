@@ -11,8 +11,6 @@ import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 
-
-
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
@@ -25,23 +23,17 @@ import org.joml.Matrix4f;
 import java.util.*;
 import java.util.concurrent.*;
 
-/**
- * Development-preview renderer, not a full replacement for vanilla's terrain renderer.
- * Minecraft models are accessed on the render thread. Disk decoding is off-thread.
- * Model callbacks are not preemptible; the time limit is a cooperative budget, not a hard real-time guarantee.
- * Native fluids, block entities and bounded entity meshes share a nearest-surface composite.
- */
 final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Worker {
     private static final int MAX_PART_VERTICES=16384,MAX_BLOCK_QUADS=512;
     private static final int BLOCKS_PER_FRAME=8192,UPLOAD_BYTES_PER_FRAME=2*1024*1024,MAX_COMPLETED_PER_FRAME=32;
     private static final int QUERY_RADIUS=512,MAX_CANDIDATES=32768;
-    /** Blocks: surfaces nearer than NEAR_CLEAR are removed and fully back by NEAR_FULL. */
+
     private static final float NEAR_CLEAR=.75f,NEAR_FULL=2.5f;
     private static final long BUILD_NANOS=4_000_000,MAX_ACTIVE_SECTION_BYTES=8L<<20;
-    /** Decoding threads and requests kept in flight; the streamer's queue still bounds memory. */
+
     private static final int DECODE_THREADS=Math.max(2,Math.min(4,Runtime.getRuntime().availableProcessors()-2)),PREFETCH_IN_FLIGHT=32;
     private static final Direction[] DIRECTIONS=Direction.values();
-    /** Block-atlas geometry lives in a shared page ({@code slice}); special textures keep their own buffer. */
+
     private record Part(ProjectionGpuMesh buffer,ProjectionPages.Slice slice,int bytes,net.minecraft.resources.Identifier texture,boolean intensity,QuadVisibility.Part visibility) {}
     private record Mesh(List<Part> parts,long bytes,AABB bounds,RenderResources.Group resources,long worldRevision,QuadVisibility.Mask mask,QuadVisibility.Mask wrong,RenderedCells cells,BitSet omitted) implements AutoCloseable {
         @Override public void close(){resources.close();}
@@ -59,10 +51,9 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private final SpatialIndex index;
     private SchematicEdits edits;
     private final WeightedLru<SectionKey,PackedSection> editedSections=new WeightedLru<>(16L<<20,PackedSection::estimatedBytes,value->{});
-    // Keep meshes across camera turns; evict cold meshes only under actual memory pressure.
-    // The shared render budget decides residency (nearest first); this cache only bounds bookkeeping.
+
     private final WeightedLru<SectionKey,Mesh> meshes=new WeightedLru<>(Long.MAX_VALUE>>2,MAX_CANDIDATES*2,Mesh::bytes,Mesh::close);
-    // One entry per candidate: a followed band touching thousands of sections must not degrade into "everything changed".
+
     private final MeshRefresh<SectionKey> worldRefresh=new MeshRefresh<>(MAX_CANDIDATES);
     private final ProjectionBuffer builder=new ProjectionBuffer(MAX_PART_VERTICES*24);
     private final QuadVisibility.Builder ownership=new QuadVisibility.Builder();
@@ -70,32 +61,35 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private final Set<SectionKey> failed=new HashSet<>(),deferred=new HashSet<>();
     private final Set<SectionKey> visibleSet=new HashSet<>();
     private final List<SectionKey> visibleKeys=new ArrayList<>();
-    /**
-     * A nearby query with everything culling needs, computed off-thread: per candidate its world box (six doubles)
-     * and arena, per arena the union box. A frame then tests arenas first and only boundary arenas section by section.
-     */
-    private record QueryResult(long generation,Vec3i camera,int radius,List<SectionKey> keys,Set<SectionKey> membership,Map<SectionKey,Integer> indices,double[] boxes,int[] arenaOf,double[] arenaBoxes,List<ProjectionEntities.Candidate> entities){}
+
+    private record QueryResult(long generation,Vec3i camera,int radius,List<SectionKey> keys,Set<SectionKey> membership,Map<SectionKey,Integer> indices,double[] boxes,int[] groupOffsets,int[] groupMembers,double[] arenaBoxes,List<ProjectionEntities.Candidate> entities){}
     private static QueryResult query(long generation,Vec3i camera,int radius,List<SectionKey> keys,PlacementLayout layout,List<Region> regions,List<ProjectionEntities.Candidate> entities){
-        int n=keys.size();double[] boxes=new double[n*6];int[] arenaOf=new int[n];var indices=new HashMap<SectionKey,Integer>(n*2);var arenas=new HashMap<ProjectionPages.Origin,Integer>();double[] arenaBoxes=new double[96];
+        int n=keys.size();double[] boxes=new double[n*6];int[] arenaOf=new int[n];var indices=new HashMap<SectionKey,Integer>(n*2);var arenas=new HashMap<CullGroup,Integer>();double[] arenaBoxes=new double[96];
         for(int i=0;i<n;i++){
             var key=keys.get(i);indices.put(key,i);var transform=layout.part(key.region()).transform();var base=regions.get(key.region()).sectionOrigin(key);
-            // Orthogonal transforms map opposite corners of the section to opposite corners of its world box.
+
             Vec3i a=transform.apply(base),b=transform.apply(base.add(new Vec3i(15,15,15)));
             boxes[i*6]=Math.min(a.x(),b.x());boxes[i*6+1]=Math.min(a.y(),b.y());boxes[i*6+2]=Math.min(a.z(),b.z());boxes[i*6+3]=Math.max(a.x(),b.x())+1.0;boxes[i*6+4]=Math.max(a.y(),b.y())+1.0;boxes[i*6+5]=Math.max(a.z(),b.z())+1.0;
-            var origin=ProjectionPages.origin(a.x(),a.y(),a.z());Integer arena=arenas.get(origin);
+            var origin=new CullGroup(a.x()>>6,a.y()>>6,a.z()>>6);Integer arena=arenas.get(origin);
             if(arena==null){arena=arenas.size();arenas.put(origin,arena);if(arena*6+6>arenaBoxes.length)arenaBoxes=Arrays.copyOf(arenaBoxes,arenaBoxes.length*2);for(int k=0;k<3;k++){arenaBoxes[arena*6+k]=Double.POSITIVE_INFINITY;arenaBoxes[arena*6+3+k]=Double.NEGATIVE_INFINITY;}}
             arenaOf[i]=arena;for(int k=0;k<3;k++){arenaBoxes[arena*6+k]=Math.min(arenaBoxes[arena*6+k],boxes[i*6+k]);arenaBoxes[arena*6+3+k]=Math.max(arenaBoxes[arena*6+3+k],boxes[i*6+3+k]);}
         }
-        return new QueryResult(generation,camera,radius,keys,indices.keySet(),indices,boxes,arenaOf,Arrays.copyOf(arenaBoxes,arenas.size()*6),entities);
+        int[] offsets=new int[arenas.size()+1];
+        for(int group:arenaOf)offsets[group+1]++;
+        for(int i=1;i<offsets.length;i++)offsets[i]+=offsets[i-1];
+        int[] next=offsets.clone(),members=new int[n];
+        for(int i=0;i<n;i++)members[next[arenaOf[i]]++]=i;
+        return new QueryResult(generation,camera,radius,keys,indices.keySet(),indices,boxes,offsets,members,Arrays.copyOf(arenaBoxes,arenas.size()*6),entities);
     }
-    private Map<SectionKey,Integer> candidateIndex=Map.of();private double[] candidateBoxes=new double[0],arenaBoxes=new double[0];private int[] candidateArena=new int[0];
-    private boolean[] candidateVisible=new boolean[0];private byte[] arenaCull=new byte[0];
+    private Map<SectionKey,Integer> candidateIndex=Map.of();private double[] candidateBoxes=new double[0],arenaBoxes=new double[0];private int[] groupOffsets=new int[]{0},groupMembers=new int[0];
+    private record CullGroup(int x,int y,int z){}
+    private final BitSet candidateVisible=new BitSet();private byte[] arenaCull=new byte[0];
     private final org.joml.FrustumIntersection cull=new org.joml.FrustumIntersection();private final Matrix4f cullMatrix=new Matrix4f();
     private static final byte OUTSIDE=0,PARTIAL=1,INSIDE=2;
-    /** Half a block of slack: the render projection includes view bobbing, so edges must not pop. */
+
     private static final float CULL_MARGIN=.5f;
     private final ExecutorService queryWorker=Executors.newSingleThreadExecutor(r->{var t=new Thread(r,"betterlitematica-spatial");t.setDaemon(true);return t;});
-    // Only one future is submitted at a time, so executor backlog is bounded to one query.
+
     private CompletableFuture<QueryResult> query;
     private long queryGeneration;
     private final net.minecraft.client.renderer.texture.TextureAtlasSprite[] lightSprites=new net.minecraft.client.renderer.texture.TextureAtlasSprite[16];
@@ -115,24 +109,24 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private Vec3i lastCamera;private Job job;private SectionKey coolingKey;private long coolingUntil;
     @Override public boolean building(){return job!=null;}
     private boolean visible=true,budgetSaturated;
-    // Per-frame scheduling state: source requests are queued once per frame, hole search stops once exhausted.
+
     private boolean prefetchedThisFrame,frameMissingWork,holesExhausted,visibleRefreshExhausted,surroundingExhausted;
     private final LinkedHashSet<LayerRange> unsettledLayers=new LinkedHashSet<>();private boolean unsettledOverflow;private long layerChangedAt;
     private LayerRange semantic=LayerRange.ALL;private int capAxis=-1,clipAxis=-1;private long capLo,capHi;private double clipFrom,clipTo,clipFade;
     private static final int FOLLOW_SPAN=6;
     private Vec3 distanceOrigin=Vec3.ZERO;
-    /** Squared distance from the viewer to a section's centre; the residency key under budget pressure. */
+
     private double sectionDistance(SectionKey key){
         Integer at=candidateIndex.get(key);if(at==null)return distance(bounds(key));
         int i=at*6;double x=(candidateBoxes[i]+candidateBoxes[i+3])*.5-distanceOrigin.x,y=(candidateBoxes[i+1]+candidateBoxes[i+4])*.5-distanceOrigin.y,z=(candidateBoxes[i+2]+candidateBoxes[i+5])*.5-distanceOrigin.z;return x*x+y*y+z*z;
     }
     private double distance(AABB box){double x=(box.minX+box.maxX)*.5-distanceOrigin.x,y=(box.minY+box.maxY)*.5-distanceOrigin.y,z=(box.minZ+box.maxZ)*.5-distanceOrigin.z;return x*x+y*y+z*z;}
-    /** Off-screen sections around the viewer keep loading while they can still displace farther meshes. */
+
     private boolean surroundingAllowed(){
         return resources.distanceOrdered()?meshes.size()<MAX_CANDIDATES*2-1024:resources.warm()&&meshes.usedBytes()<meshes.capacity()*3/4&&meshes.size()<24576;
     }
     private final ArrayList<SectionKey> residencyKeys=new ArrayList<>();private int residencyCursor;private boolean releaseWarned;
-    /** Up to 512 resident meshes per frame take their new distance; changes under a sixteenth are not worth a re-sort. */
+
     private void refreshResidency(){
         for(int n=0;n<512&&residencyCursor<residencyKeys.size();n++){
             var key=residencyKeys.get(residencyCursor++);var mesh=meshes.get(key);if(mesh==null)continue;var group=mesh.resources();
@@ -152,7 +146,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     PlacementLayout layout(){return layout;}
     private List<BlockStateSpec> displayPalette;
     private BitSet hiddenStates;
-    /** Compile once per immutable palette/filter revision, never once per source cell. */
+
     boolean displays(int id){
         var palette=metadata().palette();
         if(displayPalette!=palette||hiddenStates==null){
@@ -164,19 +158,18 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     }
     void scene(ProjectionScene value){
         var changes=value.changesFrom(scene,this);scene=value;if(changes.empty())return;
-        // The moved renderer already invalidated its own layout. Other renderers keep unrelated
-        // buffers, spatial queries and in-flight builds, including off-screen warm meshes.
+
         var affected=new HashSet<SectionKey>();
         meshes.forEach((key,mesh)->{if(changes.affects(sceneBounds(key)))affected.add(key);});
         for(var key:failed)if(changes.affects(sceneBounds(key)))affected.add(key);
         for(var key:deferred)if(changes.affects(sceneBounds(key)))affected.add(key);
         if(job!=null&&changes.affects(sceneBounds(job.key))){affected.add(job.key);discardJob();}
         for(var key:affected){meshes.remove(key);failed.remove(key);deferred.remove(key);}
-        // In-flight builds read the old scene: overlaps may have appeared, so every one restarts.
+
         discardMeshing();
         blockEntities.keySet().removeIf(pos->changes.affects(new PlacementBounds(new Vec3i(pos.getX()-1,pos.getY()-1,pos.getZ()-1),new Vec3i(pos.getX()+1,pos.getY()+1,pos.getZ()+1))));
         entities.sceneChanged(changes,entityCandidates);
-        if(!affected.isEmpty())wakeWorldRefresh();
+        if(!affected.isEmpty()){drawRevision++;wakeWorldRefresh();}
     }
     private PlacementBounds sceneBounds(SectionKey key){var box=bounds(key);return new PlacementBounds(new Vec3i((int)box.minX-1,(int)box.minY-1,(int)box.minZ-1),new Vec3i((int)box.maxX,(int)box.maxY,(int)box.maxZ));}
     void drain(){stream.drain();}
@@ -185,7 +178,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     BlueprintMetadata metadata(){return edits==null?stream.source().metadata():edits.snapshot().metadata();}
     LoadCoordinator.Loaded printerSourceLease(){return sourceLease.retain();}
     SchematicEdits.Snapshot printerEdits(){return edits==null?null:edits.snapshot();}
-    /** Source-owned, read-only auxiliary data; deliberately does not use render entity fallbacks. */
+
     Map<String,Object> informationBlockData(PlacementLayout.Part region,Vec3i local){
         var patch=edits==null?null:edits.snapshot().patch(region.section(local),region.cell(local));
         if(patch!=null&&!patch.blockData())return null;
@@ -194,8 +187,20 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     }
     long[] sourceCounts(){return stream.source().copyBlockStateCounts();}
     void draft(SchematicEdits value){edits=value;editedSections.close();resolvers.clear();discardMeshing();palettes.clear();}
+
+    private SectionKey lastBaseKey;
+    private PackedSection lastBaseSection;
     int baseState(SectionKey key,int cell){
-        if(!stream.source().index().containsKey(key))return 0;var data=stream.get(key);if(data==null){stream.request(key);return -1;}return data.globalId(cell);
+        if(!key.equals(lastBaseKey)){
+            PackedSection section=null;
+            if(stream.source().index().containsKey(key)){
+                section=stream.get(key);
+                if(section==null){stream.request(key);return -1;}
+            }
+            lastBaseKey=key;
+            lastBaseSection=section;
+        }
+        return lastBaseSection==null?0:lastBaseSection.globalId(cell);
     }
     private PackedSection section(SectionKey key){
         var patch=edits==null?null:edits.snapshot().sections().get(key);if(patch!=null){var cached=editedSections.get(key);if(cached!=null)return cached;}
@@ -214,16 +219,16 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             for(int x:new int[]{box.min().x(),box.max().x()})for(int y:new int[]{box.min().y(),box.max().y()})for(int z:new int[]{box.min().z(),box.max().z()}){var local=part.local(new Vec3i(x,y,z)).subtract(part.region().min());minX=Math.min(minX,local.x());minY=Math.min(minY,local.y());minZ=Math.min(minZ,local.z());maxX=Math.max(maxX,local.x());maxY=Math.max(maxY,local.y());maxZ=Math.max(maxZ,local.z());}
             var size=part.region().size();for(int y=Math.max(0,minY>>4);y<=Math.min((size.y()-1)>>4,maxY>>4);y++)for(int z=Math.max(0,minZ>>4);z<=Math.min((size.z()-1)>>4,maxZ>>4);z++)for(int x=Math.max(0,minX>>4);x<=Math.min((size.x()-1)>>4,maxX>>4);x++)affected.add(new SectionKey(part.index(),x,y,z));
         }
-        if(job!=null&&affected.contains(job.key))discardJob();for(var key:affected){meshes.remove(key);failed.remove(key);deferred.remove(key);discardMeshing(key);}blockEntities.clear();nextWorkProbe=0;budgetSaturated=false;waitingRevision=-1;
+        if(job!=null&&affected.contains(job.key))discardJob();for(var key:affected){meshes.remove(key);failed.remove(key);deferred.remove(key);discardMeshing(key);}if(!affected.isEmpty())drawRevision++;blockEntities.clear();nextWorkProbe=0;budgetSaturated=false;waitingRevision=-1;
     }
-    /** World changes arrive on the client thread. Keep the previous complete mesh until commit. */
+
     void worldChanged(List<PlacementBounds> boxes){
         if(boxes.size()>64||layout.size()>4096){worldAllChanged();return;}
         int visited=0;boolean changed=false;
         for(var raw:boxes){
             var box=MeshRefresh.padded(raw);
             for(var part:layout.overlapping(box)){
-                // Orthogonal transforms map opposite AABB corners to the opposite local corners.
+
                 var range=MeshRefresh.sourceSections(part,box);if(range==null)continue;
                 for(int y=range.min().y();y<=range.max().y();y++)for(int z=range.min().z();z<=range.max().z();z++)for(int x=range.min().x();x<=range.max().x();x++){
                     if(++visited>8192){worldAllChanged();return;}
@@ -237,7 +242,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         }
         if(changed)wakeWorldRefresh();
     }
-    /** Runs synchronously with client world mutation, before the next projection draw. */
+
     void worldBlockChanged(BlockPos pos,BlockState actual){
         var world=new Vec3i(pos.getX(),pos.getY(),pos.getZ());
         if(!layer.contains(world))return;
@@ -256,7 +261,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                 int id=active.section.globalId(cell);var state=active.states.resolve(id);
                 if(!active.states.unresolvedState(id)){
                     boolean activeComplete=completedBlock(loaded,actual,state);active.mask.set(cell,activeComplete);active.wrong.set(cell,wrongBlock(loaded,actual,state));
-                    // A build may already have skipped this cell while it was complete.
+
                     if(!activeComplete&&active.omitted.get(cell))rebuild=true;
                 }
             }
@@ -267,13 +272,15 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private long fullWorldRefreshes,localWorldRefreshes;
     void worldAllChanged(){fullWorldRefreshes++;worldRefresh.allChanged();failed.clear();deferred.clear();wakeWorldRefresh();}
     void worldChunkUnloaded(int x,int z){
-        drawRevision++;
         if(client.level==null)return;
         var box=new PlacementBounds(new Vec3i(x<<4,client.level.getMinY(),z<<4),new Vec3i((x<<4)+15,client.level.getMaxY(),(z<<4)+15));int visited=0;
         for(var part:layout.overlapping(box)){var range=MeshRefresh.sourceSections(part,box);if(range==null)continue;
             for(int y=range.min().y();y<=range.max().y();y++)for(int sz=range.min().z();sz<=range.max().z();sz++)for(int sx=range.min().x();sx<=range.max().x();sx++){
-                if(++visited>8192){meshes.forEach((key,mesh)->mesh.wrong.clear());if(job!=null)job.wrong.clear();meshing.values().forEach(task->task.unloaded=true);return;}
-                var key=new SectionKey(part.index(),sx,y,sz);var mesh=meshes.get(key);if(mesh!=null)mesh.wrong.clear();if(job!=null&&job.key.equals(key))job.wrong.clear();var task=meshing.get(key);if(task!=null)task.unloaded=true;
+                if(++visited>8192){drawRevision++;meshes.forEach((key,mesh)->mesh.wrong.clear());if(job!=null)job.wrong.clear();meshing.values().forEach(task->task.unloaded=true);return;}
+                var key=new SectionKey(part.index(),sx,y,sz);var mesh=meshes.get(key);
+                if(mesh!=null&&!mesh.wrong.isEmpty()){mesh.wrong.clear();if(visibleSet.contains(key))drawRevision++;}
+                if(job!=null&&job.key.equals(key))job.wrong.clear();
+                var task=meshing.get(key);if(task!=null)task.unloaded=true;
             }
         }
     }
@@ -290,15 +297,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     void place(Placement next){
         layout=new PlacementLayout(next,metadata().regions());displayPalette=null;invalidate();
     }
-    /**
-     * Fixed layers: the surface shader clips every mesh to the new range at once, so nothing is rebuilt while the
-     * range keeps changing; once it has rested, one pass marks the sections whose cells or culling neighbours
-     * differ from any range seen since, and they replace their old meshes as they finish.
-     *
-     * Following the player vertically: meshes are built {@link #FOLLOW_SPAN} cells past the boundary and keep
-     * top and bottom faces in that band, so the shader can cut anywhere inside it with a capped cross-section.
-     * Only when the boundary nears the edge of the built band is the band recentred and rebuilt.
-     */
+
     void layer(LayerRange next){layer(next,false);}
     void layer(LayerRange next,boolean follow){
         var before=layer;int beforeAxis=capAxis;long beforeLo=capLo,beforeHi=capHi;
@@ -308,7 +307,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         boolean smooth=follow&&next.axis()==LayerRange.Axis.Y&&(next.mode()==LayerRange.Mode.ABOVE||next.mode()==LayerRange.Mode.BELOW);
         boolean wasSmooth=capAxis>=0;semantic=next;
         if(smooth!=wasSmooth||smooth&&layer.mode()!=next.mode()){
-            // Entering, leaving or flipping a followed layer changes every section: refresh all, keep old meshes.
+
             layer=smooth?followRange(next):next;caps(smooth);unsettledLayers.clear();unsettledOverflow=false;
             worldRefresh.allChanged();failed.clear();deferred.clear();wakeWorldRefresh();return;
         }
@@ -327,7 +326,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         return next.mode()==LayerRange.Mode.ABOVE?new LayerRange(next.axis(),(int)Math.max(Integer.MIN_VALUE+1L,(long)next.min()-FOLLOW_SPAN),Integer.MAX_VALUE)
             :new LayerRange(next.axis(),Integer.MIN_VALUE,(int)Math.min(Integer.MAX_VALUE-1L,(long)next.max()+FOLLOW_SPAN));
     }
-    /** The built band must hold one cell beyond the boundary (interpolated eye) and no more than two spans of slack. */
+
     private static boolean followCovers(LayerRange built,LayerRange next){
         if(built.mode()!=next.mode()||built.axis()!=next.axis())return false;
         return next.mode()==LayerRange.Mode.ABOVE?(long)built.min()<=(long)next.min()-1&&(long)built.min()>=(long)next.min()-2L*FOLLOW_SPAN
@@ -338,7 +337,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         capAxis=layer.axis().ordinal();
         if(layer.mode()==LayerRange.Mode.ABOVE){capLo=layer.min();capHi=(long)layer.min()+2L*FOLLOW_SPAN+2;}else{capHi=layer.max();capLo=(long)layer.max()-2L*FOLLOW_SPAN-2;}
     }
-    /** Continuous visible slab along {@code axis}, set every frame; meshes may hold more cells than it shows. */
+
     void visualClip(int axis,double from,double to,double fade){clipAxis=axis;clipFrom=from;clipTo=to;clipFade=fade;}
     private void settleLayer(){
         if(unsettledLayers.isEmpty()&&!unsettledOverflow||System.nanoTime()-layerChangedAt<LAYER_SETTLE_NANOS)return;
@@ -357,15 +356,13 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     boolean visible(){return visible;}
     void suspend(){discardJob();discardMeshing();frameReady=false;resourcesVisible=false;if(!resources.distanceOrdered())meshes.forEach((key,mesh)->mesh.resources().priority(RenderResources.COLD));entities.suspend();}
     void invalidate(){
-        discardJob();discardMeshing();palettes.clear();layerRevision++;meshes.close();worldRefresh.clear();editedSections.close();candidates=List.of();candidateSet=Set.of();candidateIndex=Map.of();candidateBoxes=new double[0];candidateArena=new int[0];arenaBoxes=new double[0];candidateVisible=new boolean[0];arenaCull=new byte[0];entityCandidates=List.of();entities.invalidate();visibleKeys.clear();Arrays.fill(lightSprites,null);opaqueStates.clear();failed.clear();deferred.clear();budgetSaturated=false;visibilityDirty=true;nextWorkProbe=0;waitingRevision=-1;visibleSet.clear();queryGeneration++;resolvers.clear();blockEntities.clear();projectionWorld=null;lastCamera=null;failure="";
+        drawRevision++;
+        discardJob();discardMeshing();palettes.clear();layerRevision++;meshes.close();worldRefresh.clear();editedSections.close();candidates=List.of();candidateSet=Set.of();candidateIndex=Map.of();candidateBoxes=new double[0];groupOffsets=new int[]{0};groupMembers=new int[0];arenaBoxes=new double[0];candidateVisible.clear();arenaCull=new byte[0];entityCandidates=List.of();entities.invalidate();visibleKeys.clear();Arrays.fill(lightSprites,null);opaqueStates.clear();failed.clear();deferred.clear();budgetSaturated=false;visibilityDirty=true;nextWorkProbe=0;waitingRevision=-1;visibleSet.clear();queryGeneration++;resolvers.clear();blockEntities.clear();projectionWorld=null;lastCamera=null;failure="";
     }
     String status(){return "Partial preview (nearby only, max "+MAX_CANDIDATES+" sections) | "+phaseTimes.text()+" | "+String.format(Locale.ROOT,"mesh=%d, drawn=%d, commands-rebuilt=%d, world-full=%d, world-local=%d, built=%d, off-thread=%d (%d in flight, %.2f ms avg), pages=%d (%.1f MiB), CPU=%.1f MiB, GPU-total=%.1f MiB, queue=%d, build=%.2f ms, unsupported=%d",
         meshes.size(),drawCalls,commandRebuilds,fullWorldRefreshes,localWorldRefreshes,builtSections,meshedSections,meshing.size(),meshedSections==0?0:meshNanos/1e6/meshedSections,pages.pages(),pages.reservedBytes()/1048576.0,stream.cachedBytes()/1048576.0,resources.usedBytes()/1048576.0,stream.queuedJobs(),lastBuildNanos/1e6,resolvers.values().stream().mapToInt(StateResolver1201::unsupportedCount).sum());}
     String error(){return !failure.isEmpty()?failure:!detailsError.isEmpty()?detailsError:!entities.error().isEmpty()?entities.error():stream.error();}
-    /**
-     * Render-thread time of this renderer, per phase, over the last complete second: average and worst frame in
-     * milliseconds. Frame-time spikes can then be split into projection work and everything else.
-     */
+
     private static final class PhaseTimes {
         private final long[] total=new long[3],worst=new long[3],current=new long[3],reported=new long[6];private long second=-1;private int frames,reportedFrames;
         void add(int phase,long nanos){current[phase]+=nanos;}
@@ -385,15 +382,13 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private void prepareFrameTimed(ProjectionFrame context,boolean active){
         settleLayer();
         stream.drain();drawCalls=0;lastBuildNanos=0;frameReady=active&&visible&&client.level!=null;prefetchedThisFrame=false;frameMissingWork=false;holesExhausted=visibleRefreshExhausted=surroundingExhausted=false;
-        // Disk workers can finish between frames. Wake builds on admitted data instead of
-        // leaving a ready section idle until the fallback polling interval expires.
+
         if(decodedRevision!=stream.revision()){decodedRevision=stream.revision();nextWorkProbe=0;}
         if(!frameReady){discardJob();if(!meshing.isEmpty())discardMeshing();if(resourcesVisible&&!resources.distanceOrdered())meshes.forEach((key,mesh)->mesh.resources().priority(RenderResources.COLD));resourcesVisible=false;entities.prepare(context,List.of(),false);return;}
-        // Distance-ordered residency never reads the priority lanes: skip their bookkeeping entirely.
+
         boolean lanes=!resources.distanceOrdered(),refreshAllPriorities=lanes&&!resourcesVisible;
         boolean budgetChanged=visibilityDirty||!resourcesVisible;resourcesVisible=true;
-        // Evicted meshes stay charged until released. Paged geometry releases without GL calls, so release far more
-        // than the shared 64 per frame; otherwise fast flight fills the budget with pending deletions and leaves holes.
+
         try{resources.drain(4096,System.nanoTime()+500_000L);releaseWarned=false;}catch(RuntimeException e){if(!releaseWarned)BetterLitematicaClient.LOGGER.warn("Projection memory release will retry",e);releaseWarned=true;}
         try{
             Vec3 camera=context.camera().getPosition();distanceOrigin=camera;Vec3i local=new Vec3i(Mth.floor(camera.x),Mth.floor(camera.y),Mth.floor(camera.z));
@@ -404,11 +399,10 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                     var members=result.membership();budgetChanged=true;refreshAllPriorities=lanes;
                     failed.retainAll(members);visibilityDirty=true;nextWorkProbe=0;
                     visibleSet.retainAll(members);deferred.clear();budgetSaturated=false;
-                    drawRevision++;candidates=result.keys();candidateSet=result.membership();candidateIndex=result.indices();candidateBoxes=result.boxes();candidateArena=result.arenaOf();arenaBoxes=result.arenaBoxes();
-                    candidateVisible=new boolean[candidates.size()];for(var key:visibleSet){Integer at=candidateIndex.get(key);if(at!=null)candidateVisible[at]=true;}arenaCull=new byte[arenaBoxes.length/6];
+                    drawRevision++;candidates=result.keys();candidateSet=result.membership();candidateIndex=result.indices();candidateBoxes=result.boxes();groupOffsets=result.groupOffsets();groupMembers=result.groupMembers();arenaBoxes=result.arenaBoxes();
+                    candidateVisible.clear();for(var key:visibleSet){Integer at=candidateIndex.get(key);if(at!=null)candidateVisible.set(at);}arenaCull=new byte[arenaBoxes.length/6];
                     entityCandidates=result.entities();lastCamera=result.camera();lastRadius=radius;
-                    // Residency follows distance from the viewer. Re-sorting every resident mesh at once would stall this
-                    // frame, so distances are refreshed a slice per frame (see refreshResidency).
+
                     residencyKeys.clear();meshes.forEach((key,mesh)->residencyKeys.add(key));residencyCursor=0;
                     if(job!=null&&!members.contains(job.key))discardJob();
                 }
@@ -421,29 +415,42 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             }
             var viewMatrix=context.matrixStack().last().pose();
             if(visibilityDirty||!camera.equals(lastCullCamera)||!lastCullView.equals(viewMatrix)||!lastCullProjection.equals(context.projectionMatrix())){
+            boolean resetOrder=visibilityDirty;
             visibilityDirty=false;
-            visibleKeys.clear();boolean visibilityChanged=false,newVisibleWork=false;boolean everything=context.frustum()==null;
+            boolean visibilityChanged=false,drawVisibilityChanged=false,newVisibleWork=false;
+            boolean everything=context.frustum()==null;
             if(!everything){cullMatrix.set(context.projectionMatrix()).mul(viewMatrix);cull.set(cullMatrix,false);}
             double cx=camera.x,cy=camera.y,cz=camera.z;
-            // Whole arenas first: most are entirely outside or inside, so only boundary arenas test their sections.
-            for(int a=0;a<arenaCull.length;a++){
-                if(everything){arenaCull[a]=INSIDE;continue;}int i=a*6;
-                int result=cull.intersectAab((float)(arenaBoxes[i]-cx)-CULL_MARGIN,(float)(arenaBoxes[i+1]-cy)-CULL_MARGIN,(float)(arenaBoxes[i+2]-cz)-CULL_MARGIN,(float)(arenaBoxes[i+3]-cx)+CULL_MARGIN,(float)(arenaBoxes[i+4]-cy)+CULL_MARGIN,(float)(arenaBoxes[i+5]-cz)+CULL_MARGIN);
-                arenaCull[a]=result==org.joml.FrustumIntersection.INSIDE?INSIDE:result==org.joml.FrustumIntersection.INTERSECT?PARTIAL:OUTSIDE;
+            for(int group=0;group<arenaCull.length;group++){
+                byte state=INSIDE;
+                if(!everything){
+                    int i=group*6;
+                    int relation=cull.intersectAab((float)(arenaBoxes[i]-cx)-CULL_MARGIN,(float)(arenaBoxes[i+1]-cy)-CULL_MARGIN,(float)(arenaBoxes[i+2]-cz)-CULL_MARGIN,(float)(arenaBoxes[i+3]-cx)+CULL_MARGIN,(float)(arenaBoxes[i+4]-cy)+CULL_MARGIN,(float)(arenaBoxes[i+5]-cz)+CULL_MARGIN);
+                    state=relation==org.joml.FrustumIntersection.INSIDE?INSIDE:relation==org.joml.FrustumIntersection.INTERSECT?PARTIAL:OUTSIDE;
+                }
+                if(!resetOrder&&state!=PARTIAL&&state==arenaCull[group])continue;
+                arenaCull[group]=state;
+                for(int j=groupOffsets[group];j<groupOffsets[group+1];j++){
+                    int k=groupMembers[j],i=k*6;
+                    boolean inView=state==INSIDE||state==PARTIAL&&cull.testAab((float)(candidateBoxes[i]-cx)-CULL_MARGIN,(float)(candidateBoxes[i+1]-cy)-CULL_MARGIN,(float)(candidateBoxes[i+2]-cz)-CULL_MARGIN,(float)(candidateBoxes[i+3]-cx)+CULL_MARGIN,(float)(candidateBoxes[i+4]-cy)+CULL_MARGIN,(float)(candidateBoxes[i+5]-cz)+CULL_MARGIN);
+                    if(inView==candidateVisible.get(k))continue;
+                    var key=candidates.get(k);
+                    drawVisibilityChanged=drawVisibilityChanged||meshes.contains(key)||job!=null&&job.key.equals(key);
+                    candidateVisible.set(k,inView);
+                    if(inView){visibleSet.add(key);newVisibleWork|=needsMesh(key);}else visibleSet.remove(key);
+                    visibilityChanged=true;
+                    if(lanes&&!refreshAllPriorities){var mesh=meshes.get(key);if(mesh!=null)mesh.resources().priority(inView?RenderResources.VISIBLE:RenderResources.NEARBY);}
+                }
             }
-            for(int k=0,n=candidates.size();k<n;k++){
-                byte state=arenaCull[candidateArena[k]];int i=k*6;
-                boolean inView=state==INSIDE||state==PARTIAL&&cull.testAab((float)(candidateBoxes[i]-cx)-CULL_MARGIN,(float)(candidateBoxes[i+1]-cy)-CULL_MARGIN,(float)(candidateBoxes[i+2]-cz)-CULL_MARGIN,(float)(candidateBoxes[i+3]-cx)+CULL_MARGIN,(float)(candidateBoxes[i+4]-cy)+CULL_MARGIN,(float)(candidateBoxes[i+5]-cz)+CULL_MARGIN);
-                if(inView)visibleKeys.add(candidates.get(k));
-                if(inView==candidateVisible[k])continue;
-                candidateVisible[k]=inView;var key=candidates.get(k);if(inView){visibleSet.add(key);newVisibleWork|=needsMesh(key);}else visibleSet.remove(key);visibilityChanged=true;
-                // Camera movement normally changes only a few sections. A membership
-                // refresh or resume still updates every resident mesh, including cold ones.
-                if(lanes&&!refreshAllPriorities){var mesh=meshes.get(key);if(mesh!=null)mesh.resources().priority(inView?RenderResources.VISIBLE:RenderResources.NEARBY);}
+
+            if(resetOrder||visibilityChanged){
+                visibleKeys.clear();
+                for(int k=candidateVisible.nextSetBit(0);k>=0;k=candidateVisible.nextSetBit(k+1))visibleKeys.add(candidates.get(k));
             }
             if(visibilityChanged){
-                drawRevision++;budgetChanged=true;
-                // Camera motion alone does not create work for an already resident, current mesh.
+                if(drawVisibilityChanged)drawRevision++;
+                budgetChanged=true;
+
                 if(newVisibleWork||!deferred.isEmpty()||budgetSaturated)nextWorkProbe=0;
                 deferred.clear();budgetSaturated=false;
             }
@@ -463,18 +470,14 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         if(!frameReady||System.nanoTime()>=deadline||uploadLimit<=0)return RenderScheduler.Work.NONE;
         long started=System.nanoTime();frameUploadBytes=0;frameUploadLimit=uploadLimit;boolean progressed=false;
         try{
-            // Decoded sections wait in a short bounded queue; collect them before every attempt, not once per frame,
-            // so decoding threads never stall behind it while this frame still has budget.
+
             stream.drain();if(decodedRevision!=stream.revision()){decodedRevision=stream.revision();nextWorkProbe=0;}
-            // Off-thread builds that arrived since the last attempt are uploaded first.
+
             if(finishMeshes(deadline))progressed=true;expireMeshing();
             long workNow=System.nanoTime();boolean schedule=(job!=null||workNow>=nextWorkProbe)&&waitingRevision!=resources.revision();
             boolean missingWork=job!=null||stream.queuedJobs()>0||!meshing.isEmpty();
             if(schedule&&!prefetchedThisFrame){
-            // A mesh needs its six neighboring source sections too. Queue a bounded
-            // working set of complete neighborhoods before filling the queue with more
-            // centers; otherwise their dependencies sit behind unrelated requests.
-            // Once per frame: later attempts in the same frame only build what has arrived.
+
             prefetchedThisFrame=true;
             frameMissingWork=prefetch(visibleKeys,buildCursor,deadline,false);
             boolean warm=surroundingAllowed();
@@ -485,9 +488,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             if(schedule&&!missingWork)nextWorkProbe=Long.MAX_VALUE;
             if(schedule&&missingWork){
                 nextWorkProbe=workNow+50_000_000L;
-                // Keep the off-thread builders busy; starting a build costs no upload budget. Visible holes first,
-                // refreshing a section that is already drawn can wait. Only a section that needs the scene comes back
-                // as a render-thread job.
+
                 if(job==null&&!budgetSaturated&&!holesExhausted){job=findJob(visibleKeys,deadline,false,true);if(job==null)holesExhausted=true;}
                 if(job==null&&!budgetSaturated&&!visibleRefreshExhausted)job=findJob(visibleKeys,deadline,false,false);
                 if(job==null&&warm&&!surroundingExhausted)job=findJob(candidates,deadline,true,false);
@@ -505,7 +506,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
                 }
             }
             if(job==null&&frameUploadBytes<frameUploadLimit)frameUploadBytes+=entities.build(entityCandidates,this,scene,deadline,frameUploadLimit-frameUploadBytes);
-            // Every uploaded part is charged in full; unfinished sections resume next frame.
+
             return new RenderScheduler.Work(frameUploadBytes,progressed||frameUploadBytes>0);
         }catch(RuntimeException e){failure="Renderer paused: "+e;visible=false;frameReady=false;discardJob();discardMeshing();BetterLitematicaClient.LOGGER.error("Projection renderer failed",e);return new RenderScheduler.Work(frameUploadBytes,false);}
         finally{lastBuildNanos+=System.nanoTime()-started;}
@@ -518,13 +519,12 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         try{renderMeshes(context,context.camera().getPosition(),visibleKeys);entities.render(context,entityCandidates,opacity);}
         catch(RuntimeException e){failure="Renderer paused: "+e;visible=false;frameReady=false;discardJob();discardMeshing();BetterLitematicaClient.LOGGER.error("Projection draw failed",e);}
     }
-    // ---- Off-thread section builds -------------------------------------------------------------------------------
-    /** Render-thread record of one build in flight; world events that arrive meanwhile are replayed when it finishes. */
+
     private static final class MeshTask {
         final SectionMesher.Input input;final long worldRevision,layerRevision;BoundedTaskPool.Ticket<SectionMesher.Output> ticket;final ProjectionPages.Origin arena;final BitSet changed=new BitSet();boolean unloaded;
         MeshTask(SectionMesher.Input input,long worldRevision,long layerRevision,ProjectionPages.Origin arena){this.input=input;this.worldRevision=worldRevision;this.layerRevision=layerRevision;this.arena=arena;}
     }
-    /** An output whose GPU upload or block entity layers continue over several frames. */
+
     private static final class Finishing {
         final SectionMesher.Output out;final MeshTask task;RenderResources.Group group;final ArrayList<Part> parts=new ArrayList<>();long bytes,visibilityBytes,waitingSince;int entity,part;boolean uploaded;
         List<ProjectionScene.Part> overlaps;ProjectionBlockView view;
@@ -562,7 +562,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             result.marker=FrozenModel.capture(geometry.marker(),state,index->safeTint(state,index));return result;});
     }
     private int safeTint(BlockState state,int index){try{return geometry.tint(state,index);}catch(RuntimeException ignored){return 0xffffff;}}
-    /** Preparation is incremental and budgeted. No worker reads Minecraft's mutable model caches. */
+
     private boolean prepare(SectionMesher.Palette palette,StateResolver1201 resolver,PackedSection section,long deadline){
         if(section==null)return true;
         for(int i=0;i<section.paletteSize();i++){int id=section.paletteId(i);if((palette.flags[id]&SectionMesher.READY)==0){if(System.nanoTime()>=deadline)return false;flag(palette,resolver,id);}}
@@ -571,7 +571,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private void flag(SectionMesher.Palette palette,StateResolver1201 resolver,int id){
         BlockState state=resolver.resolve(id);short flags=SectionMesher.flags(metadata().palette().get(id),state,displays(id),resolver.unresolvedState(id));
         if((flags&SectionMesher.MODEL)!=0&&(flags&SectionMesher.SKIP)==0)try{palette.models[id]=FrozenModel.capture(geometry.model(state),state,index->safeTint(state,index));}
-        catch(RuntimeException ignored){/* Unknown/custom models use the render-thread builder. */}
+        catch(RuntimeException ignored){ }
         palette.states[id]=state;palette.flags[id]=flags;
     }
     private void lightSprites(){
@@ -582,11 +582,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             lightSprites[level]=item.pickParticleMaterial(random).sprite();
         }
     }
-    /**
-     * Starts an off-thread build once the section and every neighbour it reads are decoded: the six faces, or all
-     * twenty-six around fluids, whose surfaces sample diagonal heights. Overlapping placements need the scene and
-     * stay on the render-thread builder.
-     */
+
     private int startMeshing(SectionKey key,PackedSection center,long deadline){
         if(client.level==null)return WAITING;
         var box=bounds(key);if(scene.overlapping(new PlacementBounds(new Vec3i((int)box.minX-1,(int)box.minY-1,(int)box.minZ-1),new Vec3i((int)box.maxX,(int)box.maxY,(int)box.maxZ))).size()>1)return RENDER_THREAD;
@@ -620,7 +616,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     private void discardMeshing(){meshGeneration++;abortFinishing();for(var task:meshing.values())task.ticket.close();meshing.clear();}
     private void discardMeshing(SectionKey key){var task=meshing.remove(key);if(task==null)return;if(finishing!=null&&finishing.task==task)abortFinishing();task.ticket.close();}
     private void abortFinishing(){var current=finishing;finishing=null;if(current==null)return;current.out.free();current.task.ticket.close();if(current.group!=null)current.group.close();}
-    /** Completed outputs retain a global slot until consumed, including while waiting for GPU space. */
+
     private Finishing pollMeshed(){
         var iterator=meshing.entrySet().iterator();
         while(iterator.hasNext()){
@@ -637,7 +633,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         }
         return null;
     }
-    /** Consume ready builds incrementally; every upload part must fit the remaining frame budget. */
+
     private boolean finishMeshes(long deadline){
         boolean progressed=false;int finished=0;
         while(System.nanoTime()<deadline&&(finished==0||frameUploadBytes<frameUploadLimit)){
@@ -645,14 +641,14 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             int entityBefore=finishing.entity,partBefore=finishing.part;
             int result=finish(finishing,deadline);
             if(result==WAIT){
-                // A section that cannot finish (no room on screen, a neighbour that never decodes) must not hold up the rest.
+
                 long now=System.nanoTime();if(finishing.entity!=entityBefore||finishing.part!=partBefore)finishing.waitingSince=0;
                 else if(finishing.waitingSince==0)finishing.waitingSince=now;
                 else if(now-finishing.waitingSince>500_000_000L){deferred.add(finishing.task.input.key);result=DROPPED;}
                 if(result==WAIT)break;
             }
             var done=finishing;finishing=null;meshing.remove(done.task.input.key);
-            // Meshes own immutable cell snapshots; return staging buffers on success as well as cancellation.
+
             done.out.free();done.task.ticket.close();progressed=true;finished++;nextWorkProbe=0;
             if(result==DROPPED&&done.group!=null)done.group.close();
         }
@@ -674,12 +670,12 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             }
             f.uploaded=true;
         }
-        // Block entity layers need the render thread, one cell at a time within the frame budget.
+
         while(f.entity<f.out.entities){
             if(System.nanoTime()>=deadline)return WAIT;
             int result=entityLayers(f,f.out.entityCells[f.entity],demand,onscreen);if(result==WAIT||result==DROPPED)return result;f.entity++;
         }
-        // Replay block changes that arrived while the section was being built, exactly as worldBlockChanged would.
+
         var in=f.task.input;boolean stale=f.task.layerRevision!=layerRevision;var cells=f.out.cells.build();
         for(int cell=f.task.changed.nextSetBit(0);cell>=0;cell=f.task.changed.nextSetBit(cell+1)){
             int expected=cells.state(cell);if(expected<0)continue;var pos=cellPosition(in,cell);boolean loaded=client.level!=null&&WorldChunks.loaded(client.level,pos);
@@ -696,7 +692,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         int lx=in.localBase.x()+(cell&15),ly=in.localBase.y()+(cell>>>8),lz=in.localBase.z()+((cell>>>4)&15);
         return new BlockPos(in.ox+lx*in.exx+lz*in.ezx,in.oy+ly,in.oz+lx*in.exz+lz*in.ezz);
     }
-    /** Captures one block entity renderer into its own textured parts, owned by that cell. */
+
     private int entityLayers(Finishing f,int cell,int demand,boolean onscreen){
         var in=f.task.input;var key=in.key;var pos=cellPosition(in,cell);int id=in.sections[13].globalId(cell);var state=in.palette.states[id];
         if(f.overlaps==null){var box=bounds(key);f.overlaps=scene.overlapping(new PlacementBounds(new Vec3i((int)box.minX-1,(int)box.minY-1,(int)box.minZ-1),new Vec3i((int)box.maxX,(int)box.maxY,(int)box.maxZ)));f.view=new ProjectionBlockView(client.level,scene,f.overlaps,in.layer);}
@@ -725,19 +721,16 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         if((in.palette.flags[id]&SectionMesher.INVALID)==0)f.out.cells.record(cell,Block.getId(state));
         return NEXT;
     }
-    /**
-     * Starts off-thread builds for the next sections in {@code keys} until the workers are busy, and returns a
-     * render-thread job only for a section whose neighbours belong to another placement. Holes start from the nearest.
-     */
+
     private Job findJob(List<SectionKey> keys,long deadline,boolean surrounding,boolean holesOnly){
         int start=holesOnly?0:Math.floorMod(surrounding?surroundingCursor:buildCursor,Math.max(1,keys.size()));
         for(int visited=0;visited<keys.size();visited++){
             int at=(start+visited)%keys.size();SectionKey key=keys.get(at);
-            // Busy workers end the scan; the rare section that needs the render-thread builder waits for them too.
+
             if(System.nanoTime()>=deadline||meshing.size()>=MAX_MESHING||!SectionMesher.hasCapacity())return null;
             if(surrounding&&visibleSet.contains(key)||key.equals(coolingKey)&&System.nanoTime()<coolingUntil)continue;
             if(meshing.containsKey(key)||holesOnly&&meshes.contains(key)||!needsMesh(key)||failed.contains(key)||deferred.contains(key))continue;
-            // Under a full budget a section farther than every resident mesh would only be rejected: skip it.
+
             if(!resources.admits(sectionDistance(key)))continue;
             var section=section(key);if(section==null)continue;
             int started=startMeshing(key,section,deadline);
@@ -745,8 +738,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             if(started==WAITING||job!=null)continue;
             Job next=prepare(key,section);if(next!=null){if(surrounding)surroundingCursor=at+1;else buildCursor=at+1;return next;}
         }
-        // A completed scan found every eligible key. Do not repeat it for each scheduler attempt in this frame.
-        // Early exits for a deadline or busy workers deliberately leave the scan retryable.
+
         if(holesOnly)holesExhausted=true;else if(surrounding)surroundingExhausted=true;else visibleRefreshExhausted=true;
         return null;
     }
@@ -829,8 +821,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             if(quads.isEmpty()&&fluidVertices.size()==0&&specialModels.vertices()==0){current.cursor++;processed++;continue;}
             Vec3i relative=world.subtract(transform.apply(current.localBase));
             if(specialModels.vertices()>0){
-                // Reserve the entire block before emitting it: a budget wait must never
-                // replay an already uploaded regular face or a subset of special layers.
+
                 if(!flushPart())return;
                 var layers=specialModels.layers().entrySet().stream().filter(e->e.getValue().size()>0).toList();
                 int regular=(quads.size()*4+fluidVertices.size())*24,offset=regular>0?1:0;
@@ -852,8 +843,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             Mesh mesh=new Mesh(List.copyOf(job.parts),Math.max(128,job.bytes+job.visibilityBytes+cells.estimatedBytes()+1792),bounds(job.key),job.resources,job.worldRevision,job.mask,job.wrong,cells,job.omitted);
             boolean onscreen=visibleSet.contains(job.key);
             var old=meshes.get(job.key);boolean room=old==null||(onscreen?meshes.canReplaceProtecting(job.key,mesh.bytes(),visibleSet):meshes.canReplaceWithoutEviction(job.key,mesh.bytes()));
-            // Admission is established before detaching the old complete value. Replacement is
-            // synchronous on the render thread; no frame can see the cache between remove/put.
+
             if(old!=null&&room)meshes.remove(job.key);
             boolean admitted=room&&(onscreen?meshes.tryPutProtecting(job.key,mesh,visibleSet):meshes.tryPutWithoutEviction(job.key,mesh));
             if(!admitted){mesh.close();deferred.add(job.key);if(onscreen)budgetSaturated=true;}
@@ -861,11 +851,11 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
             builtSections++;job=null;drawRevision++;
         }
     }
-    /** Admission is established before detaching the old complete value; replacement never leaves a frame without either. */
+
     private boolean admit(SectionKey key,Mesh mesh){
         boolean onscreen=visibleSet.contains(key);
         var old=meshes.get(key);boolean room=old==null||(onscreen?meshes.canReplaceProtecting(key,mesh.bytes(),visibleSet):meshes.canReplaceWithoutEviction(key,mesh.bytes()));
-        // Replacement is synchronous on the render thread; no frame can see the cache between remove/put.
+
         if(old!=null&&room)meshes.remove(key);
         boolean admitted=room&&(onscreen?meshes.tryPutProtecting(key,mesh,visibleSet):meshes.tryPutWithoutEviction(key,mesh));
         if(!admitted){mesh.close();deferred.add(key);if(onscreen)budgetSaturated=true;return false;}
@@ -904,10 +894,9 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         return neighbor.isSolidRender();
     }
     private boolean cull(Job current,int x,int y,int z,Vec3i world,BlockState state,Direction side){
-        // The usual single-placement, full-height path needs only local palette data.
-        // Avoid six temporary world positions for every source block in a huge schematic.
+
         Vec3i neighborPosition=null;
-        // Inside a followed band every cut must be capped, so faces along the layer axis are never culled there.
+
         if(capAxis>=0&&side.getAxis().ordinal()==capAxis){int c=capAxis==0?world.x():capAxis==1?world.y():world.z();if(c>=capLo&&c<=capHi)return false;}
         if(layer.mode()!=LayerRange.Mode.ALL||current.overlaps.size()>1){neighborPosition=world.add(new Vec3i(side.getStepX(),side.getStepY(),side.getStepZ()));if(!layer.contains(neighborPosition))return false;}
         BlockState neighbor;
@@ -920,8 +909,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         int level=state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LEVEL);
         var sprite=lightSprites[level];
         if(sprite==null){var item=new net.minecraft.client.renderer.item.ItemStackRenderState();client.getItemModelResolver().updateForTopItem(item,LightProjectionMarker.stack(state),net.minecraft.world.item.ItemDisplayContext.GUI,client.level,null,0);sprite=item.pickParticleMaterial(random).sprite();lightSprites[level]=sprite;}
-        // Four coincident centers; alpha=0 tags a marker and RG encodes view-space corners.
-        // The vertex shader expands the quad towards the camera without rebuilding its mesh.
+
         for(int vertex=0;vertex<4;vertex++){
             boolean right=vertex==1||vertex==2,top=vertex>=2;
             builder.vertex(position.x()+0.5,position.y()+0.5,position.z()+0.5)
@@ -931,7 +919,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
     }
     private void emit(BakedQuad quad,BlockState state,Vec3i position){
         int tint=0xffffff;var material=quad.materialInfo();
-        if(material.isTinted())try{tint=client.getBlockColors().getTintSource(state,material.tintIndex()).color(state);}catch(RuntimeException ignored){/* Context-sensitive tint: neutral fallback in preview. */}
+        if(material.isTinted())try{tint=client.getBlockColors().getTintSource(state,material.tintIndex()).color(state);}catch(RuntimeException ignored){ }
         float shade=ProjectionModels.shade(quad);
         for(int vertex=0;vertex<4;vertex++){var at=quad.position(vertex);long uv=quad.packedUV(vertex);builder.vertex(position.x()+at.x(),position.y()+at.y(),position.z()+at.z()).uv(net.minecraft.client.model.geom.builders.UVPair.unpackU(uv),net.minecraft.client.model.geom.builders.UVPair.unpackV(uv)).color(((tint>>>16)&255)/255f*shade,((tint>>>8)&255)/255f*shade,(tint&255)/255f*shade,1f);}
     }
@@ -939,7 +927,7 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         try{boolean onscreen=visibleSet.contains(job.key);var result=job.resources.reserve(sizes,onscreen?RenderResources.VISIBLE:RenderResources.NEARBY);if(result==null){if(!onscreen){discardJob();waitingRevision=-1;nextWorkProbe=0;}else waitingRevision=resources.revision();}return result;}
         catch(IllegalArgumentException e){failed.add(job.key);failure="区段模型超过资源预算";discardJob();return null;}
     }
-    /** The rare overlapping/custom-model path keeps atomic, section-relative private buffers. */
+
     private void upload(RenderResources.Lease lease,int bytes,net.minecraft.resources.Identifier texture,boolean intensity){
         short[] owners=ownership.build(bytes/24);var visibility=new QuadVisibility.Part(owners);
         for(short cell:owners)if(cell>=0){int id=job.section.globalId(cell);var state=job.states.resolve(id);if(!job.states.unresolvedState(id))job.cells.record(cell,Block.getId(state));}
@@ -952,14 +940,18 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         var leases=reserve(new int[]{bytes});if(leases==null)return false;
         upload(leases.get(0),bytes,TextureAtlas.LOCATION_BLOCKS,false);job.vertices=0;return true;
     }
-    /** Parts with their own texture (block entity layers) draw one by one after the paged geometry. */
+
     private record Special(Vec3i base,Part part,QuadVisibility.Mask mask,QuadVisibility.Mask wrong){}
     private final ArrayList<Special> specials=new ArrayList<>();
+    private Job drawnJob;
+    private int drawnJobParts;
+    private long drawnJobMask,drawnJobWrong;
+    private final Matrix4f inverseView=new Matrix4f();
     private Vec3i worldBase(SectionKey key){return layout.part(key.region()).transform().apply(localBase(key));}
     private int visibilityCheckSection,visibilityCheckCell;
     private long visibilityChecks,visibilityRepairs;
     private SectionKey visibilityCheckKey;
-    /** Repair missed/bulk world notifications without rebuilding geometry or traversing the whole projection. */
+
     private void recheckVisibleMasks(Vec3 camera,List<SectionKey> keys){
         if(keys.isEmpty()||client.level==null)return;
         long deadline=System.nanoTime()+200_000L;boolean redraw=false,rebuild=false;
@@ -987,25 +979,25 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         recheckVisibleMasks(camera,visibleKeys);
         var view=context.matrixStack().last().pose();
         ProjectionClip.configure(view,camera.x,camera.y,camera.z,clipAxis,clipFrom,clipTo,clipFade);
-        if(job!=null||cachedDrawRevision!=drawRevision){
+        if(cachedDrawRevision!=drawRevision||drawnJob!=job||job!=null&&(drawnJobParts!=job.parts.size()||drawnJobMask!=job.mask.revision()||drawnJobWrong!=job.wrong.revision())){
         pages.beginFrame();specials.clear();commandRebuilds++;
         for(SectionKey key:visibleKeys){
             Mesh mesh=meshes.get(key);List<Part> parts=mesh!=null?mesh.parts:job!=null&&job.key.equals(key)?job.parts:List.of();if(parts.isEmpty())continue;
             var mask=mesh!=null?mesh.mask:job.mask;var wrong=mesh!=null?mesh.wrong:job.wrong;
-            for(Part part:parts){
+            for(int partIndex=0;partIndex<parts.size();partIndex++){var part=parts.get(partIndex);
                 var slice=part.slice();if(slice==null){specials.add(new Special(worldBase(key),part,mask,wrong));continue;}
                 var visibility=part.visibility();
                 if(wrong.isEmpty()){
                     if(mask.isEmpty()||visibility.fullyVisible(mask))pages.add(slice,0,slice.vertices/4,false);
                     else for(int i=0,n=visibility.rangeCount(mask);i<n;i++)pages.add(slice,visibility.firstQuad(i),visibility.quadCount(i),false);
                 }else{
-                    // Read each group right after counting it: the visibility caches one split at a time.
+
                     for(int i=0,n=visibility.rangeCount(mask,wrong,false);i<n;i++)pages.add(slice,visibility.firstQuad(i),visibility.quadCount(i),false);
                     for(int i=0,n=visibility.rangeCount(mask,wrong,true);i<n;i++)pages.add(slice,visibility.firstQuad(i),visibility.quadCount(i),true);
                 }
             }
         }
-        cachedDrawRevision=drawRevision;
+        cachedDrawRevision=drawRevision;drawnJob=job;if(job!=null){drawnJobParts=job.parts.size();drawnJobMask=job.mask.revision();drawnJobWrong=job.wrong.revision();}
         }
         if(!pages.queued()&&specials.isEmpty())return;
         drawCalls+=pages.draw(view,context.projectionMatrix(),camera.x,camera.y,camera.z,opacity);
@@ -1016,7 +1008,8 @@ final class ProjectionRenderer1201 implements AutoCloseable,RenderScheduler.Work
         }
     }
     private void discardJob(){
-        if(job!=null)drawRevision++;
+        if(job!=null||drawnJob!=null)drawRevision++;
+        drawnJob=null;
         if(builder.building())builder.end().close();builder.clear();ownership.clear();
         if(job!=null){job.resources.close();job=null;}
     }

@@ -12,7 +12,6 @@ import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Own visibility as a unit; the existing workers and draw passes consume compact output. */
 @Mixin(WorldRenderer.class)
 public abstract class TerrainVisibilityGraphMixin {
     @Shadow private BuiltChunkStorage chunks;
@@ -39,11 +38,10 @@ public abstract class TerrainVisibilityGraphMixin {
         if(sx!=cameraChunkX||sy!=cameraChunkY||sz!=cameraChunkZ){
 
             cameraChunkX=sx;cameraChunkY=sy;cameraChunkZ=sz;chunks.updateCameraPosition(net.minecraft.util.math.ChunkSectionPos.from(camera.getCameraPos()));worldBorderRendering.markBuffersDirty();
+            betterlitematica$traversal.storageMoved();
         }
         chunkBuilder.setCameraPosition(camera.getCameraPos());
-        // Completed data is read directly; no old background-graph mailbox accumulates references.
 
-        // Captured-frustum debug mode freezes visibility, not the storage/camera lifecycle.
         if(capturedFrustum!=null)return;
         boolean culling=client.chunkCullingEnabled;
         if(spectator&&world.getBlockState(camera.getBlockPos()).isOpaqueFullCube())culling=false;

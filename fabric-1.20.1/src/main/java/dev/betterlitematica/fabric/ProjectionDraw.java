@@ -7,7 +7,6 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL14;
 
-/** Render-thread scratch only. The caller's VAO and shared sequential EBO remain bound. */
 final class ProjectionDraw {
     private static final IntBuffer COUNTS=BufferUtils.createIntBuffer(4096);
     private static final PointerBuffer OFFSETS=BufferUtils.createPointerBuffer(4096);

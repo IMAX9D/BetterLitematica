@@ -8,7 +8,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.*;
 import net.minecraft.network.chat.Component;
 
-/** Keep widget coordinates and editor policy independent of native input event records. */
 final class UiEvents {
     static final KeyEvent NONE=new KeyEvent(0,0,0);
     private UiEvents() {}

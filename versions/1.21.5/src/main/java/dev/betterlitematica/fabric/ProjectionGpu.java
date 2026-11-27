@@ -13,7 +13,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
 
-/** A bounded vertex allocation; sequential indices remain owned and shared by Minecraft. */
 final class ProjectionGpu implements AutoCloseable {
     private final GpuBuffer vertices;
     private final VertexFormat.DrawMode mode;
@@ -21,7 +20,7 @@ final class ProjectionGpu implements AutoCloseable {
     private ProjectionGpu(GpuBuffer vertices,VertexFormat.DrawMode mode,int indices){this.vertices=vertices;this.mode=mode;this.indices=indices;}
     static ProjectionGpu upload(BuiltBuffer source){
         try(source){var parameters=source.getDrawParameters();
-            // Shared index growth writes GPU memory, which must happen before any render pass opens.
+
             RenderSystem.getSequentialBuffer(parameters.mode()).getIndexBuffer(parameters.indexCount());
             return new ProjectionGpu(RenderSystem.getDevice().createBuffer(()->"BetterLitematica projection",BufferType.VERTICES,BufferUsage.STATIC_WRITE,source.getBuffer()),parameters.mode(),parameters.indexCount());
         }

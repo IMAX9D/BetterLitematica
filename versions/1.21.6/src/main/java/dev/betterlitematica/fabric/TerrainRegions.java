@@ -9,8 +9,6 @@ import org.lwjgl.system.MemoryUtil;
 import java.nio.*;
 import java.util.*;
 
-/** Shared native terrain pages through the game's GPU API. Absolute 32-bit indices permit
- * suballocations on backends whose indexed draw API has no base-vertex argument. No GL casts. */
 public final class TerrainRegions {
     public static final TerrainRegions INSTANCE=new TerrainRegions();
     public record Origin(int x,int y,int z){}
